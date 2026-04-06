@@ -1,0 +1,1804 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Зарплата">
+<meta name="theme-color" content="#0d0f14">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230d0f14'/><text y='.9em' font-size='72' x='12'>💰</text></svg>">
+<title>Зарплата</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+
+/* ── THEME VARS ── */
+:root{
+  --bg:#0d0f14;--surface:#161920;--surface2:#1e2230;--border:#2a2f42;
+  --accent:#4ade80;--accent2:#22d3ee;--accent3:#f472b6;
+  --text:#f0f2ff;--muted:#6b7280;--danger:#f87171;--warn:#fbbf24;
+  --card-shadow:0 4px 24px rgba(0,0,0,.4);
+}
+body.light{
+  --bg:#f0f2f5;--surface:#ffffff;--surface2:#f5f7fa;--border:#e2e6ef;
+  --text:#111827;--muted:#9ca3af;--card-shadow:0 2px 12px rgba(0,0,0,.08);
+}
+
+body{
+  font-family:'Manrope',sans-serif;background:var(--bg);color:var(--text);
+  min-height:100vh;padding-bottom:calc(50px + env(safe-area-inset-bottom));
+  overflow-x:hidden;transition:background .3s,color .3s;
+}
+
+/* ── HEADER ── */
+.header{
+  padding:52px 20px 14px;
+  padding-top:calc(52px + env(safe-area-inset-top));
+  display:flex;justify-content:space-between;align-items:flex-end;
+}
+.header-left{}
+.header-label{font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--accent);margin-bottom:4px}
+.header h1{font-size:26px;font-weight:800;line-height:1.2;color:var(--text)}
+.header-actions{display:flex;gap:8px;align-items:center;padding-bottom:4px}
+.icon-btn{
+  width:36px;height:36px;border-radius:10px;border:1px solid var(--border);
+  background:var(--surface);display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:17px;transition:all .15s;flex-shrink:0;
+}
+.icon-btn:active{transform:scale(.9);background:var(--surface2)}
+
+/* ── PERIOD CARD ── */
+.period-card{
+  margin:10px 16px 12px;
+  background:var(--surface);
+  border:1px solid var(--border);border-radius:20px;padding:16px 18px;
+  position:relative;overflow:hidden;box-shadow:var(--card-shadow);
+}
+.period-card::before{
+  content:'';position:absolute;top:-40px;right:-40px;width:130px;height:130px;
+  background:radial-gradient(circle,rgba(34,211,238,.1) 0%,transparent 70%);pointer-events:none;
+}
+.period-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.period-title{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent2);opacity:.9}
+.period-badge{font-size:11px;font-weight:700;background:rgba(34,211,238,.12);color:var(--accent2);border:1px solid rgba(34,211,238,.25);border-radius:20px;padding:3px 10px}
+.period-selectors{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.sel-group{display:flex;flex-direction:column;gap:4px}
+.sel-label{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.sel-wrap{background:var(--surface2);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.sel-wrap select{font-family:'Manrope',sans-serif;font-size:14px;font-weight:700;color:var(--text);background:transparent;border:none;outline:none;width:100%;padding:10px 12px;-webkit-appearance:none;cursor:pointer}
+.sel-wrap select option{background:#1e2230;color:#f0f2ff}
+.paydate-box{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:11px 14px}
+.paydate-row{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.paydate-period-name{font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px}
+.paydate-period-range{font-size:11px;color:var(--muted)}
+.paydate-right{text-align:right;flex-shrink:0}
+.paydate-label{font-size:10px;color:var(--muted);margin-bottom:2px;font-weight:600}
+.paydate-date{font-size:18px;font-weight:800;color:var(--accent2);letter-spacing:-.5px}
+.paydate-note{font-size:10px;color:var(--warn);margin-top:5px}
+.paydate-note.hidden{display:none}
+.days-badge{display:inline-block;margin-top:7px;font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px}
+.days-badge.soon{background:rgba(251,191,36,.12);color:var(--warn);border:1px solid rgba(251,191,36,.25)}
+.days-badge.past{background:rgba(107,114,128,.12);color:var(--muted);border:1px solid rgba(107,114,128,.2)}
+.days-badge.today{background:rgba(74,222,128,.12);color:var(--accent);border:1px solid rgba(74,222,128,.3)}
+
+/* ── PERIOD COUNTDOWN ── */
+.period-countdown{
+  display:flex;gap:6px;margin-top:10px;
+}
+.countdown-pill{
+  flex:1;background:var(--surface2);border:1px solid var(--border);
+  border-radius:12px;padding:8px 10px;text-align:center;
+}
+.countdown-pill .cp-val{font-size:20px;font-weight:800;color:var(--text);line-height:1}
+.countdown-pill .cp-lbl{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-top:2px}
+.countdown-pill.urgent .cp-val{color:var(--danger)}
+.countdown-pill.warn .cp-val{color:var(--warn)}
+.countdown-pill.ok .cp-val{color:var(--accent)}
+
+/* ── GOALS CARD ── */
+.goals-card{
+  margin:0 16px 12px;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:20px;padding:16px 18px;box-shadow:var(--card-shadow);
+  position:relative;overflow:hidden;
+}
+.goals-card::before{
+  content:'';position:absolute;top:-40px;right:-40px;width:130px;height:130px;
+  background:radial-gradient(circle,rgba(244,114,182,.08) 0%,transparent 70%);pointer-events:none;
+}
+.goals-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.goals-title{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent3);opacity:.9}
+.goals-edit-btn{
+  font-size:11px;font-weight:700;color:var(--muted);
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:8px;padding:4px 10px;cursor:pointer;transition:all .15s;
+}
+.goals-edit-btn:active{color:var(--accent3);border-color:var(--accent3)}
+
+.goal-row{margin-bottom:12px}
+.goal-row:last-child{margin-bottom:0}
+.goal-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+.goal-name{font-size:13px;font-weight:700;color:var(--text)}
+.goal-nums{font-size:12px;color:var(--muted)}
+.goal-nums strong{font-weight:800}
+.goal-bar-bg{height:8px;background:var(--surface2);border-radius:4px;overflow:hidden;border:1px solid var(--border)}
+.goal-bar-fill{height:100%;border-radius:4px;transition:width .5s cubic-bezier(.4,0,.2,1);min-width:0}
+.goal-bar-fill.low{background:linear-gradient(90deg,var(--danger),#fb923c)}
+.goal-bar-fill.mid{background:linear-gradient(90deg,var(--warn),#facc15)}
+.goal-bar-fill.high{background:linear-gradient(90deg,var(--accent),#86efac)}
+.goal-bar-fill.done{background:linear-gradient(90deg,var(--accent2),var(--accent))}
+.goal-note{font-size:11px;color:var(--muted);margin-top:4px}
+.goal-note.fire{color:var(--accent)}
+.goal-note.warn{color:var(--warn)}
+.goal-note.danger{color:var(--danger)}
+
+/* goal modal */
+.goal-inputs{display:flex;flex-direction:column;gap:10px;margin-bottom:4px}
+.goal-input-row{display:flex;align-items:center;gap:10px}
+.goal-input-label{font-size:13px;font-weight:700;color:var(--text);min-width:80px}
+
+/* ── TOTAL CARD ── */
+.total-card{
+  margin:0 16px 12px;
+  background:linear-gradient(135deg,#1a3a2a 0%,#1a2a3a 100%);
+  border:1px solid #2d4a38;border-radius:20px;padding:18px 20px;
+  position:relative;overflow:hidden;box-shadow:var(--card-shadow);
+}
+body.light .total-card{background:linear-gradient(135deg,#e8faf0 0%,#e8f4ff 100%);border-color:#b6e6cc}
+.total-card::before{content:'';position:absolute;top:-30px;right:-30px;width:120px;height:120px;background:radial-gradient(circle,rgba(74,222,128,.15) 0%,transparent 70%);pointer-events:none}
+.total-label{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent);opacity:.8;margin-bottom:5px}
+.total-amount{font-size:40px;font-weight:800;color:var(--accent);letter-spacing:-1px}
+.total-amount span{font-size:20px;font-weight:600;opacity:.7}
+.total-meta{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.meta-item{background:rgba(255,255,255,.07);border-radius:10px;padding:4px 10px;font-size:11px;color:var(--muted)}
+body.light .meta-item{background:rgba(0,0,0,.05)}
+.meta-item strong{color:var(--text);font-weight:700}
+
+/* compare badge */
+.compare-badge{
+  display:inline-flex;align-items:center;gap:4px;
+  margin-top:6px;font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;
+}
+.compare-badge.up{background:rgba(74,222,128,.1);color:var(--accent);border:1px solid rgba(74,222,128,.2)}
+.compare-badge.down{background:rgba(248,113,113,.1);color:var(--danger);border:1px solid rgba(248,113,113,.2)}
+.compare-badge.same{background:rgba(107,114,128,.1);color:var(--muted);border:1px solid rgba(107,114,128,.2)}
+
+/* ── CHART ── */
+.chart-wrap{margin:0 16px 12px;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:14px 16px;box-shadow:var(--card-shadow)}
+.chart-title{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
+.chart-bars{display:flex;align-items:flex-end;gap:4px;height:60px}
+.chart-bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
+.chart-bar{width:100%;border-radius:5px 5px 0 0;background:var(--border);transition:all .3s;min-height:3px}
+.chart-bar.active{background:var(--accent)}
+.chart-bar.has-data{background:rgba(74,222,128,.4)}
+.chart-bar.active.has-data{background:var(--accent)}
+.chart-bar-lbl{font-size:8px;font-weight:700;color:var(--muted)}
+.chart-bar-wrap.active .chart-bar-lbl{color:var(--accent)}
+.chart-stats{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}
+.chart-stat{flex:1;background:var(--surface2);border-radius:10px;padding:8px 10px;min-width:80px}
+.chart-stat-label{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
+.chart-stat-val{font-size:14px;font-weight:800;color:var(--text)}
+
+/* ── TAX TOGGLE ── */
+.tax-row{
+  display:flex;align-items:center;justify-content:space-between;
+  margin:0 16px 12px;background:var(--surface);border-radius:14px;
+  padding:12px 16px;border:1px solid var(--border);box-shadow:var(--card-shadow);
+}
+.tax-info{display:flex;flex-direction:column;gap:2px}
+.tax-title{font-size:14px;font-weight:600}
+.tax-sub{font-size:11px;color:var(--muted)}
+.toggle{width:48px;height:28px;background:var(--border);border-radius:14px;position:relative;cursor:pointer;transition:background .2s;flex-shrink:0}
+.toggle.on{background:var(--accent)}
+.toggle::after{content:'';position:absolute;top:3px;left:3px;width:22px;height:22px;background:white;border-radius:50%;transition:transform .2s;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.toggle.on::after{transform:translateX(20px)}
+
+/* ── SECTION ── */
+.section{margin:0 16px 14px}
+.section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.section-title{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
+
+/* ── DAY STRIP ── */
+.day-strip-wrap{margin:0 16px 12px}
+.day-strip-label{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.day-strip{display:flex;gap:5px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.day-strip::-webkit-scrollbar{display:none}
+.day-btn{
+  flex-shrink:0;width:46px;min-height:58px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  cursor:pointer;transition:all .15s;position:relative;
+}
+.day-btn:active{transform:scale(.93)}
+.day-btn.active{background:rgba(74,222,128,.1);border-color:var(--accent)}
+.day-btn.has-data .day-dot{opacity:1}
+.day-dot{position:absolute;top:4px;right:4px;width:6px;height:6px;background:var(--accent);border-radius:50%;opacity:0;transition:opacity .2s}
+.day-btn .day-num{font-size:15px;font-weight:800;color:var(--text)}
+.day-btn .day-dow{font-size:9px;font-weight:600;color:var(--muted);text-transform:uppercase}
+.day-btn .day-sum{font-size:8px;font-weight:700;color:var(--accent);margin-top:1px;opacity:0;transition:opacity .2s;max-width:42px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
+.day-btn.has-data .day-sum{opacity:1}
+.day-btn.active .day-num{color:var(--accent)}
+.day-btn.active .day-dow{color:var(--accent);opacity:.7}
+.day-btn.weekend .day-dow{color:var(--danger);opacity:.7}
+.day-btn.today-mark{border-color:var(--accent2)}
+.day-btn.today-mark .day-dow{color:var(--accent2)}
+
+/* ── DAY PANEL ── */
+.day-panel{
+  margin:0 16px 12px;background:var(--surface);border:1px solid var(--border);
+  border-radius:18px;overflow:hidden;box-shadow:var(--card-shadow);
+}
+.day-panel-header{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:12px 14px;border-bottom:1px solid var(--border);
+}
+.day-panel-left{display:flex;align-items:center;gap:10px}
+.day-panel-title{font-size:15px;font-weight:800;color:var(--text)}
+.day-panel-sum{font-size:15px;font-weight:800;color:var(--accent2)}
+.copy-day-btn{
+  font-size:11px;font-weight:700;color:var(--muted);
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:8px;padding:4px 9px;cursor:pointer;transition:all .15s;white-space:nowrap;
+}
+.copy-day-btn:active{color:var(--accent2);border-color:var(--accent2)}
+.day-works{padding:6px 10px}
+/* swipe-delete row */
+.dw-outer{position:relative;overflow:hidden;border-radius:10px;margin-bottom:2px}
+.dw-delete-bg{
+  position:absolute;right:0;top:0;bottom:0;width:70px;
+  background:var(--danger);display:flex;align-items:center;justify-content:center;
+  font-size:18px;border-radius:0 10px 10px 0;
+}
+.day-work-row{
+  display:flex;align-items:center;gap:6px;
+  padding:6px 4px;border-bottom:1px solid rgba(255,255,255,.04);
+  background:var(--surface);
+  position:relative;touch-action:pan-y;
+  transition:transform .2s;
+}
+.day-work-row:last-child{border-bottom:none}
+.dw-name{
+  font-family:'Manrope',sans-serif;font-size:14px;font-weight:600;color:var(--text);
+  background:transparent;border:none;outline:none;flex:1;min-width:0;
+}
+.dw-name::placeholder{color:var(--muted);font-weight:500}
+.dw-qty-wrap,.dw-price-wrap{
+  display:flex;align-items:center;background:var(--surface2);
+  border:1px solid var(--border);border-radius:9px;padding:0 7px;transition:border-color .15s;
+}
+.dw-qty-wrap{width:66px}.dw-price-wrap{width:84px}
+.dw-qty-wrap:focus-within,.dw-price-wrap:focus-within{border-color:var(--accent)}
+.dw-qty-wrap input,.dw-price-wrap input{
+  font-family:'Manrope',sans-serif;font-size:14px;font-weight:700;color:var(--text);
+  background:transparent;border:none;outline:none;width:100%;padding:8px 0;text-align:center;
+}
+.dw-qty-wrap input::placeholder,.dw-price-wrap input::placeholder{color:var(--border);font-size:11px}
+.dw-suffix{font-size:10px;font-weight:700;color:var(--muted);white-space:nowrap}
+.dw-del{
+  width:26px;height:26px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.15);
+  border-radius:7px;color:var(--danger);font-size:14px;display:flex;align-items:center;
+  justify-content:center;cursor:pointer;flex-shrink:0;transition:all .15s;
+}
+.dw-del:active{background:rgba(248,113,113,.22);transform:scale(.9)}
+/* ── MOTIVATION BLOCK ── */
+.motivation-block{
+  margin:0 12px 10px;
+  background:linear-gradient(135deg,rgba(244,114,182,.08) 0%,rgba(34,211,238,.06) 100%);
+  border:1px solid rgba(244,114,182,.2);
+  border-radius:14px;padding:12px 14px;
+}
+.motivation-quote{
+  font-size:13px;font-weight:700;color:var(--text);line-height:1.4;margin-bottom:10px;
+}
+.motivation-target{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.motivation-pill{
+  display:flex;align-items:center;gap:5px;
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:10px;padding:5px 10px;font-size:11px;font-weight:700;
+}
+.motivation-pill .mp-count{font-size:15px;font-weight:800;color:var(--accent3)}
+.motivation-pill .mp-label{color:var(--muted)}
+.motivation-need{font-size:11px;color:var(--muted);margin-top:4px}
+.motivation-need strong{color:var(--warn);font-weight:800}
+.motivation-done{font-size:13px;font-weight:800;color:var(--accent);display:flex;align-items:center;gap:6px}
+
+/* ── SHIFT TRACKER ── */
+.shift-block{
+  margin:0 12px 10px;
+  background:linear-gradient(135deg,rgba(34,211,238,.07) 0%,rgba(74,222,128,.05) 100%);
+  border:1px solid rgba(34,211,238,.2);
+  border-radius:14px;padding:12px 14px;
+}
+.shift-title{
+  font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
+  color:var(--accent2);margin-bottom:10px;
+}
+/* template selector chips inside shift block */
+.shift-tpl-row{
+  display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;
+}
+.shift-tpl-chip{
+  font-size:12px;font-weight:700;
+  background:var(--surface2);border:1.5px solid var(--border);
+  border-radius:20px;padding:5px 12px;cursor:pointer;transition:all .15s;
+  color:var(--muted);white-space:nowrap;display:flex;align-items:center;gap:5px;
+}
+.shift-tpl-chip.selected{
+  background:rgba(34,211,238,.12);border-color:var(--accent2);color:var(--accent2);
+}
+.shift-tpl-chip .chip-check{font-size:11px}
+.shift-tpl-chip:active{transform:scale(.95)}
+.shift-tpl-hint{font-size:11px;color:var(--muted);margin-bottom:10px}
+
+/* time + units row */
+.shift-stats{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.shift-stat-pill{
+  flex:1;min-width:80px;
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:12px;padding:10px 10px;text-align:center;
+}
+.shift-stat-pill .ssp-val{font-size:20px;font-weight:800;line-height:1}
+.shift-stat-pill .ssp-lbl{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-top:3px}
+.shift-stat-pill.urgent .ssp-val{color:var(--danger)}
+.shift-stat-pill.warn .ssp-val{color:var(--warn)}
+.shift-stat-pill.ok .ssp-val{color:var(--accent)}
+.shift-stat-pill.done .ssp-val{color:var(--accent2)}
+
+/* progress bar for shift */
+.shift-progress-bg{height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;margin-bottom:6px;border:1px solid var(--border)}
+.shift-progress-fill{height:100%;border-radius:3px;transition:width .4s ease}
+.shift-progress-fill.low{background:linear-gradient(90deg,var(--danger),#fb923c)}
+.shift-progress-fill.mid{background:linear-gradient(90deg,var(--warn),#facc15)}
+.shift-progress-fill.high{background:linear-gradient(90deg,var(--accent),#86efac)}
+
+.shift-note{font-size:11px;color:var(--muted);text-align:center}
+
+/* shift template rows */
+.stri-list{display:flex;flex-direction:column;gap:6px}
+.shift-tpl-row-item{
+  display:flex;justify-content:space-between;align-items:center;
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:11px;padding:10px 12px;gap:8px;
+}
+.stri-left{flex:1;min-width:0}
+.stri-name{font-size:14px;font-weight:700;color:var(--text);margin-bottom:2px}
+.stri-price{font-size:10px;color:var(--muted);font-weight:600}
+.stri-right{display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex-shrink:0}
+.stri-count{font-size:24px;font-weight:800;line-height:1}
+.stri-count.ok{color:var(--accent)}
+.stri-count.warn{color:var(--warn)}
+.stri-count.urgent{color:var(--danger)}
+.stri-lbl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.stri-made{font-size:10px;color:var(--muted);margin-top:2px}
+.stri-badge{font-size:12px;font-weight:800;padding:4px 10px;border-radius:20px}
+.stri-badge.done{background:rgba(74,222,128,.12);color:var(--accent);border:1px solid rgba(74,222,128,.25)}
+
+.add-work-btn{
+  width:100%;display:flex;align-items:center;justify-content:center;gap:6px;
+  padding:11px;background:transparent;border:none;border-top:1px solid var(--border);
+  color:var(--muted);font-family:'Manrope',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;
+}
+.add-work-btn:active{color:var(--accent)}
+
+/* ── TEMPLATES ── */
+.templates-section{margin:0 16px 12px}
+.templates-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.tpl-list{display:flex;gap:6px;flex-wrap:wrap}
+.tpl-chip{
+  display:flex;align-items:center;gap:6px;
+  background:var(--surface);border:1px solid var(--border);border-radius:20px;
+  padding:6px 12px;cursor:pointer;transition:all .15s;font-size:12px;font-weight:600;color:var(--text);
+}
+.tpl-chip:active{background:rgba(74,222,128,.1);border-color:var(--accent);transform:scale(.96)}
+.tpl-chip .tpl-price{font-size:10px;color:var(--muted)}
+.tpl-chip .tpl-del{color:var(--muted);font-size:12px;margin-left:2px}
+.tpl-empty{font-size:12px;color:var(--muted)}
+
+/* ── ADD BTN ── */
+.add-btn{
+  width:100%;display:flex;align-items:center;justify-content:center;gap:8px;
+  padding:13px;background:transparent;border:1.5px dashed var(--border);
+  border-radius:16px;color:var(--muted);font-family:'Manrope',sans-serif;
+  font-size:14px;font-weight:600;cursor:pointer;transition:all .15s;
+}
+.add-btn:active{border-color:var(--accent);color:var(--accent);background:rgba(74,222,128,.05)}
+
+/* ── BONUS ── */
+.bonus-item{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:12px;margin-bottom:8px;animation:slideIn .2s ease;box-shadow:var(--card-shadow)}
+.bonus-row{display:flex;align-items:center;gap:8px}
+.bonus-name{font-family:'Manrope',sans-serif;font-size:14px;font-weight:700;color:var(--text);background:transparent;border:none;outline:none;flex:1;min-width:0}
+.bonus-name::placeholder{color:var(--muted);font-weight:500}
+.bonus-input-wrap{display:flex;align-items:center;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:0 10px;transition:border-color .15s;width:110px;flex-shrink:0}
+.bonus-input-wrap:focus-within{border-color:var(--accent3)}
+.bonus-input-wrap input{font-family:'Manrope',sans-serif;font-size:15px;font-weight:700;color:var(--text);background:transparent;border:none;outline:none;width:100%;padding:9px 0;text-align:right}
+
+/* ── HISTORY ── */
+.history-wrap{margin:0 16px 12px}
+.history-cards{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.history-cards::-webkit-scrollbar{display:none}
+.hist-card{
+  flex-shrink:0;width:120px;background:var(--surface);border:1px solid var(--border);
+  border-radius:14px;padding:12px;cursor:pointer;transition:all .15s;
+}
+.hist-card:active{transform:scale(.95)}
+.hist-card.current{border-color:var(--accent2)}
+.hist-month{font-size:11px;font-weight:700;color:var(--muted);margin-bottom:2px}
+.hist-period{font-size:10px;color:var(--muted);margin-bottom:6px}
+.hist-total{font-size:16px;font-weight:800;color:var(--accent)}
+.hist-empty{font-size:11px;color:var(--muted);margin-top:2px}
+
+/* ── BREAKDOWN ── */
+.breakdown{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:var(--card-shadow)}
+.breakdown-row{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px}
+.breakdown-row:last-child{border-bottom:none}
+.breakdown-row .lbl{color:var(--muted)}
+.breakdown-row .val{font-weight:700}
+.breakdown-row.total-row{background:rgba(74,222,128,.05)}
+.breakdown-row.total-row .lbl{color:var(--text);font-weight:700}
+.breakdown-row.total-row .val{color:var(--accent);font-size:15px}
+.breakdown-row.tax-r .val{color:var(--danger)}
+.breakdown-row.bonus-r .val{color:var(--accent3)}
+.empty{text-align:center;padding:22px;color:var(--muted);font-size:13px}
+
+/* ── RESET ── */
+.reset-btn{
+  width:calc(100% - 32px);margin:10px 16px 0;padding:14px;
+  background:rgba(248,113,113,.07);border:1px solid rgba(248,113,113,.2);
+  border-radius:16px;color:var(--danger);font-family:'Manrope',sans-serif;
+  font-size:14px;font-weight:700;cursor:pointer;transition:all .15s;
+}
+.reset-btn:active{background:rgba(248,113,113,.15);transform:scale(.98)}
+
+/* ── MODAL (templates / copy) ── */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;
+  display:flex;align-items:flex-end;justify-content:center;
+  opacity:0;pointer-events:none;transition:opacity .25s;
+}
+.modal-overlay.open{opacity:1;pointer-events:all}
+.modal{
+  width:100%;max-width:500px;background:var(--surface);border-radius:24px 24px 0 0;
+  padding:16px 20px calc(32px + env(safe-area-inset-bottom));
+  transform:translateY(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);
+  max-height:80vh;overflow-y:auto;
+}
+.modal-overlay.open .modal{transform:translateY(0)}
+.modal-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px}
+.modal-title{font-size:17px;font-weight:800;margin-bottom:16px}
+.modal-input-row{display:flex;gap:8px;margin-bottom:12px}
+.modal-input{
+  font-family:'Manrope',sans-serif;font-size:15px;font-weight:600;color:var(--text);
+  background:var(--surface2);border:1px solid var(--border);border-radius:12px;
+  padding:12px 14px;outline:none;transition:border-color .15s;flex:1;
+}
+.modal-input:focus{border-color:var(--accent)}
+.modal-input::placeholder{color:var(--muted);font-weight:500}
+.modal-btn{
+  padding:12px 18px;background:var(--accent);color:#0d1a0f;
+  font-family:'Manrope',sans-serif;font-size:14px;font-weight:800;
+  border:none;border-radius:12px;cursor:pointer;white-space:nowrap;transition:all .15s;
+}
+.modal-btn:active{transform:scale(.96)}
+.modal-list{display:flex;flex-direction:column;gap:8px}
+.modal-tpl-row{
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--surface2);border-radius:12px;padding:12px 14px;cursor:pointer;transition:all .15s;
+}
+.modal-tpl-row:active{background:rgba(74,222,128,.1)}
+.modal-tpl-name{font-size:14px;font-weight:700}
+.modal-tpl-price{font-size:12px;color:var(--muted);margin-top:2px}
+.modal-tpl-del{color:var(--muted);font-size:18px;padding:4px;cursor:pointer}
+
+/* copy day modal */
+.copy-day-list{display:flex;flex-direction:column;gap:6px}
+.copy-day-row{
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--surface2);border-radius:12px;padding:12px 14px;cursor:pointer;transition:all .15s;
+}
+.copy-day-row:active{background:rgba(34,211,238,.1)}
+.copy-day-info .copy-day-name{font-size:14px;font-weight:700}
+.copy-day-info .copy-day-works{font-size:11px;color:var(--muted);margin-top:2px}
+.copy-day-sum{font-size:14px;font-weight:800;color:var(--accent2)}
+
+@keyframes slideIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <div class="header-label">Калькулятор</div>
+    <h1>Сдельная<br>зарплата</h1>
+  </div>
+  <div class="header-actions">
+    <div class="icon-btn" onclick="toggleTheme()" title="Тема" id="themeBtn">🌙</div>
+  </div>
+</div>
+
+<!-- PERIOD CARD -->
+<div class="period-card">
+  <div class="period-header">
+    <div class="period-title">Расчётный период</div>
+    <div class="period-badge" id="periodBadge">—</div>
+  </div>
+  <div class="period-selectors">
+    <div class="sel-group">
+      <div class="sel-label">Месяц</div>
+      <div class="sel-wrap"><select id="monthSel" onchange="onPeriodChange()"></select></div>
+    </div>
+    <div class="sel-group">
+      <div class="sel-label">Период</div>
+      <div class="sel-wrap">
+        <select id="periodSel" onchange="onPeriodChange()">
+          <option value="1">1–15 (аванс)</option>
+          <option value="2">16–31 (зарплата)</option>
+        </select>
+      </div>
+    </div>
+  </div>
+  <div class="paydate-box">
+    <div class="paydate-row">
+      <div>
+        <div class="paydate-period-name" id="pdName">—</div>
+        <div class="paydate-period-range" id="pdRange">—</div>
+      </div>
+      <div class="paydate-right">
+        <div class="paydate-label">Дата выплаты</div>
+        <div class="paydate-date" id="pdDate">—</div>
+      </div>
+    </div>
+    <div class="paydate-note hidden" id="pdNote">⚠ Перенесено с выходного или праздника</div>
+    <div id="pdBadge"></div>
+    <!-- COUNTDOWN -->
+    <div class="period-countdown" id="periodCountdown"></div>
+  </div>
+</div>
+
+<!-- GOALS CARD -->
+<div class="goals-card" id="goalsCard">
+  <div class="goals-header">
+    <div class="goals-title">🎯 Цели и прогресс</div>
+    <div class="goals-edit-btn" onclick="openGoalsModal()">Изменить</div>
+  </div>
+  <div id="goalsBody"></div>
+</div>
+
+<!-- TOTAL CARD -->
+<div class="total-card">
+  <div class="total-label">Итого к получению</div>
+  <div class="total-amount" id="totalDisplay">0 <span>₽</span></div>
+  <div class="total-meta" id="totalMeta"></div>
+  <div id="compareBadge"></div>
+</div>
+
+<!-- CHART -->
+<div class="chart-wrap" id="chartWrap" style="display:none">
+  <div class="chart-title">По дням периода</div>
+  <div class="chart-bars" id="chartBars"></div>
+  <div class="chart-stats" id="chartStats"></div>
+</div>
+
+<!-- TAX -->
+<div class="tax-row">
+  <div class="tax-info">
+    <div class="tax-title">Вычесть НДФЛ</div>
+    <div class="tax-sub">13% подоходный налог</div>
+  </div>
+  <div class="toggle" id="taxToggle" onclick="toggleTax()"></div>
+</div>
+
+<!-- DAY STRIP -->
+<div class="day-strip-wrap">
+  <div class="day-strip-label">Выбери день</div>
+  <div class="day-strip" id="dayStrip"></div>
+</div>
+
+<!-- DAY PANEL -->
+<div class="day-panel" id="dayPanel" style="display:none">
+  <div class="day-panel-header">
+    <div class="day-panel-left">
+      <div class="day-panel-title" id="dpTitle">—</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="copy-day-btn" onclick="openCopyModal()">📋 Копировать с дня</div>
+      <div class="day-panel-sum" id="dpSum"></div>
+    </div>
+  </div>
+  <div class="day-works" id="dayWorks"></div>
+  <div id="dayShiftTracker"></div>
+  <div id="dayMotivation"></div>
+  <button class="add-work-btn" onclick="addWork()">
+    <span style="font-size:18px;line-height:1">+</span> Добавить работу
+  </button>
+</div>
+
+<!-- TEMPLATES -->
+<div class="templates-section">
+  <div class="templates-header">
+    <div class="section-title">Шаблоны работ</div>
+    <div class="copy-day-btn" onclick="openTplModal()">+ Создать</div>
+  </div>
+  <div class="tpl-list" id="tplList"></div>
+</div>
+
+<!-- BONUSES -->
+<div class="section">
+  <div class="section-header"><div class="section-title">Доплаты и вычеты</div></div>
+  <div id="bonusList"></div>
+  <button class="add-btn" onclick="addBonus()">
+    <span style="font-size:20px;line-height:1">+</span> Добавить доплату / вычет
+  </button>
+</div>
+
+<!-- HISTORY -->
+<div class="history-wrap">
+  <div class="section-title" style="margin-bottom:8px">История периодов</div>
+  <div class="history-cards" id="historyCards"></div>
+</div>
+
+<!-- BREAKDOWN -->
+<div class="section">
+  <div class="section-header"><div class="section-title">Итоговая разбивка</div></div>
+  <div class="breakdown" id="breakdown"></div>
+</div>
+
+<button class="reset-btn" onclick="resetAll()">🗑 Сбросить период</button>
+
+<!-- TEMPLATE MODAL -->
+<div class="modal-overlay" id="tplModal" onclick="closeTplModal(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Шаблоны работ</div>
+    <div class="modal-input-row">
+      <input class="modal-input" id="tplNameIn" placeholder="Название работы" type="text">
+      <input class="modal-input" id="tplPriceIn" placeholder="Ставка ₽" type="number" inputmode="decimal" style="max-width:110px">
+      <button class="modal-btn" onclick="saveTpl()">+</button>
+    </div>
+    <div class="modal-list" id="tplModalList"></div>
+  </div>
+</div>
+
+<!-- COPY DAY MODAL -->
+<div class="modal-overlay" id="copyModal" onclick="closeCopyModal(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Копировать работы с дня</div>
+    <div class="copy-day-list" id="copyDayList"></div>
+  </div>
+</div>
+
+<!-- GOALS MODAL -->
+<div class="modal-overlay" id="goalsModal" onclick="closeGoalsModal(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">🎯 Мои цели</div>
+    <div class="goal-inputs">
+      <div class="goal-input-row">
+        <div class="goal-input-label">За период</div>
+        <div class="modal-input-row" style="margin:0;flex:1">
+          <input class="modal-input" id="goalPeriodIn" placeholder="например 30 000" type="number" inputmode="decimal">
+          <span style="font-size:14px;font-weight:700;color:var(--muted);white-space:nowrap;padding:0 4px">₽</span>
+        </div>
+      </div>
+      <div class="goal-input-row">
+        <div class="goal-input-label">За неделю</div>
+        <div class="modal-input-row" style="margin:0;flex:1">
+          <input class="modal-input" id="goalWeekIn" placeholder="например 15 000" type="number" inputmode="decimal">
+          <span style="font-size:14px;font-weight:700;color:var(--muted);white-space:nowrap;padding:0 4px">₽</span>
+        </div>
+      </div>
+      <div class="goal-input-row">
+        <div class="goal-input-label">За месяц</div>
+        <div class="modal-input-row" style="margin:0;flex:1">
+          <input class="modal-input" id="goalMonthIn" placeholder="например 60 000" type="number" inputmode="decimal">
+          <span style="font-size:14px;font-weight:700;color:var(--muted);white-space:nowrap;padding:0 4px">₽</span>
+        </div>
+      </div>
+    </div>
+    <button class="modal-btn" style="width:100%;margin-top:14px" onclick="saveGoals()">Сохранить</button>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════
+let days={}, bonuses=[], taxEnabled=false, selectedDay=null;
+let templates=[]; // [{id,name,price}]
+let lightTheme=false;
+let goals={period:0,week:0,month:0}; // plan targets in ₽
+let selectedShiftTpls=new Set(); // IDs of templates active in shift tracker
+
+// ══════════════════════════════════════════════
+//  HOLIDAYS
+// ══════════════════════════════════════════════
+const HOLIDAYS=new Set([
+  '2025-01-01','2025-01-02','2025-01-03','2025-01-06','2025-01-07','2025-01-08',
+  '2025-02-24','2025-03-10','2025-05-01','2025-05-02','2025-05-08','2025-05-09',
+  '2025-06-12','2025-06-13','2025-11-03','2025-11-04','2025-12-31',
+  '2026-01-01','2026-01-02','2026-01-07','2026-01-08','2026-01-09',
+  '2026-02-23','2026-03-09','2026-05-01','2026-05-11','2026-06-12','2026-11-04',
+]);
+function isNonWorking(d){const dow=d.getDay(),key=d.toISOString().slice(0,10);return dow===0||dow===6||HOLIDAYS.has(key)}
+function adjustPayDate(date){let d=new Date(date),shifted=false;while(isNonWorking(d)){d.setDate(d.getDate()-1);shifted=true}return{date:d,shifted}}
+
+// ══════════════════════════════════════════════
+//  CONSTANTS
+// ══════════════════════════════════════════════
+const MN=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+const MG=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+const MS=['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+const DOW=['вс','пн','вт','ср','чт','пт','сб'];
+
+// ══════════════════════════════════════════════
+//  HAPTICS
+// ══════════════════════════════════════════════
+function haptic(type='light'){
+  try{
+    if(window.navigator&&window.navigator.vibrate){
+      window.navigator.vibrate(type==='heavy'?[10,5,10]:type==='medium'?10:5);
+    }
+  }catch(e){}
+}
+
+// ══════════════════════════════════════════════
+//  THEME
+// ══════════════════════════════════════════════
+function toggleTheme(){
+  lightTheme=!lightTheme;
+  document.body.classList.toggle('light',lightTheme);
+  document.getElementById('themeBtn').textContent=lightTheme?'🌙':'☀️';
+  try{localStorage.setItem('salary_theme',lightTheme?'light':'dark')}catch(e){}
+}
+function loadTheme(){
+  try{
+    const t=localStorage.getItem('salary_theme');
+    if(t==='light'){lightTheme=true;document.body.classList.add('light');document.getElementById('themeBtn').textContent='🌙'}
+    else{document.getElementById('themeBtn').textContent='☀️'}
+  }catch(e){}
+}
+
+// ══════════════════════════════════════════════
+//  MONTH INIT
+// ══════════════════════════════════════════════
+function initMonths(){
+  const sel=document.getElementById('monthSel');
+  const now=new Date(),cy=now.getFullYear(),cm=now.getMonth();
+  for(let d=-3;d<=3;d++){
+    let m=cm+d,y=cy;
+    if(m<0){m+=12;y--}if(m>11){m-=12;y++}
+    const o=document.createElement('option');
+    o.value=`${y}-${m}`;o.textContent=`${MN[m]} ${y}`;
+    if(d===0)o.selected=true;sel.appendChild(o);
+  }
+}
+
+// ══════════════════════════════════════════════
+//  PERIOD HELPERS
+// ══════════════════════════════════════════════
+function getPeriod(){
+  const[year,month]=document.getElementById('monthSel').value.split('-').map(Number);
+  const period=parseInt(document.getElementById('periodSel').value);
+  const startDay=period===1?1:16;
+  const endDay=period===1?15:new Date(year,month+1,0).getDate();
+  return{year,month,period,startDay,endDay};
+}
+function saveKey(){const{year,month,period}=getPeriod();return`salary_${year}_${month}_${period}`}
+function save(){
+  try{
+    localStorage.setItem(saveKey(),JSON.stringify({days,bonuses,taxEnabled}));
+    renderHistory();
+  }catch(e){}
+}
+function load(){
+  try{
+    const raw=localStorage.getItem(saveKey());
+    if(!raw){days={};bonuses=[];taxEnabled=false;return}
+    const data=JSON.parse(raw);
+    days=data.days||{};bonuses=data.bonuses||[];taxEnabled=!!data.taxEnabled;
+    document.getElementById('taxToggle').classList.toggle('on',taxEnabled);
+  }catch(e){days={};bonuses=[];taxEnabled=false}
+}
+
+function onPeriodChange(){
+  selectedDay=null;load();
+  renderPeriodCard();renderDayStrip();renderDayPanel();renderBonuses();
+  renderTotal();renderChart();renderBreakdown();renderHistory();renderGoals();
+}
+
+// ══════════════════════════════════════════════
+//  GOALS
+// ══════════════════════════════════════════════
+function loadGoals(){try{goals=JSON.parse(localStorage.getItem('salary_goals')||'{"period":0,"week":0,"month":0}')}catch(e){goals={period:0,week:0,month:0}}}
+function saveGoals(){
+  goals.period=parseFloat(document.getElementById('goalPeriodIn').value)||0;
+  goals.week=parseFloat(document.getElementById('goalWeekIn').value)||0;
+  goals.month=parseFloat(document.getElementById('goalMonthIn').value)||0;
+  try{localStorage.setItem('salary_goals',JSON.stringify(goals))}catch(e){}
+  haptic('light');
+  document.getElementById('goalsModal').classList.remove('open');
+  renderGoals();renderDayMotivation();renderShiftTracker();
+}
+function openGoalsModal(){
+  document.getElementById('goalPeriodIn').value=goals.period||'';
+  document.getElementById('goalWeekIn').value=goals.week||'';
+  document.getElementById('goalMonthIn').value=goals.month||'';
+  document.getElementById('goalsModal').classList.add('open');
+}
+function closeGoalsModal(e){if(e.target===document.getElementById('goalsModal'))document.getElementById('goalsModal').classList.remove('open')}
+
+function renderGoals(){
+  const card=document.getElementById('goalsCard');
+  const body=document.getElementById('goalsBody');
+  const hasAnyGoal=goals.period>0||goals.week>0||goals.month>0;
+  // Use calcTotal() so НДФЛ already applied if toggled
+  const earned=calcTotal();
+  const taxMult=taxEnabled?0.87:1;
+
+  if(!hasAnyGoal){
+    body.innerHTML=`<div style="text-align:center;padding:8px 0 4px;font-size:13px;color:var(--muted)">
+      Нажми «Изменить» и поставь цель — это мотивирует 💪
+    </div>`;
+    return;
+  }
+
+  // --- period goal ---
+  const {year,month,startDay,endDay}=getPeriod();
+  const today=new Date();today.setHours(0,0,0,0);
+  const isCurrentPeriod=today.getFullYear()===year&&today.getMonth()===month&&today.getDate()>=startDay&&today.getDate()<=endDay;
+  const totalDays=endDay-startDay+1;
+
+  // working days left in period (rough: exclude weekends)
+  let daysLeft=0, workDaysLeft=0, workDaysTotal=0;
+  for(let d=startDay;d<=endDay;d++){
+    const dt=new Date(year,month,d);
+    const isWE=dt.getDay()===0||dt.getDay()===6;
+    if(!isWE)workDaysTotal++;
+    if(isCurrentPeriod&&d>today.getDate()){
+      daysLeft++;
+      if(!isWE)workDaysLeft++;
+    }
+  }
+  const calDaysLeft=isCurrentPeriod?endDay-today.getDate():0;
+
+  let html='';
+
+  if(goals.period>0){
+    const pct=Math.min(earned/goals.period,1);
+    const left=Math.max(goals.period-earned,0);
+    const cls=pct>=1?'done':pct>=0.7?'high':pct>=0.4?'mid':'low';
+    const barW=Math.round(pct*100);
+    let note='',noteCls='';
+    if(pct>=1){note='🎉 Цель достигнута! Отличная работа!';noteCls='fire'}
+    else if(isCurrentPeriod&&workDaysLeft>0){
+      const needPerDay=left/workDaysLeft;
+      note=`Осталось ${fmt(left)} ₽ · нужно зарабатывать ${fmt(needPerDay)} ₽/день`;
+      noteCls=needPerDay>earned/Math.max(workDaysTotal-workDaysLeft,1)*1.3?'danger':'warn';
+    } else if(!isCurrentPeriod){note=`Заработано ${fmt(earned)} ₽ из ${fmt(goals.period)} ₽`}
+    html+=goalRowHtml('За период',earned,goals.period,barW,cls,note,noteCls);
+  }
+
+  if(goals.week>0&&isCurrentPeriod){
+    // earned this week (Mon–Sun), applying tax multiplier per day
+    const dow=today.getDay()===0?6:today.getDay()-1; // 0=Mon
+    let weekEarned=0;
+    for(let d=today.getDate()-dow;d<=today.getDate();d++){
+      if(d>=startDay&&d<=endDay)weekEarned+=daySum(d)*taxMult;
+    }
+    const daysLeftInWeek=6-dow;
+    const pct=Math.min(weekEarned/goals.week,1);
+    const barW=Math.round(pct*100);
+    const cls=pct>=1?'done':pct>=0.7?'high':pct>=0.4?'mid':'low';
+    const left=Math.max(goals.week-weekEarned,0);
+    let note='',noteCls='';
+    if(pct>=1){note='🔥 Недельная цель выполнена!';noteCls='fire'}
+    else if(daysLeftInWeek>0){note=`Осталось ${fmt(left)} ₽ · нужно ${fmt(left/daysLeftInWeek)} ₽/день`;noteCls=pct<0.3?'danger':'warn'}
+    else{note=`На этой неделе ${fmt(weekEarned)} ₽ из ${fmt(goals.week)} ₽`;noteCls=pct<0.5?'danger':'warn'}
+    html+=goalRowHtml('За неделю',weekEarned,goals.week,barW,cls,note,noteCls);
+  }
+
+  if(goals.month>0){
+    // sum both periods of this month, applying tax
+    const{period}=getPeriod();
+    let monthEarned=earned;
+    const otherPeriod=period===1?2:1;
+    const otherKey=`salary_${year}_${month}_${otherPeriod}`;
+    try{
+      const raw=localStorage.getItem(otherKey);
+      if(raw){
+        const d2=JSON.parse(raw);
+        const b2=[].concat.apply([],Object.values(d2.days||{})).reduce((s,w)=>s+(parseFloat(w.qty)||0)*(parseFloat(w.price)||0),0);
+        const bon2=(d2.bonuses||[]).reduce((s,b)=>s+(parseFloat(b.amount)||0),0);
+        // apply same tax setting to the other period
+        const otherTax=!!d2.taxEnabled;
+        monthEarned+=(b2+bon2)*(otherTax?0.87:1);
+      }
+    }catch(e){}
+    const pct=Math.min(monthEarned/goals.month,1);
+    const barW=Math.round(pct*100);
+    const cls=pct>=1?'done':pct>=0.7?'high':pct>=0.4?'mid':'low';
+    const left=Math.max(goals.month-monthEarned,0);
+    let note='',noteCls='';
+    if(pct>=1){note='🏆 Месячная цель достигнута!';noteCls='fire'}
+    else{
+      const lastDay=new Date(year,month+1,0).getDate();
+      const calLeft=isCurrentPeriod?lastDay-today.getDate():0;
+      if(calLeft>0){note=`До конца месяца нужно ещё ${fmt(left)} ₽`;noteCls=pct<0.3?'danger':'warn'}
+      else{note=`${fmt(monthEarned)} ₽ из ${fmt(goals.month)} ₽ за месяц`;noteCls='warn'}
+    }
+    html+=goalRowHtml('За месяц',monthEarned,goals.month,barW,cls,note,noteCls);
+  }
+
+  body.innerHTML=html;
+}
+
+function goalRowHtml(name,earned,goal,barW,cls,note,noteCls){
+  const noteHtml = note ? '<div class="goal-note ' + noteCls + '">' + note + '</div>' : '';
+  return '<div class="goal-row">'
+    + '<div class="goal-top">'
+    + '<span class="goal-name">' + name + '</span>'
+    + '<span class="goal-nums">' + fmt(earned) + ' <strong style="color:var(--text)">/ ' + fmt(goal) + ' \u20bd</strong></span>'
+    + '</div>'
+    + '<div class="goal-bar-bg"><div class="goal-bar-fill ' + cls + '" style="width:' + barW + '%"></div></div>'
+    + noteHtml
+    + '</div>';
+}
+
+// ══════════════════════════════════════════════
+//  PERIOD CARD
+// ══════════════════════════════════════════════
+function getPeriodInfo(){
+  const{year,month,period,endDay}=getPeriod();
+  let payRaw,periodName,periodRange,badgeText;
+  if(period===1){payRaw=new Date(year,month,22);periodName='Аванс';periodRange=`1–15 ${MG[month]} ${year}`;badgeText='Аванс'}
+  else{payRaw=new Date(year,month+1,7);periodName='Зарплата';periodRange=`16–${endDay} ${MG[month]} ${year}`;badgeText='Зарплата'}
+  const{date:payDate,shifted}=adjustPayDate(payRaw);
+  const today=new Date();today.setHours(0,0,0,0);
+  const diffDays=Math.round((payDate-today)/86400000);
+  return{payDate,shifted,periodName,periodRange,badgeText,diffDays};
+}
+function renderPeriodCard(){
+  const{payDate,shifted,periodName,periodRange,badgeText,diffDays}=getPeriodInfo();
+  document.getElementById('periodBadge').textContent=badgeText;
+  document.getElementById('pdName').textContent=periodName;
+  document.getElementById('pdRange').textContent=periodRange;
+  document.getElementById('pdDate').textContent=`${payDate.getDate()} ${MG[payDate.getMonth()]} (${DOW[payDate.getDay()]})`;
+  document.getElementById('pdNote').classList.toggle('hidden',!shifted);
+  const badge=document.getElementById('pdBadge');
+  if(diffDays<0)badge.innerHTML=`<span class="days-badge past">Выплачено ${Math.abs(diffDays)} ${pl(Math.abs(diffDays))} назад</span>`;
+  else if(diffDays===0)badge.innerHTML=`<span class="days-badge today">🎉 Сегодня день выплаты!</span>`;
+  else if(diffDays<=7)badge.innerHTML=`<span class="days-badge soon">⏳ Через ${diffDays} ${pl(diffDays)}</span>`;
+  else badge.innerHTML=`<span class="days-badge past">Через ${diffDays} ${pl(diffDays)}</span>`;
+
+  // ── COUNTDOWN: days left in period ──
+  renderCountdown();
+}
+function pl(n){if(n%10===1&&n%100!==11)return'день';if([2,3,4].includes(n%10)&&![12,13,14].includes(n%100))return'дня';return'дней'}
+
+function renderCountdown(){
+  const{year,month,startDay,endDay}=getPeriod();
+  const today=new Date();today.setHours(0,0,0,0);
+  const el=document.getElementById('periodCountdown');
+
+  // Is today inside this period?
+  const isInPeriod=today.getFullYear()===year&&today.getMonth()===month
+    &&today.getDate()>=startDay&&today.getDate()<=endDay;
+
+  if(!isInPeriod){el.innerHTML='';return}
+
+  const calLeft=endDay-today.getDate(); // calendar days left (not counting today)
+  let workLeft=0,workTotal=0;
+  for(let d=startDay;d<=endDay;d++){
+    const dt=new Date(year,month,d);
+    const isWE=dt.getDay()===0||dt.getDay()===6;
+    if(!isWE){workTotal++;if(d>today.getDate())workLeft++}
+  }
+  const totalDays=endDay-startDay+1;
+  const passedDays=today.getDate()-startDay+1;
+  const progressPct=Math.round(passedDays/totalDays*100);
+
+  const calCls=calLeft<=2?'urgent':calLeft<=5?'warn':'ok';
+  const workCls=workLeft<=1?'urgent':workLeft<=3?'warn':'ok';
+
+  el.innerHTML=`
+    <div class="countdown-pill ${calCls}">
+      <div class="cp-val">${calLeft}</div>
+      <div class="cp-lbl">кал. дней</div>
+    </div>
+    <div class="countdown-pill ${workCls}">
+      <div class="cp-val">${workLeft}</div>
+      <div class="cp-lbl">раб. дней</div>
+    </div>
+    <div class="countdown-pill ok">
+      <div class="cp-val">${progressPct}%</div>
+      <div class="cp-lbl">прошло</div>
+    </div>
+  `;
+}
+
+// ══════════════════════════════════════════════
+//  DAY STRIP
+// ══════════════════════════════════════════════
+function daySum(d){return(days[d]||[]).reduce((s,w)=>s+(parseFloat(w.qty)||0)*(parseFloat(w.price)||0),0)}
+
+function renderDayStrip(){
+  const{year,month,startDay,endDay}=getPeriod();
+  const today=new Date();
+  const strip=document.getElementById('dayStrip');
+  strip.innerHTML='';
+  for(let d=startDay;d<=endDay;d++){
+    const date=new Date(year,month,d);
+    const dow=date.getDay();
+    const isWE=dow===0||dow===6;
+    const isToday=today.getFullYear()===year&&today.getMonth()===month&&today.getDate()===d;
+    const sum=daySum(d);
+    const hasData=sum>0;
+    const isActive=selectedDay===d;
+    const btn=document.createElement('div');
+    btn.className='day-btn'+(isActive?' active':'')+(isWE?' weekend':'')+(isToday?' today-mark':'')+(hasData?' has-data':'');
+    const sumStr=hasData?fmtShort(sum):'';
+    btn.innerHTML=`<div class="day-dot"></div><span class="day-num">${d}</span><span class="day-dow">${DOW[dow]}</span><span class="day-sum">${sumStr}</span>`;
+    btn.onclick=()=>selectDay(d);
+    strip.appendChild(btn);
+  }
+  if(selectedDay!==null){
+    const idx=selectedDay-startDay;
+    const btn=strip.children[idx];
+    if(btn)setTimeout(()=>btn.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'}),50);
+  }
+}
+function fmtShort(n){
+  n=Math.round(n);
+  if(n>=1000)return(n/1000).toFixed(n%1000===0?0:1)+'к';
+  return n.toString();
+}
+
+function selectDay(d){
+  haptic('light');
+  selectedDay=d;
+  if(!days[d])days[d]=[];
+  renderDayStrip();renderDayPanel();renderChart();
+}
+
+// ══════════════════════════════════════════════
+//  DAY PANEL
+// ══════════════════════════════════════════════
+function renderDayPanel(){
+  const panel=document.getElementById('dayPanel');
+  if(selectedDay===null){panel.style.display='none';return}
+  panel.style.display='';
+  const{month,year}=getPeriod();
+  const date=new Date(year,month,selectedDay);
+  document.getElementById('dpTitle').textContent=`${selectedDay} ${MG[month]}, ${DOW[date.getDay()]}`;
+  const sum=daySum(selectedDay);
+  document.getElementById('dpSum').textContent=sum>0?fmt(sum)+' ₽':'';
+  const works=days[selectedDay]||[];
+  const container=document.getElementById('dayWorks');
+  if(!works.length){
+    container.innerHTML='<div class="empty" style="padding:14px 4px;font-size:12px">Нет работ — нажми «+» ниже</div>';
+  } else {
+    container.innerHTML=works.map(w=>`
+      <div class="day-work-row">
+        <input class="dw-name" type="text" placeholder="Вид работы" value="${esc(w.name)}"
+          oninput="updateWork(${selectedDay},${w.id},'name',this.value)">
+        <div class="dw-qty-wrap">
+          <input type="number" inputmode="decimal" placeholder="кол" value="${w.qty}"
+            oninput="updateWork(${selectedDay},${w.id},'qty',this.value)">
+          <span class="dw-suffix">шт</span>
+        </div>
+        <div class="dw-price-wrap">
+          <input type="number" inputmode="decimal" placeholder="ставка" value="${w.price}"
+            oninput="updateWork(${selectedDay},${w.id},'price',this.value)">
+          <span class="dw-suffix">₽</span>
+        </div>
+        <div class="dw-del" onclick="delWork(${selectedDay},${w.id})">✕</div>
+      </div>`).join('');
+  }
+  renderShiftTracker();
+  renderDayMotivation();
+}
+
+// ══════════════════════════════════════════════
+//  SHIFT TRACKER  (20:00 → 08:00, 12 hours)
+// ══════════════════════════════════════════════
+const SHIFT_START_H = 20; // 20:00
+const SHIFT_END_H   = 8;  // 08:00 next day
+const SHIFT_DURATION_MIN = 12 * 60; // 720 min
+
+let selectedShiftTplOld = null; // unused, kept for compat
+let shiftTimerInterval = null;
+
+// Returns minutes remaining in shift from now
+// Shift: 20:00 today → 08:00 tomorrow
+function shiftMinutesLeft() {
+  const now = new Date();
+  const h = now.getHours(), m = now.getMinutes();
+  const nowMin = h * 60 + m;
+  const startMin = SHIFT_START_H * 60; // 1200
+  const endMin   = SHIFT_END_H   * 60; // 480 (next day)
+
+  // During shift: 20:00–23:59 OR 00:00–07:59
+  if (nowMin >= startMin) {
+    // after 20:00: time left = (24:00 - now) + endMin
+    return (24 * 60 - nowMin) + endMin;
+  } else if (nowMin < endMin) {
+    // before 08:00: time left = endMin - now
+    return endMin - nowMin;
+  }
+  return -1; // outside shift
+}
+
+function shiftMinutesElapsed() {
+  const left = shiftMinutesLeft();
+  if (left < 0) return -1;
+  return SHIFT_DURATION_MIN - left;
+}
+
+function isInShift() { return shiftMinutesLeft() > 0; }
+
+function fmtTime(totalMin) {
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h > 0) return `${h}ч ${m}м`;
+  return `${m}м`;
+}
+
+function toggleShiftTpl(id) {
+  if (selectedShiftTpls.has(id)) {
+    selectedShiftTpls.delete(id);
+  } else {
+    selectedShiftTpls.add(id);
+  }
+  haptic('light');
+  renderShiftTracker();
+}
+
+function renderShiftTracker() {
+  const el = document.getElementById('dayShiftTracker');
+  if (!el || selectedDay === null) return;
+
+  const hasGoal = goals.period > 0 || goals.week > 0;
+  if (!hasGoal || !templates.length) { el.innerHTML = ''; return; }
+
+  const { year, month, startDay, endDay } = getPeriod();
+  const today0 = new Date(); today0.setHours(0, 0, 0, 0);
+  const isCurrentPeriod = today0.getFullYear() === year && today0.getMonth() === month
+    && today0.getDate() >= startDay && today0.getDate() <= endDay;
+  if (!isCurrentPeriod) { el.innerHTML = ''; return; }
+
+  // ── Active templates: selected ones, or ALL if none chosen ──
+  const validTpls = templates.filter(t => (parseFloat(t.price) || 0) > 0);
+  if (!validTpls.length) { el.innerHTML = ''; return; }
+  const workingTpls = selectedShiftTpls.size > 0
+    ? validTpls.filter(t => selectedShiftTpls.has(t.id))
+    : validTpls;
+  const activeTpls = workingTpls.length > 0 ? workingTpls : validTpls;
+
+  // ── Time ──
+  const minLeft = shiftMinutesLeft();
+  const inShift = minLeft > 0;
+  const hLeft   = Math.floor(Math.max(0, minLeft) / 60);
+  const mLeft   = Math.max(0, minLeft) % 60;
+  const elapsed = Math.max(0, SHIFT_DURATION_MIN - Math.max(0, minLeft));
+  const pct     = Math.round(elapsed / SHIFT_DURATION_MIN * 100);
+  const pctCls  = pct > 80 ? 'high' : pct > 50 ? 'mid' : 'low';
+  const timeCls = hLeft <= 1 ? 'urgent' : hLeft <= 3 ? 'warn' : 'ok';
+
+  // ── How much still needed today ──
+  const taxMult    = taxEnabled ? 0.87 : 1;
+  const earned     = calcTotal();
+  const goalTarget = goals.period > 0 ? goals.period : goals.week;
+  const remaining  = Math.max(goalTarget - earned, 0);
+  let workDaysLeft = 0;
+  for (let d = today0.getDate(); d <= endDay; d++) {
+    const dt = new Date(year, month, d);
+    if (dt.getDay() !== 0 && dt.getDay() !== 6) workDaysLeft++;
+  }
+  const neededToday = workDaysLeft > 0 ? remaining / workDaysLeft : remaining;
+  const earnedToday = daySum(selectedDay) * taxMult;
+  const stillNeeded = Math.max(neededToday - earnedToday, 0);
+
+  // ── Chips: all templates, togglable, checked = in activeTpls ──
+  const noneSelected = selectedShiftTpls.size === 0;
+  const chips = validTpls.map(t => {
+    const active = noneSelected || selectedShiftTpls.has(t.id);
+    return `<div class="shift-tpl-chip${active?' selected':''}" onclick="toggleShiftTpl(${t.id})">
+      <span class="chip-check">${active?'☑':'☐'}</span> ${esc(t.name)} · ${fmt(t.price)} ₽
+    </div>`;
+  }).join('');
+
+  // ── Plan done? ──
+  if (stillNeeded <= 0) {
+    el.innerHTML = `<div class="shift-block">
+      <div class="shift-title">⏱ Счётчик смены (20:00 – 08:00)</div>
+      <div class="shift-tpl-row">${chips}</div>
+      <div class="motivation-done" style="padding:2px 0">🎉 Дневной план выполнен! Всё что сверху — бонус!</div>
+      ${inShift?`<div class="shift-progress-bg" style="margin-top:10px">
+        <div class="shift-progress-fill ${pctCls}" style="width:${pct}%"></div>
+      </div><div class="shift-note" style="margin-top:6px">${hLeft}ч ${mLeft}м до конца смены</div>`:''}
+    </div>`;
+    return;
+  }
+
+  // ── Time header ──
+  const timeHeader = inShift
+    ? `<div class="shift-stats" style="margin-bottom:10px">
+        <div class="shift-stat-pill ${timeCls}">
+          <div class="ssp-val">${hLeft}ч ${mLeft}м</div>
+          <div class="ssp-lbl">до конца смены</div>
+        </div>
+        <div class="shift-stat-pill warn">
+          <div class="ssp-val">${fmt(Math.ceil(stillNeeded))} ₽</div>
+          <div class="ssp-lbl">нужно заработать</div>
+        </div>
+      </div>
+      <div class="shift-progress-bg" style="margin-bottom:12px">
+        <div class="shift-progress-fill ${pctCls}" style="width:${pct}%"></div>
+      </div>`
+    : `<div class="shift-note" style="margin-bottom:10px;text-align:left">
+        Смена начнётся в 20:00 · нужно заработать
+        <strong style="color:var(--warn)"> ${fmt(Math.ceil(stillNeeded))} ₽</strong>
+      </div>`;
+
+  // ── Per-template rows (only active ones) ──
+  let totalUnitsLeft = 0;
+  const rows = activeTpls.map(t => {
+    const rate        = parseFloat(t.price) * taxMult;
+    const unitsNeeded = Math.ceil(neededToday / activeTpls.length / rate);
+    const madeSoFar   = (days[selectedDay] || [])
+      .filter(w => w.name === t.name)
+      .reduce((s, w) => s + (parseFloat(w.qty) || 0), 0);
+    const unitsLeft   = Math.max(0, unitsNeeded - madeSoFar);
+    totalUnitsLeft   += unitsLeft;
+    const done        = unitsLeft === 0;
+    const paceNeeded  = (inShift && minLeft > 0 && unitsLeft > 0)
+      ? unitsLeft / (minLeft / 60) : 0;
+    const urgency     = done ? 'ok' : !inShift ? 'ok'
+      : paceNeeded > 12 ? 'urgent' : paceNeeded > 6 ? 'warn' : 'ok';
+
+    return `<div class="shift-tpl-row-item">
+      <div class="stri-left">
+        <div class="stri-name">${esc(t.name)}</div>
+        <div class="stri-price">${fmt(t.price)} ₽/шт${inShift && !done && paceNeeded > 0
+          ? ` · темп: ${paceNeeded.toFixed(1)} шт/ч` : ''}</div>
+        ${madeSoFar > 0 ? `<div class="stri-made">сделано: ${madeSoFar} шт</div>` : ''}
+      </div>
+      <div class="stri-right">
+        ${done
+          ? `<span class="stri-badge done">✓ готово</span>`
+          : `<span class="stri-count ${urgency}">${unitsLeft}</span>
+             <span class="stri-lbl">шт осталось</span>`}
+      </div>
+    </div>`;
+  }).join('');
+
+  // ── Overall urgency ──
+  const overallPace = (inShift && minLeft > 0 && totalUnitsLeft > 0)
+    ? totalUnitsLeft / (minLeft / 60) : 0;
+  const overallNote = !inShift ? ''
+    : overallPace > 12
+      ? `<div class="shift-note" style="margin-top:8px">🔴 Нужно ускориться!</div>`
+    : overallPace > 6
+      ? `<div class="shift-note" style="margin-top:8px">🟡 Держи темп, ты справляешься!</div>`
+      : `<div class="shift-note" style="margin-top:8px">🟢 Отличный темп — план под контролем!</div>`;
+
+  el.innerHTML = `<div class="shift-block">
+    <div class="shift-title">⏱ Счётчик смены (20:00 – 08:00)</div>
+    <div class="shift-tpl-row">${chips}</div>
+    ${timeHeader}
+    <div class="stri-list">${rows}</div>
+    ${overallNote}
+  </div>`;
+}
+
+// ── auto-refresh shift timer every minute ──
+function startShiftTimer() {
+  if (shiftTimerInterval) clearInterval(shiftTimerInterval);
+  shiftTimerInterval = setInterval(() => {
+    if (selectedDay !== null) { renderShiftTracker(); }
+  }, 60000);
+}
+
+// ══════════════════════════════════════════════
+//  MOTIVATIONAL PHRASES
+// ══════════════════════════════════════════════
+const MOTIV_PHRASES = [
+  'Каждое изделие — шаг к цели. Вперёд! 💪',
+  'Сегодня ты решаешь, каким будет конец месяца. Давай! 🔥',
+  'Темп сегодня = зарплата завтра. Не сбавляй! 🚀',
+  'Один час интенсивной работы = ощутимая прибавка! ⚡',
+  'Ты уже начал — это главное. Теперь не останавливайся! 🎯',
+  'Чем больше сделаешь сейчас — тем легче потом. Жми! 💥',
+  'Маленькие детали — большие деньги. Каждая штука в копилку! 🏆',
+  'Твои руки — твой доход. Задействуй их на полную! 🙌',
+  'Сегодня продуктивно = завтра спокойно. Вперёд! 😤',
+  'Не считай часы — считай изделия. Это и есть твой заработок! 📦',
+  'Ещё немного — и план закрыт. Не отступай! 🏁',
+  'Каждый лишний час работы = реальные деньги. Используй его! 💎',
+  'Сделай сегодня чуть больше, чем вчера — вот формула роста! 📈',
+  'Ночная смена — двойная сила. Держишь темп? Отлично! 🌙',
+  'До конца смены ещё есть время. Не сдавай позиции! ⏰',
+];
+function getDayPhrase(day) {
+  return MOTIV_PHRASES[(day + new Date().getMonth()) % MOTIV_PHRASES.length];
+}
+
+function renderDayMotivation(){
+  const el=document.getElementById('dayMotivation');
+  if(!el||selectedDay===null){return}
+
+  const hasGoal=goals.period>0||goals.week>0;
+  if(!hasGoal){el.innerHTML='';return}
+
+  const{year,month,startDay,endDay}=getPeriod();
+  // Check today is within the selected period (not a different month/period)
+  const today=new Date();today.setHours(0,0,0,0);
+  const isCurrentPeriod=today.getFullYear()===year&&today.getMonth()===month
+    &&today.getDate()>=startDay&&today.getDate()<=endDay;
+  // Show motivation for any day within the period, even if not today
+  const inPeriodWindow=today.getFullYear()===year&&today.getMonth()===month;
+  if(!inPeriodWindow){el.innerHTML='';return}
+
+  // Count working days left from today to end of period
+  let workDaysLeft=0;
+  for(let d=today.getDate();d<=endDay;d++){
+    const dt=new Date(year,month,d);
+    if(dt.getDay()!==0&&dt.getDay()!==6)workDaysLeft++;
+  }
+  // If today is past the period, still show planned info
+  if(workDaysLeft===0&&today.getDate()>endDay){el.innerHTML='';return}
+
+  const earned=calcTotal();
+  const taxMult=taxEnabled?0.87:1;
+  let goalTarget=0,goalLabel='';
+  if(goals.period>0){goalTarget=goals.period;goalLabel='периода'}
+  else if(goals.week>0){goalTarget=goals.week;goalLabel='недели'}
+
+  const remaining=Math.max(goalTarget-earned,0);
+
+  // Get avg rate from this day's works, fallback to all period days
+  const works=days[selectedDay]||[];
+  const validWorks=works.filter(w=>(parseFloat(w.price)||0)>0);
+  let avgRate=0;
+  if(validWorks.length){
+    avgRate=validWorks.reduce((s,w)=>s+(parseFloat(w.price)||0),0)/validWorks.length*taxMult;
+  } else {
+    // fallback: avg rate from templates or past days
+    if(templates.length){
+      const validTpls=templates.filter(t=>(parseFloat(t.price)||0)>0);
+      if(validTpls.length)
+        avgRate=validTpls.reduce((s,t)=>s+(parseFloat(t.price)||0),0)/validTpls.length*taxMult;
+    }
+    if(!avgRate){
+      let rateSum=0,rateCount=0;
+      for(let d=startDay;d<=endDay;d++){
+        (days[d]||[]).forEach(w=>{const p=parseFloat(w.price)||0;if(p>0){rateSum+=p;rateCount++;}});
+      }
+      if(rateCount>0)avgRate=(rateSum/rateCount)*taxMult;
+    }
+  }
+
+  const phrase=getDayPhrase(selectedDay);
+  const earnedToday=daySum(selectedDay)*taxMult;
+
+  if(goalTarget>0&&earned>=goalTarget){
+    el.innerHTML=`<div class="motivation-block">
+      <div class="motivation-done">🏆 Цель ${goalLabel} выполнена! Ты молодец!</div>
+    </div>`;
+    return;
+  }
+
+  const neededToday=workDaysLeft>0?remaining/workDaysLeft:remaining;
+  let pillsHtml='';
+  if(avgRate>0&&neededToday>0){
+    const unitsNeeded=Math.ceil(neededToday/avgRate);
+    const unitsLeft=Math.max(0,Math.ceil((neededToday-earnedToday)/avgRate));
+    pillsHtml=`<div class="motivation-target">
+      <div class="motivation-pill">
+        <span class="mp-count">${unitsNeeded}</span>
+        <span class="mp-label">шт/день для плана</span>
+      </div>`;
+    if(unitsLeft>0&&earnedToday<neededToday){
+      pillsHtml+=`<div class="motivation-pill">
+        <span class="mp-count" style="color:var(--accent2)">${unitsLeft}</span>
+        <span class="mp-label">шт ещё сегодня</span>
+      </div>`;
+    } else if(earnedToday>=neededToday&&earnedToday>0){
+      pillsHtml+=`<div class="motivation-pill">
+        <span class="mp-count" style="color:var(--accent)">✓</span>
+        <span class="mp-label">на сегодня хватит!</span>
+      </div>`;
+    }
+    pillsHtml+=`</div>`;
+    if(remaining>0&&workDaysLeft>0){
+      pillsHtml+=`<div class="motivation-need">Нужно ещё <strong>${fmt(Math.ceil(neededToday))} ₽</strong> в день · осталось ${workDaysLeft} ${plWD(workDaysLeft)}</div>`;
+    }
+  } else if(neededToday>0){
+    pillsHtml=`<div class="motivation-need">Нужно заработать <strong>${fmt(Math.ceil(neededToday))} ₽</strong> сегодня для выполнения плана</div>`;
+  }
+
+  el.innerHTML=`<div class="motivation-block">
+    <div class="motivation-quote">${phrase}</div>
+    ${pillsHtml}
+  </div>`;
+}
+
+function plWD(n){if(n%10===1&&n%100!==11)return'рабочий день';if([2,3,4].includes(n%10)&&![12,13,14].includes(n%100))return'рабочих дня';return'рабочих дней'}
+
+function addWork(){
+  if(selectedDay===null)return;
+  if(!days[selectedDay])days[selectedDay]=[];
+  days[selectedDay].push({id:Date.now(),name:'',qty:'',price:''});
+  save();haptic('light');
+  renderDayPanel();renderDayStrip();renderTotal();renderChart();renderBreakdown();renderGoals();
+  setTimeout(()=>{const inputs=document.querySelectorAll('.dw-name');if(inputs.length)inputs[inputs.length-1].focus()},50);
+}
+function delWork(day,id){
+  if(!days[day])return;
+  days[day]=days[day].filter(w=>w.id!==id);
+  save();haptic('medium');
+  renderDayPanel();renderDayStrip();renderTotal();renderChart();renderBreakdown();renderGoals();
+}
+function updateWork(day,id,field,value){
+  const w=(days[day]||[]).find(w=>w.id===id);
+  if(!w)return;
+  w[field]=value;save();
+  const sum=daySum(day);
+  document.getElementById('dpSum').textContent=sum>0?fmt(sum)+' ₽':'';
+  renderDayStrip();renderTotal();renderChart();renderBreakdown();renderGoals();
+  renderShiftTracker();renderDayMotivation();
+}
+
+// ══════════════════════════════════════════════
+//  TEMPLATES
+// ══════════════════════════════════════════════
+function loadTemplates(){try{templates=JSON.parse(localStorage.getItem('salary_templates')||'[]')}catch(e){templates=[]}}
+function saveTemplates(){try{localStorage.setItem('salary_templates',JSON.stringify(templates))}catch(e){}}
+
+function renderTemplates(){
+  const list=document.getElementById('tplList');
+  if(!templates.length){list.innerHTML='<span class="tpl-empty">Шаблоны пусты</span>';return}
+  list.innerHTML=templates.map(t=>`
+    <div class="tpl-chip" onclick="applyTemplate(${t.id})">
+      <span>${esc(t.name)}</span>
+      <span class="tpl-price">${fmt(t.price)} ₽</span>
+    </div>`).join('');
+}
+
+function openTplModal(){
+  document.getElementById('tplModal').classList.add('open');
+  renderTplModal();
+}
+function closeTplModal(e){if(e.target===document.getElementById('tplModal'))document.getElementById('tplModal').classList.remove('open')}
+
+function renderTplModal(){
+  const list=document.getElementById('tplModalList');
+  if(!templates.length){list.innerHTML='<div class="empty">Нет шаблонов</div>';return}
+  list.innerHTML=templates.map(t=>`
+    <div class="modal-tpl-row" onclick="applyTemplateFromModal(${t.id})">
+      <div>
+        <div class="modal-tpl-name">${esc(t.name)}</div>
+        <div class="modal-tpl-price">${fmt(t.price)} ₽ за ед.</div>
+      </div>
+      <div class="modal-tpl-del" onclick="deleteTpl(event,${t.id})">✕</div>
+    </div>`).join('');
+}
+
+function saveTpl(){
+  const name=document.getElementById('tplNameIn').value.trim();
+  const price=parseFloat(document.getElementById('tplPriceIn').value)||0;
+  if(!name)return;
+  templates.push({id:Date.now(),name,price});
+  saveTemplates();haptic('light');
+  document.getElementById('tplNameIn').value='';
+  document.getElementById('tplPriceIn').value='';
+  renderTplModal();renderTemplates();
+}
+function deleteTpl(e,id){
+  e.stopPropagation();
+  templates=templates.filter(t=>t.id!==id);
+  saveTemplates();haptic('medium');
+  renderTplModal();renderTemplates();
+}
+function applyTemplate(id){
+  if(selectedDay===null){alert('Сначала выбери день');return}
+  const t=templates.find(t=>t.id===id);if(!t)return;
+  if(!days[selectedDay])days[selectedDay]=[];
+  days[selectedDay].push({id:Date.now(),name:t.name,qty:'',price:String(t.price)});
+  save();haptic('light');
+  renderDayPanel();renderDayStrip();renderTotal();renderChart();renderBreakdown();
+}
+function applyTemplateFromModal(id){
+  applyTemplate(id);
+  document.getElementById('tplModal').classList.remove('open');
+}
+
+// ══════════════════════════════════════════════
+//  COPY DAY
+// ══════════════════════════════════════════════
+function openCopyModal(){
+  const{startDay,endDay}=getPeriod();
+  const list=document.getElementById('copyDayList');
+  const{month}=getPeriod();
+  const sourceDays=[];
+  for(let d=startDay;d<=endDay;d++){
+    if(d===selectedDay)continue;
+    const works=days[d]||[];
+    const sum=daySum(d);
+    if(works.length>0)sourceDays.push({d,works,sum});
+  }
+  if(!sourceDays.length){list.innerHTML='<div class="empty">Нет дней с работами</div>'}
+  else{
+    list.innerHTML=sourceDays.map(({d,works,sum})=>`
+      <div class="copy-day-row" onclick="copyFromDay(${d})">
+        <div class="copy-day-info">
+          <div class="copy-day-name">${d} ${MG[month]}</div>
+          <div class="copy-day-works">${works.length} ${plWorks(works.length)}</div>
+        </div>
+        <div class="copy-day-sum">${fmt(sum)} ₽</div>
+      </div>`).join('');
+  }
+  document.getElementById('copyModal').classList.add('open');
+}
+function closeCopyModal(e){if(e.target===document.getElementById('copyModal'))document.getElementById('copyModal').classList.remove('open')}
+function copyFromDay(fromDay){
+  if(selectedDay===null)return;
+  const srcWorks=days[fromDay]||[];
+  if(!days[selectedDay])days[selectedDay]=[];
+  srcWorks.forEach(w=>{
+    days[selectedDay].push({id:Date.now()+Math.random(),name:w.name,qty:w.qty,price:w.price});
+  });
+  save();haptic('medium');
+  document.getElementById('copyModal').classList.remove('open');
+  renderDayPanel();renderDayStrip();renderTotal();renderChart();renderBreakdown();renderGoals();
+}
+function plWorks(n){if(n%10===1&&n%100!==11)return'работа';if([2,3,4].includes(n%10)&&![12,13,14].includes(n%100))return'работы';return'работ'}
+
+// ══════════════════════════════════════════════
+//  BONUSES
+// ══════════════════════════════════════════════
+function addBonus(){
+  bonuses.push({id:Date.now(),name:'',amount:''});
+  save();renderBonuses();renderTotal();renderBreakdown();renderGoals();
+  setTimeout(()=>{const els=document.querySelectorAll('.bonus-name');if(els.length)els[els.length-1].focus()},50);
+}
+function removeBonus(id){bonuses=bonuses.filter(b=>b.id!==id);save();haptic('medium');renderBonuses();renderTotal();renderBreakdown();renderGoals()}
+function updateBonus(id,f,v){const b=bonuses.find(b=>b.id===id);if(b){b[f]=v;save();renderTotal();renderBreakdown();renderGoals()}}
+function renderBonuses(){
+  const list=document.getElementById('bonusList');
+  if(!bonuses.length){list.innerHTML='';return}
+  list.innerHTML=bonuses.map(b=>`
+    <div class="bonus-item">
+      <div class="bonus-row">
+        <input class="bonus-name" type="text" placeholder="Название" value="${esc(b.name)}"
+          oninput="updateBonus(${b.id},'name',this.value)">
+        <div class="bonus-input-wrap">
+          <input type="number" inputmode="decimal" placeholder="0" value="${b.amount}"
+            oninput="updateBonus(${b.id},'amount',this.value)">
+          <span class="dw-suffix" style="margin-left:4px">₽</span>
+        </div>
+        <div class="dw-del" onclick="removeBonus(${b.id})">✕</div>
+      </div>
+    </div>`).join('');
+}
+
+// ══════════════════════════════════════════════
+//  CALC
+// ══════════════════════════════════════════════
+function calcBase(){return [].concat.apply([],Object.values(days)).reduce((s,w)=>s+(parseFloat(w.qty)||0)*(parseFloat(w.price)||0),0)}
+function calcBonus(){return bonuses.reduce((s,b)=>s+(parseFloat(b.amount)||0),0)}
+function calcTotal(){let t=calcBase()+calcBonus();if(taxEnabled)t*=0.87;return Math.max(0,t)}
+function fmt(n){return Math.round(n).toLocaleString('ru-RU')}
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')}
+
+// ══════════════════════════════════════════════
+//  TOGGLE
+// ══════════════════════════════════════════════
+function toggleTax(){
+  taxEnabled=!taxEnabled;
+  document.getElementById('taxToggle').classList.toggle('on',taxEnabled);
+  save();renderTotal();renderBreakdown();renderGoals();
+}
+
+// ══════════════════════════════════════════════
+//  TOTAL
+// ══════════════════════════════════════════════
+function renderTotal(){
+  const base=calcBase(),total=calcTotal();
+  document.getElementById('totalDisplay').innerHTML=fmt(total)+' <span>₽</span>';
+  const filledDays=Object.keys(days).filter(d=>daySum(parseInt(d))>0).length;
+  const meta=[];
+  if(filledDays>0)meta.push(`<div class="meta-item">Дней: <strong>${filledDays}</strong></div>`);
+  if(base>0)meta.push(`<div class="meta-item">База: <strong>${fmt(base)} ₽</strong></div>`);
+  if(filledDays>1){
+    const avg=base/filledDays;
+    meta.push(`<div class="meta-item">Ср/день: <strong>${fmt(avg)} ₽</strong></div>`);
+  }
+  document.getElementById('totalMeta').innerHTML=meta.join('');
+  renderCompareBadge(total);
+}
+
+function renderCompareBadge(total){
+  const{year,month,period}=getPeriod();
+  // prev period: if period=1 → prev is period 2 of prev month; if period=2 → prev is period 1 same month
+  let prevKey;
+  if(period===1){
+    let pm=month-1,py=year;
+    if(pm<0){pm=11;py--}
+    prevKey=`salary_${py}_${pm}_2`;
+  } else {
+    prevKey=`salary_${year}_${month}_1`;
+  }
+  try{
+    const raw=localStorage.getItem(prevKey);
+    if(!raw){document.getElementById('compareBadge').innerHTML='';return}
+    const data=JSON.parse(raw);
+    const prevDays=data.days||{};
+    const prevBonuses=data.bonuses||[];
+    const prevTax=!!data.taxEnabled;
+    const prevBase=[].concat.apply([],Object.values(prevDays)).reduce((s,w)=>s+(parseFloat(w.qty)||0)*(parseFloat(w.price)||0),0);
+    const prevBonus=prevBonuses.reduce((s,b)=>s+(parseFloat(b.amount)||0),0);
+    let prevTotal=prevBase+prevBonus;
+    if(prevTax)prevTotal*=0.87;
+    prevTotal=Math.max(0,prevTotal);
+    if(prevTotal===0){document.getElementById('compareBadge').innerHTML='';return}
+    const diff=total-prevTotal;
+    const pct=Math.abs(Math.round(diff/prevTotal*100));
+    if(Math.abs(diff)<50){
+      document.getElementById('compareBadge').innerHTML=`<span class="compare-badge same">= как прошлый период</span>`;
+    } else if(diff>0){
+      document.getElementById('compareBadge').innerHTML=`<span class="compare-badge up">▲ +${fmt(diff)} ₽ (+${pct}%) vs прошлый период</span>`;
+    } else {
+      document.getElementById('compareBadge').innerHTML=`<span class="compare-badge down">▼ ${fmt(diff)} ₽ (−${pct}%) vs прошлый период</span>`;
+    }
+  }catch(e){document.getElementById('compareBadge').innerHTML=''}
+}
+
+// ══════════════════════════════════════════════
+//  CHART
+// ══════════════════════════════════════════════
+function renderChart(){
+  const{startDay,endDay}=getPeriod();
+  const{month}=getPeriod();
+  const sums=[];
+  for(let d=startDay;d<=endDay;d++)sums.push({d,s:daySum(d)});
+  const maxSum=Math.max(...sums.map(x=>x.s),1);
+  const totalFilled=sums.filter(x=>x.s>0).length;
+  const wrap=document.getElementById('chartWrap');
+  if(totalFilled===0){wrap.style.display='none';return}
+  wrap.style.display='';
+  const barsEl=document.getElementById('chartBars');
+  barsEl.innerHTML=sums.map(({d,s})=>{
+    const h=Math.max(s>0?4:2,Math.round((s/maxSum)*56));
+    const isActive=selectedDay===d;
+    const hasData=s>0;
+    return`<div class="chart-bar-wrap${isActive?' active':''}" onclick="selectDay(${d})">
+      <div class="chart-bar${isActive?' active':''}${hasData?' has-data':''}" style="height:${h}px"></div>
+      <div class="chart-bar-lbl">${d}</div>
+    </div>`;
+  }).join('');
+
+  // stats
+  const nonZero=sums.filter(x=>x.s>0);
+  const avg=nonZero.length?nonZero.reduce((s,x)=>s+x.s,0)/nonZero.length:0;
+  const maxDay=nonZero.reduce((a,b)=>b.s>a.s?b:a,{s:0,d:0});
+  let statsHtml='';
+  statsHtml+=`<div class="chart-stat"><div class="chart-stat-label">Средний день</div><div class="chart-stat-val">${fmt(avg)} ₽</div></div>`;
+  if(maxDay.d)statsHtml+=`<div class="chart-stat"><div class="chart-stat-label">Лучший день</div><div class="chart-stat-val">${maxDay.d} ${MS[month]} · ${fmt(maxDay.s)} ₽</div></div>`;
+  statsHtml+=`<div class="chart-stat"><div class="chart-stat-label">Рабочих дней</div><div class="chart-stat-val">${nonZero.length}</div></div>`;
+  document.getElementById('chartStats').innerHTML=statsHtml;
+}
+
+// ══════════════════════════════════════════════
+//  HISTORY
+// ══════════════════════════════════════════════
+function renderHistory(){
+  const{year,month,period}=getPeriod();
+  const currentKey=saveKey();
+  // collect all salary keys
+  const allKeys=[];
+  try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.startsWith('salary_')&&k!=='salary_theme'&&k!=='salary_templates')allKeys.push(k)}}catch(e){}
+
+  // parse and sort desc
+  const items=allKeys.map(k=>{
+    try{
+      const parts=k.replace('salary_','').split('_');
+      const y=parseInt(parts[0]),m=parseInt(parts[1]),p=parseInt(parts[2]);
+      const data=JSON.parse(localStorage.getItem(k)||'{}');
+      const base=[].concat.apply([],Object.values(data.days||{})).reduce((s,w)=>s+(parseFloat(w.qty)||0)*(parseFloat(w.price)||0),0);
+      const bonus=(data.bonuses||[]).reduce((s,b)=>s+(parseFloat(b.amount)||0),0);
+      let total=base+bonus;if(data.taxEnabled)total*=0.87;total=Math.max(0,total);
+      return{k,y,m,p,total};
+    }catch(e){return null}
+  }).filter(Boolean).sort((a,b)=>b.y-a.y||b.m-a.m||b.p-a.p);
+
+  const container=document.getElementById('historyCards');
+  if(!items.length){container.innerHTML='<div class="hist-card"><div class="hist-month">Пусто</div><div class="hist-empty">Нет сохранённых периодов</div></div>';return}
+
+  container.innerHTML=items.map(({k,y,m,p,total})=>{
+    const isCur=k===currentKey;
+    const pLabel=p===1?'1–15 (аванс)':`16–${new Date(y,m+1,0).getDate()} (зп)`;
+    return`<div class="hist-card${isCur?' current':''}" onclick="goToHistory('${y}-${m}',${p})">
+      <div class="hist-month">${MS[m]} ${y}</div>
+      <div class="hist-period">${pLabel}</div>
+      <div class="hist-total">${total>0?fmt(total)+' ₽':'—'}</div>
+    </div>`;
+  }).join('');
+}
+
+function goToHistory(monthVal,period){
+  document.getElementById('monthSel').value=monthVal;
+  document.getElementById('periodSel').value=String(period);
+  onPeriodChange();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ══════════════════════════════════════════════
+//  BREAKDOWN
+// ══════════════════════════════════════════════
+function renderBreakdown(){
+  const base=calcBase(),bonus=calcBonus(),total=calcTotal();
+  const tax=taxEnabled?(base+bonus)*0.13:0;
+  const bd=document.getElementById('breakdown');
+  if(base===0&&bonus===0){bd.innerHTML='<div class="empty">Добавьте работы по дням</div>';return}
+  const{month}=getPeriod();
+  let rows='';
+  const sortedDays=Object.keys(days).map(Number).sort((a,b)=>a-b);
+  sortedDays.forEach(d=>{
+    const s=daySum(d);
+    if(s>0)rows+=`<div class="breakdown-row"><span class="lbl">${d} ${MG[month]}</span><span class="val">${fmt(s)} ₽</span></div>`;
+  });
+  const filledCount=sortedDays.filter(d=>daySum(d)>0).length;
+  if(base>0&&filledCount>1)rows+=`<div class="breakdown-row"><span class="lbl">Итого по работам</span><span class="val">${fmt(base)} ₽</span></div>`;
+  bonuses.forEach(b=>{
+    const amt=parseFloat(b.amount)||0;
+    if(amt!==0){
+      const lbl=b.name||(amt>0?'Доплата':'Вычет');
+      rows+=`<div class="breakdown-row bonus-r"><span class="lbl">${lbl}</span><span class="val" style="color:${amt>=0?'var(--accent3)':'var(--danger)'}">${amt>=0?'+':''}${fmt(amt)} ₽</span></div>`;
+    }
+  });
+  if(taxEnabled)rows+=`<div class="breakdown-row tax-r"><span class="lbl">НДФЛ 13%</span><span class="val">−${fmt(tax)} ₽</span></div>`;
+  rows+=`<div class="breakdown-row total-row"><span class="lbl">К получению</span><span class="val">${fmt(total)} ₽</span></div>`;
+  bd.innerHTML=rows;
+}
+
+// ══════════════════════════════════════════════
+//  RESET
+// ══════════════════════════════════════════════
+function resetAll(){
+  const hasData=Object.values(days).some(ws=>ws.length>0)||bonuses.length>0;
+  if(!hasData)return;
+  if(confirm('Сбросить данные этого периода?')){
+    days={};bonuses={};bonuses=[];taxEnabled=false;selectedDay=null;
+    document.getElementById('taxToggle').classList.remove('on');
+    save();haptic('heavy');
+    renderDayStrip();renderDayPanel();renderBonuses();renderTotal();renderChart();renderBreakdown();
+  }
+}
+
+// ══════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════
+loadTheme();
+initMonths();
+loadTemplates();
+loadGoals();
+document.getElementById('periodSel').value=new Date().getDate()<=15?'1':'2';
+load();
+renderPeriodCard();
+renderDayStrip();
+renderDayPanel();
+renderBonuses();
+renderTemplates();
+renderTotal();
+renderChart();
+renderGoals();
+renderBreakdown();
+renderHistory();
+renderDayMotivation();
+startShiftTimer();
+</script>
+</body>
+</html>
