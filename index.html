@@ -502,9 +502,46 @@ body.light .meta-item{background:rgba(0,0,0,.05)}
 .copy-day-sum{font-size:14px;font-weight:800;color:var(--accent2)}
 
 @keyframes slideIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── LOCK SCREEN ── */
+.lock-overlay{position:fixed;inset:0;background:var(--bg);z-index:200;
+  display:flex;align-items:center;justify-content:center;transition:opacity .3s}
+.lock-overlay.hidden{opacity:0;pointer-events:none}
+.lock-box{display:flex;flex-direction:column;align-items:center;
+  gap:16px;padding:32px 24px;max-width:320px;width:100%}
+.lock-icon{font-size:56px;line-height:1}
+.lock-title{font-size:22px;font-weight:800;color:var(--text)}
+.lock-subtitle{font-size:13px;color:var(--muted);margin-top:-8px}
+.lock-input{width:100%;font-family:'Manrope',sans-serif;font-size:16px;
+  font-weight:600;color:var(--text);background:var(--surface2);
+  border:1px solid var(--border);border-radius:14px;padding:14px 16px;
+  outline:none;transition:border-color .15s;text-align:center;letter-spacing:3px}
+.lock-input:focus{border-color:var(--accent)}
+.lock-input.error{border-color:var(--danger)}
+.lock-btn{width:100%;padding:14px;background:var(--accent);color:#0d1a0f;
+  font-family:'Manrope',sans-serif;font-size:15px;font-weight:800;
+  border:none;border-radius:14px;cursor:pointer;transition:all .15s}
+.lock-btn:active{transform:scale(.97)}
+.lock-error{font-size:13px;color:var(--danger);font-weight:700;min-height:18px}
+@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+.shake{animation:shake .35s ease}
 </style>
 </head>
 <body>
+
+<!-- LOCK SCREEN -->
+<div class="lock-overlay" id="lockOverlay">
+  <div class="lock-box">
+    <div class="lock-icon">🔒</div>
+    <div class="lock-title">Зарплата</div>
+    <div class="lock-subtitle">Введите пароль для входа</div>
+    <input class="lock-input" id="lockInput" type="password"
+      placeholder="••••••" autocomplete="current-password"
+      onkeydown="if(event.key==='Enter')unlockApp()">
+    <div class="lock-error" id="lockError"></div>
+    <button class="lock-btn" onclick="unlockApp()">Войти</button>
+  </div>
+</div>
 
 <!-- HEADER -->
 <div class="header">
@@ -1779,9 +1816,42 @@ function resetAll(){
 }
 
 // ══════════════════════════════════════════════
+//  PASSWORD PROTECTION
+// ══════════════════════════════════════════════
+const PASSWORD_HASH='0cd15f4c69b8a09146352e24c885cb91ed726387f59a84d98e46e964f9b4b8c9';
+
+async function hashPassword(str){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+async function unlockApp(){
+  const input=document.getElementById('lockInput');
+  const errorEl=document.getElementById('lockError');
+  const val=input.value;
+  if(!val){input.classList.add('error');errorEl.textContent='Введите пароль';return;}
+  const hash=await hashPassword(val);
+  if(hash===PASSWORD_HASH){
+    const overlay=document.getElementById('lockOverlay');
+    overlay.classList.add('hidden');
+    errorEl.textContent='';
+    setTimeout(()=>overlay.style.display='none',300);
+  } else {
+    input.classList.add('error');
+    input.classList.add('shake');
+    errorEl.textContent='Неверный пароль';
+    haptic('heavy');
+    setTimeout(()=>{input.classList.remove('shake');input.classList.remove('error')},400);
+    input.value='';
+    input.focus();
+  }
+}
+
+// ══════════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════════
 loadTheme();
+document.getElementById('lockInput').focus();
 initMonths();
 loadTemplates();
 loadGoals();
