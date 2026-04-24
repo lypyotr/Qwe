@@ -550,6 +550,7 @@ body.light .meta-item{background:rgba(0,0,0,.05)}
     <h1>Сдельная<br>зарплата</h1>
   </div>
   <div class="header-actions">
+    <div class="icon-btn" onclick="openDataModal()" title="Импорт / Экспорт" id="dataBtn">💾</div>
     <div class="icon-btn" onclick="toggleTheme()" title="Тема" id="themeBtn">🌙</div>
   </div>
 </div>
@@ -735,6 +736,22 @@ body.light .meta-item{background:rgba(0,0,0,.05)}
       </div>
     </div>
     <button class="modal-btn" style="width:100%;margin-top:14px" onclick="saveGoals()">Сохранить</button>
+  </div>
+</div>
+
+<!-- DATA (IMPORT/EXPORT) MODAL -->
+<div class="modal-overlay" id="dataModal" onclick="closeDataModal(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">💾 Данные</div>
+    <div style="font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:14px">
+      Сохрани все данные в файл или восстанови их из ранее сохранённого файла. Включает периоды, шаблоны, цели и тему.
+    </div>
+    <div id="dataStats" style="display:flex;gap:8px;margin-bottom:14px"></div>
+    <button class="modal-btn" style="width:100%;padding:13px;margin-bottom:10px" onclick="exportData()">📤 Экспорт в файл</button>
+    <button class="modal-btn" style="width:100%;padding:13px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="document.getElementById('importFileIn').click()">📥 Импорт из файла</button>
+    <input type="file" id="importFileIn" accept=".json,application/json" style="display:none" onchange="importData(event)">
+    <div id="dataMsg" style="margin-top:12px;font-size:13px;text-align:center;font-weight:600;min-height:18px"></div>
   </div>
 </div>
 
@@ -1813,6 +1830,135 @@ function resetAll(){
     save();haptic('heavy');
     renderDayStrip();renderDayPanel();renderBonuses();renderTotal();renderChart();renderBreakdown();
   }
+}
+
+// ══════════════════════════════════════════════
+//  IMPORT / EXPORT
+// ══════════════════════════════════════════════
+const DATA_PREFIX='salary_';
+
+function collectAllKeys(){
+  const out=[];
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(k && k.startsWith(DATA_PREFIX)) out.push(k);
+    }
+  }catch(e){}
+  return out;
+}
+
+function openDataModal(){
+  document.getElementById('dataMsg').textContent='';
+  // quick stats
+  const keys=collectAllKeys();
+  const periods=keys.filter(k=>/^salary_\d+_\d+_\d+$/.test(k)).length;
+  let tplCount=0;
+  try{tplCount=(JSON.parse(localStorage.getItem('salary_templates')||'[]')||[]).length}catch(e){}
+  const stats=document.getElementById('dataStats');
+  stats.innerHTML=`
+    <div style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:10px;text-align:center">
+      <div style="font-size:18px;font-weight:800;color:var(--accent)">${periods}</div>
+      <div style="font-size:10px;font-weight:700;letter-spacing:1px;color:var(--muted);text-transform:uppercase;margin-top:2px">Периодов</div>
+    </div>
+    <div style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:10px;text-align:center">
+      <div style="font-size:18px;font-weight:800;color:var(--accent2)">${tplCount}</div>
+      <div style="font-size:10px;font-weight:700;letter-spacing:1px;color:var(--muted);text-transform:uppercase;margin-top:2px">Шаблонов</div>
+    </div>`;
+  document.getElementById('dataModal').classList.add('open');
+}
+function closeDataModal(e){if(e.target===document.getElementById('dataModal'))document.getElementById('dataModal').classList.remove('open')}
+
+function showDataMsg(text,kind){
+  const msg=document.getElementById('dataMsg');
+  msg.textContent=text;
+  msg.style.color=kind==='err'?'var(--danger)':kind==='warn'?'var(--warn)':'var(--accent)';
+}
+
+function exportData(){
+  const data={};
+  collectAllKeys().forEach(k=>{
+    const v=localStorage.getItem(k);
+    // try parse JSON values for cleaner readable export
+    try{ data[k]=JSON.parse(v) }catch(_){ data[k]=v }
+  });
+  if(!Object.keys(data).length){showDataMsg('Нет данных для экспорта','warn');return}
+  const payload={
+    app:'zarplata',
+    version:1,
+    exportedAt:new Date().toISOString(),
+    data
+  };
+  try{
+    const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    const dt=new Date(),pad=n=>String(n).padStart(2,'0');
+    a.href=url;
+    a.download=`zarplata-${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}.json`;
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    haptic('light');
+    showDataMsg('✓ Файл сохранён','ok');
+  }catch(e){
+    showDataMsg('Не удалось сохранить файл','err');
+  }
+}
+
+function importData(e){
+  const file=e.target.files && e.target.files[0];
+  e.target.value='';
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    let payload;
+    try{ payload=JSON.parse(ev.target.result) }
+    catch(_){ showDataMsg('Файл повреждён (не JSON)','err');return; }
+    const data=payload && payload.data;
+    if(!data || typeof data!=='object'){
+      showDataMsg('Файл не подходит','err');return;
+    }
+    const keys=Object.keys(data).filter(k=>k.startsWith(DATA_PREFIX));
+    if(!keys.length){
+      showDataMsg('В файле нет данных','warn');return;
+    }
+    const n=keys.length;
+    const word=n%10===1&&n%100!==11?'запись':n%10>=2&&n%10<=4&&(n%100<10||n%100>=20)?'записи':'записей';
+    if(!confirm(`Импортировать ${n} ${word}? Текущие данные будут заменены.`))return;
+    try{
+      // wipe existing salary_* keys
+      collectAllKeys().forEach(k=>localStorage.removeItem(k));
+      // write new
+      keys.forEach(k=>{
+        const v=data[k];
+        localStorage.setItem(k, typeof v==='string'?v:JSON.stringify(v));
+      });
+      // reload state and re-render
+      lightTheme=false;document.body.classList.remove('light');
+      loadTheme();
+      loadTemplates();
+      loadGoals();
+      load();
+      renderPeriodCard();renderDayStrip();renderDayPanel();renderBonuses();
+      renderTemplates();renderTotal();renderChart();renderGoals();
+      renderBreakdown();renderHistory();renderDayMotivation();renderShiftTracker();
+      haptic('medium');
+      showDataMsg(`✓ Импортировано: ${n}`,'ok');
+      // refresh stats in modal
+      const keysAfter=collectAllKeys();
+      const periods=keysAfter.filter(k=>/^salary_\d+_\d+_\d+$/.test(k)).length;
+      let tplCount=0;try{tplCount=(JSON.parse(localStorage.getItem('salary_templates')||'[]')||[]).length}catch(e){}
+      const stats=document.getElementById('dataStats');
+      if(stats){
+        stats.children[0].querySelector('div').textContent=periods;
+        stats.children[1].querySelector('div').textContent=tplCount;
+      }
+    }catch(err){
+      showDataMsg('Ошибка при импорте','err');
+    }
+  };
+  reader.onerror=()=>showDataMsg('Не удалось прочитать файл','err');
+  reader.readAsText(file);
 }
 
 // ══════════════════════════════════════════════
