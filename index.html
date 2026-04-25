@@ -288,9 +288,7 @@ body.light .meta-item{background:rgba(0,0,0,.05)}
   border:1px solid rgba(244,114,182,.2);
   border-radius:14px;padding:12px 14px;
 }
-.motivation-quote{
-  font-size:13px;font-weight:700;color:var(--text);line-height:1.4;margin-bottom:10px;
-}
+
 .motivation-target{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
 .motivation-pill{
   display:flex;align-items:center;gap:5px;
@@ -1388,26 +1386,6 @@ function startShiftTimer() {
 // ══════════════════════════════════════════════
 //  MOTIVATIONAL PHRASES
 // ══════════════════════════════════════════════
-const MOTIV_PHRASES = [
-  'Каждое изделие — шаг к цели. Вперёд! 💪',
-  'Сегодня ты решаешь, каким будет конец месяца. Давай! 🔥',
-  'Темп сегодня = зарплата завтра. Не сбавляй! 🚀',
-  'Один час интенсивной работы = ощутимая прибавка! ⚡',
-  'Ты уже начал — это главное. Теперь не останавливайся! 🎯',
-  'Чем больше сделаешь сейчас — тем легче потом. Жми! 💥',
-  'Маленькие детали — большие деньги. Каждая штука в копилку! 🏆',
-  'Твои руки — твой доход. Задействуй их на полную! 🙌',
-  'Сегодня продуктивно = завтра спокойно. Вперёд! 😤',
-  'Не считай часы — считай изделия. Это и есть твой заработок! 📦',
-  'Ещё немного — и план закрыт. Не отступай! 🏁',
-  'Каждый лишний час работы = реальные деньги. Используй его! 💎',
-  'Сделай сегодня чуть больше, чем вчера — вот формула роста! 📈',
-  'Ночная смена — двойная сила. Держишь темп? Отлично! 🌙',
-  'До конца смены ещё есть время. Не сдавай позиции! ⏰',
-];
-function getDayPhrase(day) {
-  return MOTIV_PHRASES[(day + new Date().getMonth()) % MOTIV_PHRASES.length];
-}
 
 function renderDayMotivation(){
   const el=document.getElementById('dayMotivation');
@@ -1464,7 +1442,6 @@ function renderDayMotivation(){
     }
   }
 
-  const phrase=getDayPhrase(selectedDay);
   const earnedToday=daySum(selectedDay)*taxMult;
 
   if(goalTarget>0&&earned>=goalTarget){
@@ -1503,10 +1480,8 @@ function renderDayMotivation(){
     pillsHtml=`<div class="motivation-need">Нужно заработать <strong>${fmt(Math.ceil(neededToday))} ₽</strong> сегодня для выполнения плана</div>`;
   }
 
-  el.innerHTML=`<div class="motivation-block">
-    <div class="motivation-quote">${phrase}</div>
-    ${pillsHtml}
-  </div>`;
+  if(pillsHtml) el.innerHTML=`<div class="motivation-block">${pillsHtml}</div>`;
+  else el.innerHTML='';
 }
 
 function plWD(n){if(n%10===1&&n%100!==11)return'рабочий день';if([2,3,4].includes(n%10)&&![12,13,14].includes(n%100))return'рабочих дня';return'рабочих дней'}
