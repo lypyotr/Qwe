@@ -522,6 +522,12 @@ body.light .meta-item{background:rgba(0,0,0,.05)}
   font-family:'Manrope',sans-serif;font-size:15px;font-weight:800;
   border:none;border-radius:14px;cursor:pointer;transition:all .15s}
 .lock-btn:active{transform:scale(.97)}
+.lock-btn.secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;gap:8px}
+.lock-btn.secondary[disabled]{opacity:.5;pointer-events:none}
+.lock-divider{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:10px;
+  font-weight:700;letter-spacing:1.5px;text-transform:uppercase;width:100%;margin:0}
+.lock-divider::before,.lock-divider::after{content:'';flex:1;height:1px;background:var(--border)}
 .lock-error{font-size:13px;color:var(--danger);font-weight:700;min-height:18px}
 @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
 .shake{animation:shake .35s ease}
@@ -535,6 +541,10 @@ body.light .meta-item{background:rgba(0,0,0,.05)}
     <div class="lock-icon">🔒</div>
     <div class="lock-title">Зарплата</div>
     <div class="lock-subtitle">Введите пароль для входа</div>
+    <button class="lock-btn secondary" id="bioBtn" onclick="tryBioAuth()" style="display:none">
+      <span style="font-size:18px">🔐</span><span>Войти по Face ID</span>
+    </button>
+    <div class="lock-divider" id="bioDivider" style="display:none">или</div>
     <input class="lock-input" id="lockInput" type="password"
       placeholder="••••••" autocomplete="current-password"
       onkeydown="if(event.key==='Enter')unlockApp()">
@@ -751,7 +761,27 @@ body.light .meta-item{background:rgba(0,0,0,.05)}
     <button class="modal-btn" style="width:100%;padding:13px;margin-bottom:10px" onclick="exportData()">📤 Экспорт в файл</button>
     <button class="modal-btn" style="width:100%;padding:13px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="document.getElementById('importFileIn').click()">📥 Импорт из файла</button>
     <input type="file" id="importFileIn" accept=".json,application/json" style="display:none" onchange="importData(event)">
+    <div id="bioSection" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+      <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Биометрия</div>
+      <div id="bioStatus" style="font-size:13px;color:var(--muted);margin-bottom:10px"></div>
+      <button class="modal-btn" id="bioToggleBtn" style="width:100%;padding:12px" onclick="toggleBio()"></button>
+    </div>
     <div id="dataMsg" style="margin-top:12px;font-size:13px;text-align:center;font-weight:600;min-height:18px"></div>
+  </div>
+</div>
+
+<!-- BIO OFFER MODAL -->
+<div class="modal-overlay" id="bioOfferModal" onclick="closeBioOffer(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div style="text-align:center;font-size:52px;margin-bottom:6px">🔐</div>
+    <div class="modal-title" style="text-align:center">Включить Face ID?</div>
+    <div style="font-size:13px;color:var(--muted);line-height:1.5;text-align:center;margin-bottom:16px">
+      Быстрый вход по биометрии без ввода пароля.
+    </div>
+    <button class="modal-btn" style="width:100%;padding:13px;margin-bottom:10px" onclick="enableBio()">Включить</button>
+    <button class="modal-btn" style="width:100%;padding:13px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="document.getElementById('bioOfferModal').classList.remove('open')">Позже</button>
+    <div id="bioOfferMsg" style="margin-top:12px;font-size:13px;text-align:center;font-weight:600;color:var(--danger);min-height:18px"></div>
   </div>
 </div>
 
@@ -1865,6 +1895,7 @@ function openDataModal(){
       <div style="font-size:18px;font-weight:800;color:var(--accent2)">${tplCount}</div>
       <div style="font-size:10px;font-weight:700;letter-spacing:1px;color:var(--muted);text-transform:uppercase;margin-top:2px">Шаблонов</div>
     </div>`;
+  renderBioSection();
   document.getElementById('dataModal').classList.add('open');
 }
 function closeDataModal(e){if(e.target===document.getElementById('dataModal'))document.getElementById('dataModal').classList.remove('open')}
@@ -1942,6 +1973,7 @@ function importData(e){
       renderPeriodCard();renderDayStrip();renderDayPanel();renderBonuses();
       renderTemplates();renderTotal();renderChart();renderGoals();
       renderBreakdown();renderHistory();renderDayMotivation();renderShiftTracker();
+      setupBioButton();renderBioSection();
       haptic('medium');
       showDataMsg(`✓ Импортировано: ${n}`,'ok');
       // refresh stats in modal
@@ -1971,6 +2003,13 @@ async function hashPassword(str){
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
 }
 
+function doUnlock(){
+  const overlay=document.getElementById('lockOverlay');
+  overlay.classList.add('hidden');
+  document.getElementById('lockError').textContent='';
+  setTimeout(()=>overlay.style.display='none',300);
+}
+
 async function unlockApp(){
   const input=document.getElementById('lockInput');
   const errorEl=document.getElementById('lockError');
@@ -1978,10 +2017,12 @@ async function unlockApp(){
   if(!val){input.classList.add('error');errorEl.textContent='Введите пароль';return;}
   const hash=await hashPassword(val);
   if(hash===PASSWORD_HASH){
-    const overlay=document.getElementById('lockOverlay');
-    overlay.classList.add('hidden');
-    errorEl.textContent='';
-    setTimeout(()=>overlay.style.display='none',300);
+    haptic('light');
+    doUnlock();
+    // offer Face ID setup on first successful password login
+    if(!bioRegistered() && await bioPlatformAvailable()){
+      setTimeout(openBioOffer,600);
+    }
   } else {
     input.classList.add('error');
     input.classList.add('shake');
@@ -1990,6 +2031,155 @@ async function unlockApp(){
     setTimeout(()=>{input.classList.remove('shake');input.classList.remove('error')},400);
     input.value='';
     input.focus();
+  }
+}
+
+// ══════════════════════════════════════════════
+//  BIOMETRIC AUTH (Face ID / Touch ID via WebAuthn)
+// ══════════════════════════════════════════════
+const BIO_KEY='salary_bio';
+
+function bioSupported(){
+  return !!(window.PublicKeyCredential && navigator.credentials && window.isSecureContext);
+}
+async function bioPlatformAvailable(){
+  if(!bioSupported())return false;
+  try{return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()}catch(e){return false}
+}
+function bioRegistered(){return !!localStorage.getItem(BIO_KEY)}
+
+function b64url(buf){
+  const bytes=new Uint8Array(buf);let s='';
+  for(let i=0;i<bytes.length;i++)s+=String.fromCharCode(bytes[i]);
+  return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function b64urlDec(str){
+  str=str.replace(/-/g,'+').replace(/_/g,'/');while(str.length%4)str+='=';
+  const bin=atob(str);const out=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)out[i]=bin.charCodeAt(i);
+  return out.buffer;
+}
+
+async function bioRegister(){
+  if(!bioSupported())throw new Error('Не поддерживается в этом браузере');
+  const challenge=crypto.getRandomValues(new Uint8Array(32));
+  const userId=crypto.getRandomValues(new Uint8Array(16));
+  const cred=await navigator.credentials.create({
+    publicKey:{
+      challenge,
+      rp:{id:location.hostname,name:'Зарплата'},
+      user:{id:userId,name:'user@'+location.hostname,displayName:'Пользователь'},
+      pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
+      authenticatorSelection:{
+        authenticatorAttachment:'platform',
+        userVerification:'required',
+        residentKey:'preferred'
+      },
+      timeout:60000,
+      attestation:'none'
+    }
+  });
+  if(!cred)throw new Error('Отменено');
+  localStorage.setItem(BIO_KEY,b64url(cred.rawId));
+}
+
+async function bioAuth(){
+  if(!bioSupported()||!bioRegistered())return false;
+  try{
+    const credId=b64urlDec(localStorage.getItem(BIO_KEY));
+    const challenge=crypto.getRandomValues(new Uint8Array(32));
+    const assertion=await navigator.credentials.get({
+      publicKey:{
+        challenge,
+        rpId:location.hostname,
+        allowCredentials:[{id:credId,type:'public-key',transports:['internal']}],
+        userVerification:'required',
+        timeout:60000
+      }
+    });
+    return !!assertion;
+  }catch(e){return false}
+}
+
+function bioDisable(){localStorage.removeItem(BIO_KEY)}
+
+async function tryBioAuth(){
+  const btn=document.getElementById('bioBtn');
+  const errorEl=document.getElementById('lockError');
+  if(btn)btn.disabled=true;
+  errorEl.textContent='';
+  const ok=await bioAuth();
+  if(btn)btn.disabled=false;
+  if(ok){haptic('light');doUnlock();return}
+  errorEl.textContent='Face ID не распознан — введите пароль';
+  haptic('medium');
+}
+
+async function setupBioButton(){
+  const btn=document.getElementById('bioBtn');
+  const divider=document.getElementById('bioDivider');
+  const show=bioSupported()&&bioRegistered()&&await bioPlatformAvailable();
+  btn.style.display=show?'flex':'none';
+  divider.style.display=show?'flex':'none';
+}
+
+function openBioOffer(){document.getElementById('bioOfferModal').classList.add('open')}
+function closeBioOffer(e){
+  if(e.target===document.getElementById('bioOfferModal'))
+    document.getElementById('bioOfferModal').classList.remove('open');
+}
+
+async function enableBio(){
+  const msg=document.getElementById('bioOfferMsg');
+  msg.textContent='';
+  try{
+    await bioRegister();
+    haptic('medium');
+    document.getElementById('bioOfferModal').classList.remove('open');
+    setupBioButton();
+    renderBioSection();
+  }catch(e){
+    msg.textContent=e.name==='NotAllowedError'||/cancel/i.test(e.message||'')
+      ?'Отменено'
+      :'Не удалось: '+(e.message||'ошибка');
+  }
+}
+
+async function renderBioSection(){
+  const sect=document.getElementById('bioSection');
+  const available=await bioPlatformAvailable();
+  if(!available){sect.style.display='none';return}
+  sect.style.display='block';
+  const registered=bioRegistered();
+  document.getElementById('bioStatus').textContent=registered
+    ?'✓ Face ID подключён на этом устройстве'
+    :'Face ID ещё не подключён';
+  const btn=document.getElementById('bioToggleBtn');
+  if(registered){
+    btn.textContent='Отключить Face ID';
+    btn.style.background='var(--surface2)';
+    btn.style.color='var(--danger)';
+    btn.style.border='1px solid var(--border)';
+  } else {
+    btn.textContent='🔐 Подключить Face ID';
+    btn.style.background='var(--accent)';
+    btn.style.color='#0d1a0f';
+    btn.style.border='none';
+  }
+}
+
+async function toggleBio(){
+  if(bioRegistered()){
+    if(!confirm('Отключить Face ID? При следующем входе потребуется пароль.'))return;
+    bioDisable();haptic('medium');
+    setupBioButton();renderBioSection();
+  } else {
+    try{
+      await bioRegister();haptic('medium');
+      setupBioButton();renderBioSection();
+    }catch(e){
+      if(e.name!=='NotAllowedError')alert('Не удалось: '+(e.message||'ошибка'));
+    }
   }
 }
 
@@ -2015,6 +2205,7 @@ renderBreakdown();
 renderHistory();
 renderDayMotivation();
 startShiftTimer();
+setupBioButton();
 </script>
 </body>
 </html>
