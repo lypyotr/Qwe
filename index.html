@@ -1005,18 +1005,11 @@ function renderGoals(){
   const isCurrentPeriod=today.getFullYear()===year&&today.getMonth()===month&&today.getDate()>=startDay&&today.getDate()<=endDay;
   const totalDays=endDay-startDay+1;
 
-  // working days left in period (rough: exclude weekends)
-  let daysLeft=0, workDaysLeft=0, workDaysTotal=0;
-  for(let d=startDay;d<=endDay;d++){
-    const dt=new Date(year,month,d);
-    const isWE=dt.getDay()===0||dt.getDay()===6;
-    if(!isWE)workDaysTotal++;
-    if(isCurrentPeriod&&d>today.getDate()){
-      daysLeft++;
-      if(!isWE)workDaysLeft++;
-    }
-  }
-  const calDaysLeft=isCurrentPeriod?endDay-today.getDate():0;
+  // Calendar days left (from tomorrow to end of period)
+  const calDaysLeft=isCurrentPeriod?Math.max(0,endDay-today.getDate()):0;
+  // Days actually worked so far (with any income)
+  const workedDaysSoFar=Object.keys(days).filter(d=>daySum(parseInt(d))>0).length;
+  const avgPerWorkedDay=workedDaysSoFar>0?earned/workedDaysSoFar:0;
 
   let html='';
 
@@ -1027,10 +1020,10 @@ function renderGoals(){
     const barW=Math.round(pct*100);
     let note='',noteCls='';
     if(pct>=1){note='🎉 Цель достигнута! Отличная работа!';noteCls='fire'}
-    else if(isCurrentPeriod&&workDaysLeft>0){
-      const needPerDay=left/workDaysLeft;
-      note=`Осталось ${fmt(left)} ₽ · нужно зарабатывать ${fmt(needPerDay)} ₽/день`;
-      noteCls=needPerDay>earned/Math.max(workDaysTotal-workDaysLeft,1)*1.3?'danger':'warn';
+    else if(isCurrentPeriod&&calDaysLeft>0){
+      const needPerDay=left/calDaysLeft;
+      note=`Осталось ${fmt(left)} ₽ · нужно ${fmt(Math.ceil(needPerDay))} ₽/день`;
+      noteCls=avgPerWorkedDay>0&&needPerDay>avgPerWorkedDay*1.3?'danger':'warn';
     } else if(!isCurrentPeriod){note=`Заработано ${fmt(earned)} ₽ из ${fmt(goals.period)} ₽`}
     html+=goalRowHtml('За период',earned,goals.period,barW,cls,note,noteCls);
   }
@@ -1042,14 +1035,14 @@ function renderGoals(){
     for(let d=today.getDate()-dow;d<=today.getDate();d++){
       if(d>=startDay&&d<=endDay)weekEarned+=daySum(d)*taxMult;
     }
-    const daysLeftInWeek=6-dow;
+    const daysLeftInWeek=6-dow; // calendar days remaining in week (incl. weekends)
     const pct=Math.min(weekEarned/goals.week,1);
     const barW=Math.round(pct*100);
     const cls=pct>=1?'done':pct>=0.7?'high':pct>=0.4?'mid':'low';
     const left=Math.max(goals.week-weekEarned,0);
     let note='',noteCls='';
     if(pct>=1){note='🔥 Недельная цель выполнена!';noteCls='fire'}
-    else if(daysLeftInWeek>0){note=`Осталось ${fmt(left)} ₽ · нужно ${fmt(left/daysLeftInWeek)} ₽/день`;noteCls=pct<0.3?'danger':'warn'}
+    else if(daysLeftInWeek>0){note=`Осталось ${fmt(left)} ₽ · нужно ${fmt(Math.ceil(left/daysLeftInWeek))} ₽/день`;noteCls=pct<0.3?'danger':'warn'}
     else{note=`На этой неделе ${fmt(weekEarned)} ₽ из ${fmt(goals.week)} ₽`;noteCls=pct<0.5?'danger':'warn'}
     html+=goalRowHtml('За неделю',weekEarned,goals.week,barW,cls,note,noteCls);
   }
@@ -1468,22 +1461,13 @@ function renderDayMotivation(){
   if(!hasGoal){el.innerHTML='';return}
 
   const{year,month,startDay,endDay}=getPeriod();
-  // Check today is within the selected period (not a different month/period)
   const today=new Date();today.setHours(0,0,0,0);
-  const isCurrentPeriod=today.getFullYear()===year&&today.getMonth()===month
-    &&today.getDate()>=startDay&&today.getDate()<=endDay;
-  // Show motivation for any day within the period, even if not today
   const inPeriodWindow=today.getFullYear()===year&&today.getMonth()===month;
   if(!inPeriodWindow){el.innerHTML='';return}
+  if(today.getDate()>endDay){el.innerHTML='';return}
 
-  // Count working days left from today to end of period
-  let workDaysLeft=0;
-  for(let d=today.getDate();d<=endDay;d++){
-    const dt=new Date(year,month,d);
-    if(dt.getDay()!==0&&dt.getDay()!==6)workDaysLeft++;
-  }
-  // If today is past the period, still show planned info
-  if(workDaysLeft===0&&today.getDate()>endDay){el.innerHTML='';return}
+  // Calendar days remaining (from today inclusive to end of period)
+  const daysLeft=endDay-today.getDate()+1;
 
   const earned=calcTotal();
   const taxMult=taxEnabled?0.87:1;
@@ -1493,14 +1477,13 @@ function renderDayMotivation(){
 
   const remaining=Math.max(goalTarget-earned,0);
 
-  // Get avg rate from this day's works, fallback to all period days
+  // Avg rate from selected day's works, then templates, then all period days
   const works=days[selectedDay]||[];
   const validWorks=works.filter(w=>(parseFloat(w.price)||0)>0);
   let avgRate=0;
   if(validWorks.length){
     avgRate=validWorks.reduce((s,w)=>s+(parseFloat(w.price)||0),0)/validWorks.length*taxMult;
   } else {
-    // fallback: avg rate from templates or past days
     if(templates.length){
       const validTpls=templates.filter(t=>(parseFloat(t.price)||0)>0);
       if(validTpls.length)
@@ -1524,33 +1507,33 @@ function renderDayMotivation(){
     return;
   }
 
-  const neededToday=workDaysLeft>0?remaining/workDaysLeft:remaining;
+  const neededPerDay=daysLeft>0?remaining/daysLeft:remaining;
   let pillsHtml='';
-  if(avgRate>0&&neededToday>0){
-    const unitsNeeded=Math.ceil(neededToday/avgRate);
-    const unitsLeft=Math.max(0,Math.ceil((neededToday-earnedToday)/avgRate));
+  if(avgRate>0&&neededPerDay>0){
+    const unitsNeeded=Math.ceil(neededPerDay/avgRate);
+    const unitsLeft=Math.max(0,Math.ceil((neededPerDay-earnedToday)/avgRate));
     pillsHtml=`<div class="motivation-target">
       <div class="motivation-pill">
         <span class="mp-count">${unitsNeeded}</span>
         <span class="mp-label">шт/день для плана</span>
       </div>`;
-    if(unitsLeft>0&&earnedToday<neededToday){
+    if(unitsLeft>0&&earnedToday<neededPerDay){
       pillsHtml+=`<div class="motivation-pill">
         <span class="mp-count" style="color:var(--accent2)">${unitsLeft}</span>
         <span class="mp-label">шт ещё сегодня</span>
       </div>`;
-    } else if(earnedToday>=neededToday&&earnedToday>0){
+    } else if(earnedToday>=neededPerDay&&earnedToday>0){
       pillsHtml+=`<div class="motivation-pill">
         <span class="mp-count" style="color:var(--accent)">✓</span>
         <span class="mp-label">на сегодня хватит!</span>
       </div>`;
     }
     pillsHtml+=`</div>`;
-    if(remaining>0&&workDaysLeft>0){
-      pillsHtml+=`<div class="motivation-need">Нужно ещё <strong>${fmt(Math.ceil(neededToday))} ₽</strong> в день · осталось ${workDaysLeft} ${plWD(workDaysLeft)}</div>`;
+    if(remaining>0&&daysLeft>0){
+      pillsHtml+=`<div class="motivation-need">Нужно ещё <strong>${fmt(Math.ceil(neededPerDay))} ₽/день</strong> · осталось ${daysLeft} дн. в периоде</div>`;
     }
-  } else if(neededToday>0){
-    pillsHtml=`<div class="motivation-need">Нужно заработать <strong>${fmt(Math.ceil(neededToday))} ₽</strong> сегодня для выполнения плана</div>`;
+  } else if(neededPerDay>0){
+    pillsHtml=`<div class="motivation-need">Нужно заработать <strong>${fmt(Math.ceil(neededPerDay))} ₽</strong> сегодня для выполнения плана</div>`;
   }
 
   if(pillsHtml) el.innerHTML=`<div class="motivation-block">${pillsHtml}</div>`;
