@@ -288,9 +288,7 @@ body.light .meta-item{background:rgba(0,0,0,.05)}
   border:1px solid rgba(244,114,182,.2);
   border-radius:14px;padding:12px 14px;
 }
-.motivation-quote{
-  font-size:13px;font-weight:700;color:var(--text);line-height:1.4;margin-bottom:10px;
-}
+
 .motivation-target{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
 .motivation-pill{
   display:flex;align-items:center;gap:5px;
@@ -438,7 +436,29 @@ body.light .meta-item{background:rgba(0,0,0,.05)}
 .breakdown-row.total-row .lbl{color:var(--text);font-weight:700}
 .breakdown-row.total-row .val{color:var(--accent);font-size:15px}
 .breakdown-row.tax-r .val{color:var(--danger)}
-.breakdown-row.bonus-r .val{color:var(--accent3)}
+.breakdown-row.exp-r .val{color:var(--danger)}
+.breakdown-row.net-r{background:rgba(74,222,128,.05)}
+.breakdown-row.net-r .lbl{color:var(--text);font-weight:700}
+.breakdown-row.net-r .val{font-size:15px}
+
+/* ── EXPENSES CARD ── */
+.expenses-card{
+  margin:0 16px 12px;background:var(--surface);border:1px solid var(--border);
+  border-radius:14px;overflow:hidden;box-shadow:var(--card-shadow);
+}
+.expenses-title{
+  font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
+  color:var(--danger);padding:10px 16px 0;opacity:.9;
+}
+.exp-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 16px}
+.exp-row+.exp-row{border-top:1px solid var(--border)}
+.exp-input{
+  font-family:'Manrope',sans-serif;font-size:15px;font-weight:700;color:var(--text);
+  background:var(--surface2);border:1px solid var(--border);border-radius:10px;
+  padding:8px 12px;text-align:right;width:110px;outline:none;transition:border-color .15s;
+  -webkit-appearance:none;
+}
+.exp-input:focus{border-color:var(--danger)}
 .empty{text-align:center;padding:22px;color:var(--muted);font-size:13px}
 
 /* ── RESET ── */
@@ -615,7 +635,7 @@ body.light .meta-item{background:rgba(0,0,0,.05)}
 
 <!-- TOTAL CARD -->
 <div class="total-card">
-  <div class="total-label">Итого к получению</div>
+  <div class="total-label" id="totalLabel">Итого к получению</div>
   <div class="total-amount" id="totalDisplay">0 <span>₽</span></div>
   <div class="total-meta" id="totalMeta"></div>
   <div id="compareBadge"></div>
@@ -635,6 +655,25 @@ body.light .meta-item{background:rgba(0,0,0,.05)}
     <div class="tax-sub">13% подоходный налог</div>
   </div>
   <div class="toggle" id="taxToggle" onclick="toggleTax()"></div>
+</div>
+
+<!-- EXPENSES -->
+<div class="expenses-card">
+  <div class="expenses-title">Расходы</div>
+  <div class="exp-row">
+    <div class="tax-info">
+      <div class="tax-title">Дорога на работу</div>
+      <div class="tax-sub">₽ за рабочий день</div>
+    </div>
+    <input class="exp-input" id="commuteIn" type="number" inputmode="decimal" placeholder="0" oninput="onExpensesChange()">
+  </div>
+  <div class="exp-row">
+    <div class="tax-info">
+      <div class="tax-title">Кредиты / ипотека</div>
+      <div class="tax-sub">₽ в месяц</div>
+    </div>
+    <input class="exp-input" id="creditIn" type="number" inputmode="decimal" placeholder="0" oninput="onExpensesChange()">
+  </div>
 </div>
 
 <!-- DAY STRIP -->
@@ -1388,26 +1427,6 @@ function startShiftTimer() {
 // ══════════════════════════════════════════════
 //  MOTIVATIONAL PHRASES
 // ══════════════════════════════════════════════
-const MOTIV_PHRASES = [
-  'Каждое изделие — шаг к цели. Вперёд! 💪',
-  'Сегодня ты решаешь, каким будет конец месяца. Давай! 🔥',
-  'Темп сегодня = зарплата завтра. Не сбавляй! 🚀',
-  'Один час интенсивной работы = ощутимая прибавка! ⚡',
-  'Ты уже начал — это главное. Теперь не останавливайся! 🎯',
-  'Чем больше сделаешь сейчас — тем легче потом. Жми! 💥',
-  'Маленькие детали — большие деньги. Каждая штука в копилку! 🏆',
-  'Твои руки — твой доход. Задействуй их на полную! 🙌',
-  'Сегодня продуктивно = завтра спокойно. Вперёд! 😤',
-  'Не считай часы — считай изделия. Это и есть твой заработок! 📦',
-  'Ещё немного — и план закрыт. Не отступай! 🏁',
-  'Каждый лишний час работы = реальные деньги. Используй его! 💎',
-  'Сделай сегодня чуть больше, чем вчера — вот формула роста! 📈',
-  'Ночная смена — двойная сила. Держишь темп? Отлично! 🌙',
-  'До конца смены ещё есть время. Не сдавай позиции! ⏰',
-];
-function getDayPhrase(day) {
-  return MOTIV_PHRASES[(day + new Date().getMonth()) % MOTIV_PHRASES.length];
-}
 
 function renderDayMotivation(){
   const el=document.getElementById('dayMotivation');
@@ -1464,7 +1483,6 @@ function renderDayMotivation(){
     }
   }
 
-  const phrase=getDayPhrase(selectedDay);
   const earnedToday=daySum(selectedDay)*taxMult;
 
   if(goalTarget>0&&earned>=goalTarget){
@@ -1503,10 +1521,8 @@ function renderDayMotivation(){
     pillsHtml=`<div class="motivation-need">Нужно заработать <strong>${fmt(Math.ceil(neededToday))} ₽</strong> сегодня для выполнения плана</div>`;
   }
 
-  el.innerHTML=`<div class="motivation-block">
-    <div class="motivation-quote">${phrase}</div>
-    ${pillsHtml}
-  </div>`;
+  if(pillsHtml) el.innerHTML=`<div class="motivation-block">${pillsHtml}</div>`;
+  else el.innerHTML='';
 }
 
 function plWD(n){if(n%10===1&&n%100!==11)return'рабочий день';if([2,3,4].includes(n%10)&&![12,13,14].includes(n%100))return'рабочих дня';return'рабочих дней'}
@@ -1691,17 +1707,21 @@ function toggleTax(){
 // ══════════════════════════════════════════════
 function renderTotal(){
   const base=calcBase(),total=calcTotal();
-  document.getElementById('totalDisplay').innerHTML=fmt(total)+' <span>₽</span>';
+  const expTotal=calcExpensesTotal(),net=calcNetTotal();
+  const hasExp=expTotal>0;
+  document.getElementById('totalLabel').textContent=hasExp?'На руки':'Итого к получению';
+  const disp=hasExp?net:total;
+  const dispEl=document.getElementById('totalDisplay');
+  dispEl.innerHTML=fmt(disp)+' <span>₽</span>';
+  dispEl.style.color=hasExp&&net<0?'var(--danger)':'';
   const filledDays=Object.keys(days).filter(d=>daySum(parseInt(d))>0).length;
   const meta=[];
   if(filledDays>0)meta.push(`<div class="meta-item">Дней: <strong>${filledDays}</strong></div>`);
   if(base>0)meta.push(`<div class="meta-item">База: <strong>${fmt(base)} ₽</strong></div>`);
-  if(filledDays>1){
-    const avg=base/filledDays;
-    meta.push(`<div class="meta-item">Ср/день: <strong>${fmt(avg)} ₽</strong></div>`);
-  }
+  if(filledDays>1)meta.push(`<div class="meta-item">Ср/день: <strong>${fmt(base/filledDays)} ₽</strong></div>`);
+  if(hasExp)meta.push(`<div class="meta-item" style="color:var(--danger)">Расходы: <strong>−${fmt(expTotal)} ₽</strong></div>`);
   document.getElementById('totalMeta').innerHTML=meta.join('');
-  renderCompareBadge(total);
+  renderCompareBadge(disp);
 }
 
 function renderCompareBadge(total){
@@ -1844,9 +1864,49 @@ function renderBreakdown(){
     }
   });
   if(taxEnabled)rows+=`<div class="breakdown-row tax-r"><span class="lbl">НДФЛ 13%</span><span class="val">−${fmt(tax)} ₽</span></div>`;
-  rows+=`<div class="breakdown-row total-row"><span class="lbl">К получению</span><span class="val">${fmt(total)} ₽</span></div>`;
+  const expTotal=calcExpensesTotal(),net=calcNetTotal();
+  const hasExp=expTotal>0;
+  if(hasExp){
+    rows+=`<div class="breakdown-row"><span class="lbl">К получению</span><span class="val">${fmt(total)} ₽</span></div>`;
+    const commute=calcCommuteTotal(),credit=calcCreditPeriod(),wd=calcWorkedDays();
+    if(commute>0)rows+=`<div class="breakdown-row exp-r"><span class="lbl">Дорога (${wd} дн. × ${fmt(expenses.commute)} ₽)</span><span class="val">−${fmt(commute)} ₽</span></div>`;
+    if(credit>0)rows+=`<div class="breakdown-row exp-r"><span class="lbl">Кредиты (½ мес.)</span><span class="val">−${fmt(credit)} ₽</span></div>`;
+    const netColor=net<0?'var(--danger)':'var(--accent)';
+    rows+=`<div class="breakdown-row net-r"><span class="lbl">На руки</span><span class="val" style="color:${netColor}">${fmt(net)} ₽</span></div>`;
+  } else {
+    rows+=`<div class="breakdown-row total-row"><span class="lbl">К получению</span><span class="val">${fmt(total)} ₽</span></div>`;
+  }
   bd.innerHTML=rows;
 }
+
+// ══════════════════════════════════════════════
+//  EXPENSES
+// ══════════════════════════════════════════════
+let expenses={commute:0,credit:0};
+function loadExpenses(){
+  try{expenses=JSON.parse(localStorage.getItem('salary_expenses')||'{"commute":0,"credit":0}')}
+  catch(e){expenses={commute:0,credit:0}}
+}
+function saveExpenses(){
+  expenses.commute=parseFloat(document.getElementById('commuteIn').value)||0;
+  expenses.credit=parseFloat(document.getElementById('creditIn').value)||0;
+  try{localStorage.setItem('salary_expenses',JSON.stringify(expenses))}catch(e){}
+}
+function onExpensesChange(){
+  saveExpenses();
+  renderTotal();renderBreakdown();renderGoals();
+}
+function renderExpensesInputs(){
+  const ci=document.getElementById('commuteIn');
+  const cr=document.getElementById('creditIn');
+  if(ci)ci.value=expenses.commute||'';
+  if(cr)cr.value=expenses.credit||'';
+}
+function calcWorkedDays(){return Object.keys(days).filter(d=>daySum(parseInt(d))>0).length}
+function calcCommuteTotal(){return (expenses.commute||0)*calcWorkedDays()}
+function calcCreditPeriod(){return (expenses.credit||0)/2}
+function calcExpensesTotal(){return calcCommuteTotal()+calcCreditPeriod()}
+function calcNetTotal(){return calcTotal()-calcExpensesTotal()}
 
 // ══════════════════════════════════════════════
 //  RESET
@@ -1969,11 +2029,13 @@ function importData(e){
       loadTheme();
       loadTemplates();
       loadGoals();
+      loadExpenses();
       load();
       renderPeriodCard();renderDayStrip();renderDayPanel();renderBonuses();
       renderTemplates();renderTotal();renderChart();renderGoals();
       renderBreakdown();renderHistory();renderDayMotivation();renderShiftTracker();
       setupBioButton();renderBioSection();
+      renderExpensesInputs();
       haptic('medium');
       showDataMsg(`✓ Импортировано: ${n}`,'ok');
       // refresh stats in modal
@@ -2191,6 +2253,7 @@ document.getElementById('lockInput').focus();
 initMonths();
 loadTemplates();
 loadGoals();
+loadExpenses();
 document.getElementById('periodSel').value=new Date().getDate()<=15?'1':'2';
 load();
 renderPeriodCard();
@@ -2204,6 +2267,7 @@ renderGoals();
 renderBreakdown();
 renderHistory();
 renderDayMotivation();
+renderExpensesInputs();
 startShiftTimer();
 setupBioButton();
 </script>
