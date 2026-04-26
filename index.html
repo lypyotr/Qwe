@@ -446,19 +446,45 @@ body.light .meta-item{background:rgba(0,0,0,.05)}
   margin:0 16px 12px;background:var(--surface);border:1px solid var(--border);
   border-radius:14px;overflow:hidden;box-shadow:var(--card-shadow);
 }
+.expenses-header{display:flex;justify-content:space-between;align-items:center;padding:10px 16px 8px}
 .expenses-title{
   font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
-  color:var(--danger);padding:10px 16px 0;opacity:.9;
+  color:var(--danger);opacity:.9;
 }
-.exp-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 16px}
-.exp-row+.exp-row{border-top:1px solid var(--border)}
-.exp-input{
+.expenses-add-btn{
+  font-size:12px;font-weight:700;color:var(--accent);cursor:pointer;
+  background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.2);
+  border-radius:8px;padding:4px 10px;
+}
+.expenses-add-btn:active{opacity:.7}
+.exp-item{padding:10px 16px;border-top:1px solid var(--border)}
+.exp-top{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.exp-name{
+  flex:1;font-family:'Manrope',sans-serif;font-size:13px;font-weight:600;
+  color:var(--text);background:transparent;border:none;outline:none;min-width:0;
+}
+.exp-name::placeholder{color:var(--muted)}
+.exp-del{color:var(--muted);font-size:16px;cursor:pointer;padding:0 2px;flex-shrink:0}
+.exp-del:active{color:var(--danger)}
+.exp-bottom{display:flex;align-items:center;gap:8px}
+.exp-amount{
   font-family:'Manrope',sans-serif;font-size:15px;font-weight:700;color:var(--text);
   background:var(--surface2);border:1px solid var(--border);border-radius:10px;
-  padding:8px 12px;text-align:right;width:110px;outline:none;transition:border-color .15s;
-  -webkit-appearance:none;
+  padding:7px 10px;width:110px;outline:none;text-align:right;
+  -webkit-appearance:none;transition:border-color .15s;
 }
-.exp-input:focus{border-color:var(--danger)}
+.exp-amount:focus{border-color:var(--danger)}
+.exp-currency{font-size:13px;font-weight:700;color:var(--muted);flex-shrink:0}
+.exp-mode{
+  display:flex;background:var(--surface2);border:1px solid var(--border);
+  border-radius:8px;overflow:hidden;margin-left:auto;flex-shrink:0;
+}
+.exp-mode-opt{
+  font-size:11px;font-weight:700;padding:6px 10px;cursor:pointer;
+  color:var(--muted);transition:all .15s;white-space:nowrap;
+}
+.exp-mode-opt.active{background:var(--danger);color:#fff}
+.exp-empty{padding:10px 16px 12px;font-size:13px;color:var(--muted);border-top:1px solid var(--border)}
 .empty{text-align:center;padding:22px;color:var(--muted);font-size:13px}
 
 /* ── RESET ── */
@@ -659,21 +685,11 @@ body.light .meta-item{background:rgba(0,0,0,.05)}
 
 <!-- EXPENSES -->
 <div class="expenses-card">
-  <div class="expenses-title">Расходы</div>
-  <div class="exp-row">
-    <div class="tax-info">
-      <div class="tax-title">Дорога на работу</div>
-      <div class="tax-sub">₽ за рабочий день</div>
-    </div>
-    <input class="exp-input" id="commuteIn" type="number" inputmode="decimal" placeholder="0" oninput="onExpensesChange()">
+  <div class="expenses-header">
+    <div class="expenses-title">Расходы</div>
+    <div class="expenses-add-btn" onclick="addExpenseItem()">+ Добавить</div>
   </div>
-  <div class="exp-row">
-    <div class="tax-info">
-      <div class="tax-title">Кредиты / ипотека</div>
-      <div class="tax-sub">₽ в месяц</div>
-    </div>
-    <input class="exp-input" id="creditIn" type="number" inputmode="decimal" placeholder="0" oninput="onExpensesChange()">
-  </div>
+  <div id="expensesList"></div>
 </div>
 
 <!-- DAY STRIP -->
@@ -1868,9 +1884,14 @@ function renderBreakdown(){
   const hasExp=expTotal>0;
   if(hasExp){
     rows+=`<div class="breakdown-row"><span class="lbl">К получению</span><span class="val">${fmt(total)} ₽</span></div>`;
-    const commute=calcCommuteTotal(),credit=calcCreditPeriod(),wd=calcWorkedDays();
-    if(commute>0)rows+=`<div class="breakdown-row exp-r"><span class="lbl">Дорога (${wd} дн. × ${fmt(expenses.commute)} ₽)</span><span class="val">−${fmt(commute)} ₽</span></div>`;
-    if(credit>0)rows+=`<div class="breakdown-row exp-r"><span class="lbl">Кредиты (½ мес.)</span><span class="val">−${fmt(credit)} ₽</span></div>`;
+    expenseItems.forEach(item=>{
+      const amt=parseFloat(item.amount)||0;
+      if(!amt)return;
+      const calc=item.mode==='month'?amt/2:amt;
+      const hint=item.mode==='month'?'½ мес.':'за период';
+      const lbl=item.name||'Расход';
+      rows+=`<div class="breakdown-row exp-r"><span class="lbl">${esc(lbl)} <span style="font-weight:400;color:var(--muted)">(${hint})</span></span><span class="val">−${fmt(calc)} ₽</span></div>`;
+    });
     const netColor=net<0?'var(--danger)':'var(--accent)';
     rows+=`<div class="breakdown-row net-r"><span class="lbl">На руки</span><span class="val" style="color:${netColor}">${fmt(net)} ₽</span></div>`;
   } else {
@@ -1882,30 +1903,77 @@ function renderBreakdown(){
 // ══════════════════════════════════════════════
 //  EXPENSES
 // ══════════════════════════════════════════════
-let expenses={commute:0,credit:0};
+let expenseItems=[];
+
 function loadExpenses(){
-  try{expenses=JSON.parse(localStorage.getItem('salary_expenses')||'{"commute":0,"credit":0}')}
-  catch(e){expenses={commute:0,credit:0}}
+  try{
+    const raw=localStorage.getItem('salary_expenses');
+    if(!raw){expenseItems=[];return}
+    const parsed=JSON.parse(raw);
+    // migrate from old {commute,credit} format
+    if(Array.isArray(parsed)){
+      expenseItems=parsed;
+    } else {
+      expenseItems=[];
+      if(parsed.commute>0) expenseItems.push({id:Date.now(),name:'Дорога на работу',amount:parsed.commute,mode:'period'});
+      if(parsed.credit>0)  expenseItems.push({id:Date.now()+1,name:'Кредиты / ипотека',amount:parsed.credit,mode:'month'});
+    }
+  }catch(e){expenseItems=[]}
 }
 function saveExpenses(){
-  expenses.commute=parseFloat(document.getElementById('commuteIn').value)||0;
-  expenses.credit=parseFloat(document.getElementById('creditIn').value)||0;
-  try{localStorage.setItem('salary_expenses',JSON.stringify(expenses))}catch(e){}
+  try{localStorage.setItem('salary_expenses',JSON.stringify(expenseItems))}catch(e){}
 }
-function onExpensesChange(){
+function addExpenseItem(){
+  expenseItems.push({id:Date.now(),name:'',amount:'',mode:'period'});
+  saveExpenses();haptic('light');
+  renderExpenses();renderTotal();renderBreakdown();renderGoals();
+}
+function delExpense(id){
+  expenseItems=expenseItems.filter(e=>e.id!==id);
+  saveExpenses();haptic('medium');
+  renderExpenses();renderTotal();renderBreakdown();renderGoals();
+}
+function updateExpense(id,field,value){
+  const item=expenseItems.find(e=>e.id===id);
+  if(!item)return;
+  item[field]=value;
   saveExpenses();
+  if(field==='mode') renderExpenses();
   renderTotal();renderBreakdown();renderGoals();
 }
-function renderExpensesInputs(){
-  const ci=document.getElementById('commuteIn');
-  const cr=document.getElementById('creditIn');
-  if(ci)ci.value=expenses.commute||'';
-  if(cr)cr.value=expenses.credit||'';
+function renderExpenses(){
+  const list=document.getElementById('expensesList');
+  if(!list)return;
+  if(!expenseItems.length){
+    list.innerHTML='<div class="exp-empty">Нажми «+ Добавить» чтобы добавить расход</div>';
+    return;
+  }
+  list.innerHTML=expenseItems.map(item=>`
+    <div class="exp-item">
+      <div class="exp-top">
+        <input class="exp-name" placeholder="Название расхода" value="${esc(String(item.name||''))}"
+          oninput="updateExpense(${item.id},'name',this.value)">
+        <div class="exp-del" onclick="delExpense(${item.id})">✕</div>
+      </div>
+      <div class="exp-bottom">
+        <input class="exp-amount" type="number" inputmode="decimal" placeholder="0"
+          value="${item.amount||''}" oninput="updateExpense(${item.id},'amount',this.value)">
+        <span class="exp-currency">₽</span>
+        <div class="exp-mode">
+          <div class="exp-mode-opt${item.mode==='period'?' active':''}"
+            onclick="updateExpense(${item.id},'mode','period')">за период</div>
+          <div class="exp-mode-opt${item.mode==='month'?' active':''}"
+            onclick="updateExpense(${item.id},'mode','month')">за месяц</div>
+        </div>
+      </div>
+    </div>`).join('');
 }
-function calcWorkedDays(){return Object.keys(days).filter(d=>daySum(parseInt(d))>0).length}
-function calcCommuteTotal(){return (expenses.commute||0)*calcWorkedDays()}
-function calcCreditPeriod(){return (expenses.credit||0)/2}
-function calcExpensesTotal(){return calcCommuteTotal()+calcCreditPeriod()}
+function calcExpensesTotal(){
+  return expenseItems.reduce((s,item)=>{
+    const amt=parseFloat(item.amount)||0;
+    return s+(item.mode==='month'?amt/2:amt);
+  },0);
+}
 function calcNetTotal(){return calcTotal()-calcExpensesTotal()}
 
 // ══════════════════════════════════════════════
@@ -2035,7 +2103,7 @@ function importData(e){
       renderTemplates();renderTotal();renderChart();renderGoals();
       renderBreakdown();renderHistory();renderDayMotivation();renderShiftTracker();
       setupBioButton();renderBioSection();
-      renderExpensesInputs();
+      renderExpenses();
       haptic('medium');
       showDataMsg(`✓ Импортировано: ${n}`,'ok');
       // refresh stats in modal
@@ -2267,7 +2335,7 @@ renderGoals();
 renderBreakdown();
 renderHistory();
 renderDayMotivation();
-renderExpensesInputs();
+renderExpenses();
 startShiftTimer();
 setupBioButton();
 </script>
