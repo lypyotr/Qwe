@@ -154,6 +154,18 @@ body.light .total-card{background:linear-gradient(135deg,#e8faf0 0%,#e8f4ff 100%
 .meta-item{background:rgba(255,255,255,.07);border-radius:10px;padding:4px 10px;font-size:11px;color:var(--muted)}
 body.light .meta-item{background:rgba(0,0,0,.05)}
 .meta-item strong{color:var(--text);font-weight:700}
+.total-view-toggle{
+  display:none;background:rgba(255,255,255,.08);border-radius:8px;overflow:hidden;
+  margin-bottom:10px;width:fit-content;
+}
+body.light .total-view-toggle{background:rgba(0,0,0,.07)}
+.tvt-opt{
+  display:inline-block;font-size:11px;font-weight:700;letter-spacing:.5px;
+  padding:5px 13px;cursor:pointer;color:rgba(255,255,255,.45);transition:all .15s;
+}
+body.light .tvt-opt{color:var(--muted)}
+.tvt-opt.active{background:rgba(255,255,255,.18);color:#fff}
+body.light .tvt-opt.active{background:rgba(0,0,0,.1);color:var(--text)}
 
 /* compare badge */
 .compare-badge{
@@ -662,6 +674,10 @@ body.light .meta-item{background:rgba(0,0,0,.05)}
 <!-- TOTAL CARD -->
 <div class="total-card">
   <div class="total-label" id="totalLabel">Итого к получению</div>
+  <div class="total-view-toggle" id="totalViewToggle">
+    <span class="tvt-opt" id="tvtGross" onclick="setTotalView('gross')">Грязными</span>
+    <span class="tvt-opt" id="tvtNet" onclick="setTotalView('net')">На руки</span>
+  </div>
   <div class="total-amount" id="totalDisplay">0 <span>₽</span></div>
   <div class="total-meta" id="totalMeta"></div>
   <div id="compareBadge"></div>
@@ -1721,15 +1737,32 @@ function toggleTax(){
 // ══════════════════════════════════════════════
 //  TOTAL
 // ══════════════════════════════════════════════
+let totalView='net'; // 'gross' | 'net'
+function setTotalView(v){
+  totalView=v;
+  document.getElementById('tvtGross').classList.toggle('active',v==='gross');
+  document.getElementById('tvtNet').classList.toggle('active',v==='net');
+  renderTotal();renderBreakdown();
+}
+
 function renderTotal(){
   const base=calcBase(),total=calcTotal();
   const expTotal=calcExpensesTotal(),net=calcNetTotal();
   const hasExp=expTotal>0;
-  document.getElementById('totalLabel').textContent=hasExp?'На руки':'Итого к получению';
-  const disp=hasExp?net:total;
+  const tog=document.getElementById('totalViewToggle');
+  if(hasExp){
+    tog.style.display='block';
+    document.getElementById('tvtGross').classList.toggle('active',totalView==='gross');
+    document.getElementById('tvtNet').classList.toggle('active',totalView==='net');
+  } else {
+    tog.style.display='none';
+  }
+  const showNet=hasExp&&totalView==='net';
+  document.getElementById('totalLabel').textContent=showNet?'На руки':'К получению';
+  const disp=showNet?net:total;
   const dispEl=document.getElementById('totalDisplay');
   dispEl.innerHTML=fmt(disp)+' <span>₽</span>';
-  dispEl.style.color=hasExp&&net<0?'var(--danger)':'';
+  dispEl.style.color=showNet&&net<0?'var(--danger)':'';
   const filledDays=Object.keys(days).filter(d=>daySum(parseInt(d))>0).length;
   const meta=[];
   if(filledDays>0)meta.push(`<div class="meta-item">Дней: <strong>${filledDays}</strong></div>`);
@@ -1884,11 +1917,14 @@ function renderBreakdown(){
   const hasExp=expTotal>0;
   if(hasExp){
     rows+=`<div class="breakdown-row"><span class="lbl">К получению</span><span class="val">${fmt(total)} ₽</span></div>`;
+    const wd=calcWorkedDays();
     expenseItems.forEach(item=>{
       const amt=parseFloat(item.amount)||0;
       if(!amt)return;
-      const calc=item.mode==='month'?amt/2:amt;
-      const hint=item.mode==='month'?'½ мес.':'за период';
+      let calc,hint;
+      if(item.mode==='day'){calc=amt*wd;hint=`${wd} дн. × ${fmt(amt)} ₽`}
+      else if(item.mode==='month'){calc=amt/2;hint='½ мес.'}
+      else{calc=amt;hint='за период'}
       const lbl=item.name||'Расход';
       rows+=`<div class="breakdown-row exp-r"><span class="lbl">${esc(lbl)} <span style="font-weight:400;color:var(--muted)">(${hint})</span></span><span class="val">−${fmt(calc)} ₽</span></div>`;
     });
@@ -1941,6 +1977,7 @@ function updateExpense(id,field,value){
   if(field==='mode') renderExpenses();
   renderTotal();renderBreakdown();renderGoals();
 }
+function calcWorkedDays(){return Object.keys(days).filter(d=>daySum(parseInt(d))>0).length}
 function renderExpenses(){
   const list=document.getElementById('expensesList');
   if(!list)return;
@@ -1948,6 +1985,7 @@ function renderExpenses(){
     list.innerHTML='<div class="exp-empty">Нажми «+ Добавить» чтобы добавить расход</div>';
     return;
   }
+  const wd=calcWorkedDays();
   list.innerHTML=expenseItems.map(item=>`
     <div class="exp-item">
       <div class="exp-top">
@@ -1958,20 +1996,25 @@ function renderExpenses(){
       <div class="exp-bottom">
         <input class="exp-amount" type="number" inputmode="decimal" placeholder="0"
           value="${item.amount||''}" oninput="updateExpense(${item.id},'amount',this.value)">
-        <span class="exp-currency">₽</span>
+        <span class="exp-currency">₽${item.mode==='day'?`<span style="font-size:10px;color:var(--muted)"> ×${wd}дн</span>`:''}</span>
         <div class="exp-mode">
+          <div class="exp-mode-opt${item.mode==='day'?' active':''}"
+            onclick="updateExpense(${item.id},'mode','day')">в день</div>
           <div class="exp-mode-opt${item.mode==='period'?' active':''}"
-            onclick="updateExpense(${item.id},'mode','period')">за период</div>
+            onclick="updateExpense(${item.id},'mode','period')">период</div>
           <div class="exp-mode-opt${item.mode==='month'?' active':''}"
-            onclick="updateExpense(${item.id},'mode','month')">за месяц</div>
+            onclick="updateExpense(${item.id},'mode','month')">месяц</div>
         </div>
       </div>
     </div>`).join('');
 }
 function calcExpensesTotal(){
+  const wd=calcWorkedDays();
   return expenseItems.reduce((s,item)=>{
     const amt=parseFloat(item.amount)||0;
-    return s+(item.mode==='month'?amt/2:amt);
+    if(item.mode==='day') return s+amt*wd;
+    if(item.mode==='month') return s+amt/2;
+    return s+amt;
   },0);
 }
 function calcNetTotal(){return calcTotal()-calcExpensesTotal()}
