@@ -1105,24 +1105,41 @@ function getPeriod(){
 function saveKey(){const{year,month,period}=getPeriod();return`salary_${year}_${month}_${period}`}
 function save(){
   try{
-    localStorage.setItem(saveKey(),JSON.stringify({days,bonuses,taxEnabled,dayOverrides}));
+    localStorage.setItem(saveKey(),JSON.stringify({days,bonuses,taxEnabled,dayOverrides,expenseItems}));
     renderHistory();
   }catch(e){}
 }
 function load(){
   try{
     const raw=localStorage.getItem(saveKey());
-    if(!raw){days={};bonuses=[];taxEnabled=false;dayOverrides={};return}
+    if(!raw){
+      days={};bonuses=[];taxEnabled=false;dayOverrides={};
+      expenseItems=_migrateGlobalExpenses();
+      return;
+    }
     const data=JSON.parse(raw);
     days=data.days||{};bonuses=data.bonuses||[];taxEnabled=!!data.taxEnabled;
     dayOverrides=data.dayOverrides||{};
+    expenseItems=Array.isArray(data.expenseItems)?data.expenseItems:_migrateGlobalExpenses();
     document.getElementById('taxToggle').classList.toggle('on',taxEnabled);
-  }catch(e){days={};bonuses=[];taxEnabled=false;dayOverrides={}}
+  }catch(e){days={};bonuses=[];taxEnabled=false;dayOverrides={};expenseItems=[]}
+}
+function _migrateGlobalExpenses(){
+  try{
+    const raw=localStorage.getItem('salary_expenses');
+    if(!raw)return[];
+    const parsed=JSON.parse(raw);
+    if(Array.isArray(parsed))return parsed;
+    const out=[];
+    if(parsed.commute>0)out.push({id:Date.now(),name:'Дорога на работу',amount:parsed.commute,mode:'period'});
+    if(parsed.credit>0) out.push({id:Date.now()+1,name:'Кредиты / ипотека',amount:parsed.credit,mode:'month'});
+    return out;
+  }catch(e){return[]}
 }
 
 function onPeriodChange(){
   selectedDay=null;load();
-  renderPeriodCard();renderDayStrip();renderDayPanel();renderBonuses();
+  renderPeriodCard();renderDayStrip();renderDayPanel();renderBonuses();renderExpenses();
   renderTotal();renderChart();renderBreakdown();renderHistory();renderGoals();
 }
 
@@ -2095,24 +2112,8 @@ function renderBreakdown(){
 // ══════════════════════════════════════════════
 let expenseItems=[];
 
-function loadExpenses(){
-  try{
-    const raw=localStorage.getItem('salary_expenses');
-    if(!raw){expenseItems=[];return}
-    const parsed=JSON.parse(raw);
-    // migrate from old {commute,credit} format
-    if(Array.isArray(parsed)){
-      expenseItems=parsed;
-    } else {
-      expenseItems=[];
-      if(parsed.commute>0) expenseItems.push({id:Date.now(),name:'Дорога на работу',amount:parsed.commute,mode:'period'});
-      if(parsed.credit>0)  expenseItems.push({id:Date.now()+1,name:'Кредиты / ипотека',amount:parsed.credit,mode:'month'});
-    }
-  }catch(e){expenseItems=[]}
-}
-function saveExpenses(){
-  try{localStorage.setItem('salary_expenses',JSON.stringify(expenseItems))}catch(e){}
-}
+function loadExpenses(){/* расходы теперь загружаются из данных периода через load() */}
+function saveExpenses(){save();}
 function addExpenseItem(){
   expenseItems.push({id:Date.now(),name:'',amount:'',mode:'period'});
   saveExpenses();haptic('light');
@@ -2180,10 +2181,10 @@ function resetAll(){
   const hasData=Object.values(days).some(ws=>ws.length>0)||bonuses.length>0;
   if(!hasData)return;
   if(confirm('Сбросить данные этого периода?')){
-    days={};bonuses={};bonuses=[];taxEnabled=false;selectedDay=null;dayOverrides={};
+    days={};bonuses={};bonuses=[];taxEnabled=false;selectedDay=null;dayOverrides={};expenseItems=[];
     document.getElementById('taxToggle').classList.remove('on');
     save();haptic('heavy');
-    renderDayStrip();renderDayPanel();renderBonuses();renderTotal();renderChart();renderBreakdown();
+    renderDayStrip();renderDayPanel();renderBonuses();renderExpenses();renderTotal();renderChart();renderBreakdown();
   }
 }
 
