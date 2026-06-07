@@ -559,6 +559,24 @@ body.light .tvt-opt.active{background:rgba(0,0,0,.1);color:var(--text)}
 .modal-tpl-price{font-size:12px;color:var(--muted);margin-top:2px}
 .modal-tpl-del{color:var(--muted);font-size:18px;padding:4px;cursor:pointer}
 
+/* ── SCHEDULE MODAL ── */
+.sched-type-row{display:flex;gap:8px;margin-bottom:16px}
+.sched-type-btn{flex:1;padding:10px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;font-family:'Manrope',sans-serif;font-size:13px;font-weight:700;color:var(--muted);cursor:pointer;transition:all .15s;text-align:center}
+.sched-type-btn.active{background:rgba(74,222,128,.1);color:var(--accent);border-color:rgba(74,222,128,.4)}
+.sched-type-btn:active{transform:scale(.96)}
+.sched-cycle-row{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+.sched-cycle-lbl{font-size:12px;font-weight:700;color:var(--muted);white-space:nowrap}
+.sched-num-in{width:56px;font-family:'Manrope',sans-serif;font-size:16px;font-weight:800;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:8px;text-align:center;-moz-appearance:textfield}
+.sched-num-in::-webkit-outer-spin-button,.sched-num-in::-webkit-inner-spin-button{-webkit-appearance:none}
+.sched-num-in:focus{outline:none;border-color:var(--accent)}
+.sched-anchor-lbl{font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px}
+.sched-preview{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
+.sched-preview-day{font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px}
+.sched-preview-day.work{background:rgba(74,222,128,.12);color:var(--accent)}
+.sched-preview-day.off{background:rgba(248,113,113,.12);color:var(--danger)}
+.sched-preview-day.today{outline:2px solid var(--accent2)}
+.icon-btn.schedule-active{color:var(--accent2)}
+
 /* copy day modal */
 .copy-day-list{display:flex;flex-direction:column;gap:6px}
 .copy-day-row{
@@ -628,6 +646,7 @@ body.light .tvt-opt.active{background:rgba(0,0,0,.1);color:var(--text)}
     <div class="header-label">Калькулятор V0.0.1</div>
   </div>
   <div class="header-actions">
+    <div class="icon-btn" onclick="openScheduleModal()" title="График работы" id="schedBtn">🗓</div>
     <div class="icon-btn" onclick="openDataModal()" title="Импорт / Экспорт" id="dataBtn">💾</div>
     <div class="icon-btn" onclick="toggleTheme()" title="Тема" id="themeBtn">🌙</div>
   </div>
@@ -831,6 +850,30 @@ body.light .tvt-opt.active{background:rgba(0,0,0,.1);color:var(--text)}
   </div>
 </div>
 
+<!-- SCHEDULE MODAL -->
+<div class="modal-overlay" id="scheduleModal" onclick="closeScheduleModal(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">🗓 График работы</div>
+    <div class="sched-type-row">
+      <button class="sched-type-btn" id="schedTypeStd" onclick="setSchedType('standard')">Стандарт пн–пт</button>
+      <button class="sched-type-btn" id="schedTypeCyc" onclick="setSchedType('cycle')">Сменный</button>
+    </div>
+    <div id="schedCycleSettings">
+      <div class="sched-cycle-row">
+        <span class="sched-cycle-lbl">Рабочих дней:</span>
+        <input class="sched-num-in" type="number" id="schedWorkIn" min="1" max="14" value="2" oninput="renderSchedulePreview()">
+        <span class="sched-cycle-lbl" style="margin-left:4px">Выходных:</span>
+        <input class="sched-num-in" type="number" id="schedOffIn" min="1" max="14" value="2" oninput="renderSchedulePreview()">
+      </div>
+      <div class="sched-anchor-lbl">Первый рабочий день цикла:</div>
+      <input class="modal-input" type="date" id="schedAnchorIn" oninput="renderSchedulePreview()" style="width:100%">
+      <div class="sched-preview" id="schedPreview"></div>
+    </div>
+    <button class="modal-btn" style="width:100%;margin-top:16px" onclick="applySchedule()">Применить</button>
+  </div>
+</div>
+
 <!-- DATA (IMPORT/EXPORT) MODAL -->
 <div class="modal-overlay" id="dataModal" onclick="closeDataModal(event)">
   <div class="modal">
@@ -873,6 +916,7 @@ body.light .tvt-opt.active{background:rgba(0,0,0,.1);color:var(--text)}
 // ══════════════════════════════════════════════
 let days={}, bonuses=[], taxEnabled=false, selectedDay=null;
 let dayOverrides={}; // {dayNum: 'work'|'off'} — user overrides for day type
+let schedule={type:'standard',cycleWork:2,cycleOff:2,anchorDate:null};
 let templates=[]; // [{id,name,price}]
 let lightTheme=false;
 let goals={period:0,week:0,month:0}; // plan targets in ₽
@@ -896,7 +940,89 @@ function isDayOff(d,date){
   const key=String(d);
   if(dayOverrides[key]==='work')return false;
   if(dayOverrides[key]==='off')return true;
+  if(schedule.type==='cycle'&&schedule.anchorDate){
+    const anchor=new Date(schedule.anchorDate+'T00:00:00');
+    const target=new Date(date);target.setHours(0,0,0,0);
+    const diff=Math.round((target-anchor)/86400000);
+    const cycleLen=(schedule.cycleWork||2)+(schedule.cycleOff||2);
+    const pos=((diff%cycleLen)+cycleLen)%cycleLen;
+    return pos>=(schedule.cycleWork||2);
+  }
   return isNonWorking(date);
+}
+
+// ══════════════════════════════════════════════
+//  SCHEDULE
+// ══════════════════════════════════════════════
+function loadSchedule(){
+  try{const raw=localStorage.getItem('salary_schedule');schedule=raw?JSON.parse(raw):{type:'standard',cycleWork:2,cycleOff:2,anchorDate:null}}
+  catch(e){schedule={type:'standard',cycleWork:2,cycleOff:2,anchorDate:null}}
+}
+function saveSchedule(){try{localStorage.setItem('salary_schedule',JSON.stringify(schedule))}catch(e){}}
+
+function renderScheduleBtn(){
+  const btn=document.getElementById('schedBtn');
+  if(!btn)return;
+  btn.classList.toggle('schedule-active',schedule.type==='cycle');
+  btn.title=schedule.type==='cycle'?`График ${schedule.cycleWork||2}/${schedule.cycleOff||2}`:'График работы';
+}
+
+function openScheduleModal(){
+  const isCycle=schedule.type==='cycle';
+  document.getElementById('schedTypeStd').classList.toggle('active',!isCycle);
+  document.getElementById('schedTypeCyc').classList.toggle('active',isCycle);
+  document.getElementById('schedCycleSettings').style.display=isCycle?'':'none';
+  document.getElementById('schedWorkIn').value=schedule.cycleWork||2;
+  document.getElementById('schedOffIn').value=schedule.cycleOff||2;
+  const today=new Date();
+  document.getElementById('schedAnchorIn').value=schedule.anchorDate||today.toISOString().slice(0,10);
+  document.getElementById('scheduleModal').classList.add('open');
+  renderSchedulePreview();
+}
+function closeScheduleModal(e){if(e.target===document.getElementById('scheduleModal'))document.getElementById('scheduleModal').classList.remove('open')}
+
+function setSchedType(t){
+  document.getElementById('schedTypeStd').classList.toggle('active',t==='standard');
+  document.getElementById('schedTypeCyc').classList.toggle('active',t==='cycle');
+  document.getElementById('schedCycleSettings').style.display=t==='cycle'?'':'none';
+  renderSchedulePreview();
+}
+
+function renderSchedulePreview(){
+  const el=document.getElementById('schedPreview');
+  if(!el)return;
+  const isCycle=document.getElementById('schedTypeCyc').classList.contains('active');
+  if(!isCycle){el.innerHTML='';return}
+  const anchorVal=document.getElementById('schedAnchorIn').value;
+  const cw=Math.max(1,parseInt(document.getElementById('schedWorkIn').value)||2);
+  const co=Math.max(1,parseInt(document.getElementById('schedOffIn').value)||2);
+  if(!anchorVal){el.innerHTML='';return}
+  const anchor=new Date(anchorVal+'T00:00:00');
+  const today=new Date();today.setHours(0,0,0,0);
+  const cycleLen=cw+co;
+  el.innerHTML=[...Array(cycleLen*2)].map((_,i)=>{
+    const d=new Date(anchor);d.setDate(anchor.getDate()+i);
+    const pos=i%cycleLen;
+    const isOff=pos>=cw;
+    const isToday=d.getTime()===today.getTime();
+    const lbl=`${d.getDate()} ${MS[d.getMonth()]}`;
+    return`<span class="sched-preview-day ${isOff?'off':'work'}${isToday?' today':''}">${lbl}</span>`;
+  }).join('');
+}
+
+function applySchedule(){
+  const isCycle=document.getElementById('schedTypeCyc').classList.contains('active');
+  schedule.type=isCycle?'cycle':'standard';
+  if(isCycle){
+    schedule.cycleWork=Math.max(1,parseInt(document.getElementById('schedWorkIn').value)||2);
+    schedule.cycleOff=Math.max(1,parseInt(document.getElementById('schedOffIn').value)||2);
+    schedule.anchorDate=document.getElementById('schedAnchorIn').value;
+  }
+  saveSchedule();haptic('medium');
+  document.getElementById('scheduleModal').classList.remove('open');
+  renderScheduleBtn();
+  renderDayStrip();renderCountdown();renderTotal();renderBreakdown();renderGoals();
+  if(selectedDay!==null)renderDayPanel();
 }
 
 function toggleDayWorkStatus(){
@@ -2166,6 +2292,7 @@ function importData(e){
       // reload state and re-render
       lightTheme=false;document.body.classList.remove('light');
       loadTheme();
+      loadSchedule();
       loadTemplates();
       loadGoals();
       loadExpenses();
@@ -2174,7 +2301,7 @@ function importData(e){
       renderTemplates();renderTotal();renderChart();renderGoals();
       renderBreakdown();renderHistory();renderDayMotivation();renderShiftTracker();
       setupBioButton();renderBioSection();
-      renderExpenses();
+      renderExpenses();renderScheduleBtn();
       haptic('medium');
       showDataMsg(`✓ Импортировано: ${n}`,'ok');
       // refresh stats in modal
@@ -2388,6 +2515,7 @@ async function toggleBio(){
 //  INIT
 // ══════════════════════════════════════════════
 loadTheme();
+loadSchedule();
 document.getElementById('lockInput').focus();
 initMonths();
 loadTemplates();
@@ -2407,6 +2535,7 @@ renderBreakdown();
 renderHistory();
 renderDayMotivation();
 renderExpenses();
+renderScheduleBtn();
 startShiftTimer();
 setupBioButton();
 </script>
