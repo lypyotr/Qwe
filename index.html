@@ -234,6 +234,18 @@ body.light .tvt-opt.active{background:rgba(0,0,0,.1);color:var(--text)}
 .day-btn.weekend .day-dow{color:var(--danger);opacity:.7}
 .day-btn.today-mark{border-color:var(--accent2)}
 .day-btn.today-mark .day-dow{color:var(--accent2)}
+.day-btn.forced-work{border-color:rgba(74,222,128,.5);background:rgba(74,222,128,.06)}
+.day-btn.forced-work .day-dow{color:var(--accent);opacity:.8}
+.day-btn.forced-off .day-num{color:var(--danger)}
+.day-btn.forced-off .day-dow{color:var(--danger);opacity:.7}
+.day-type-btn{
+  font-size:11px;font-weight:700;
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:8px;padding:4px 9px;cursor:pointer;transition:all .15s;white-space:nowrap;
+}
+.day-type-btn:active{transform:scale(.93)}
+.day-type-btn.is-work{color:var(--accent);border-color:rgba(74,222,128,.35)}
+.day-type-btn.is-off{color:var(--danger);border-color:rgba(248,113,113,.35)}
 
 /* ── DAY PANEL ── */
 .day-panel{
@@ -720,6 +732,7 @@ body.light .tvt-opt.active{background:rgba(0,0,0,.1);color:var(--text)}
     </div>
     <div style="display:flex;align-items:center;gap:8px">
       <div class="copy-day-btn" onclick="openCopyModal()">📋 Копировать с дня</div>
+      <div class="day-type-btn" id="dayTypeBtn" onclick="toggleDayWorkStatus()"></div>
       <div class="day-panel-sum" id="dpSum"></div>
     </div>
   </div>
@@ -859,6 +872,7 @@ body.light .tvt-opt.active{background:rgba(0,0,0,.1);color:var(--text)}
 //  STATE
 // ══════════════════════════════════════════════
 let days={}, bonuses=[], taxEnabled=false, selectedDay=null;
+let dayOverrides={}; // {dayNum: 'work'|'off'} — user overrides for day type
 let templates=[]; // [{id,name,price}]
 let lightTheme=false;
 let goals={period:0,week:0,month:0}; // plan targets in ₽
@@ -876,6 +890,30 @@ const HOLIDAYS=new Set([
 ]);
 function isNonWorking(d){const dow=d.getDay(),key=d.toISOString().slice(0,10);return dow===0||dow===6||HOLIDAYS.has(key)}
 function adjustPayDate(date){let d=new Date(date),shifted=false;while(isNonWorking(d)){d.setDate(d.getDate()-1);shifted=true}return{date:d,shifted}}
+
+// Returns true if a day (by day-number in current period) is effectively non-working
+function isDayOff(d,date){
+  const key=String(d);
+  if(dayOverrides[key]==='work')return false;
+  if(dayOverrides[key]==='off')return true;
+  return isNonWorking(date);
+}
+
+function toggleDayWorkStatus(){
+  if(selectedDay===null)return;
+  const{year,month}=getPeriod();
+  const date=new Date(year,month,selectedDay);
+  const defaultOff=isNonWorking(date);
+  const key=String(selectedDay);
+  if(dayOverrides[key]){
+    delete dayOverrides[key];
+  } else {
+    dayOverrides[key]=defaultOff?'work':'off';
+  }
+  save();haptic('light');
+  renderDayPanel();renderDayStrip();renderCountdown();
+  renderTotal();renderBreakdown();renderGoals();
+}
 
 // ══════════════════════════════════════════════
 //  CONSTANTS
@@ -941,18 +979,19 @@ function getPeriod(){
 function saveKey(){const{year,month,period}=getPeriod();return`salary_${year}_${month}_${period}`}
 function save(){
   try{
-    localStorage.setItem(saveKey(),JSON.stringify({days,bonuses,taxEnabled}));
+    localStorage.setItem(saveKey(),JSON.stringify({days,bonuses,taxEnabled,dayOverrides}));
     renderHistory();
   }catch(e){}
 }
 function load(){
   try{
     const raw=localStorage.getItem(saveKey());
-    if(!raw){days={};bonuses=[];taxEnabled=false;return}
+    if(!raw){days={};bonuses=[];taxEnabled=false;dayOverrides={};return}
     const data=JSON.parse(raw);
     days=data.days||{};bonuses=data.bonuses||[];taxEnabled=!!data.taxEnabled;
+    dayOverrides=data.dayOverrides||{};
     document.getElementById('taxToggle').classList.toggle('on',taxEnabled);
-  }catch(e){days={};bonuses=[];taxEnabled=false}
+  }catch(e){days={};bonuses=[];taxEnabled=false;dayOverrides={}}
 }
 
 function onPeriodChange(){
@@ -1138,8 +1177,7 @@ function renderCountdown(){
   let workLeft=0,workTotal=0;
   for(let d=startDay;d<=endDay;d++){
     const dt=new Date(year,month,d);
-    const isWE=dt.getDay()===0||dt.getDay()===6;
-    if(!isWE){workTotal++;if(d>today.getDate())workLeft++}
+    if(!isDayOff(d,dt)){workTotal++;if(d>today.getDate())workLeft++}
   }
   const totalDays=endDay-startDay+1;
   const passedDays=today.getDate()-startDay+1;
@@ -1182,8 +1220,10 @@ function renderDayStrip(){
     const sum=daySum(d);
     const hasData=sum>0;
     const isActive=selectedDay===d;
+    const override=dayOverrides[String(d)];
+    const effectiveOff=isDayOff(d,date);
     const btn=document.createElement('div');
-    btn.className='day-btn'+(isActive?' active':'')+(isWE?' weekend':'')+(isToday?' today-mark':'')+(hasData?' has-data':'');
+    btn.className='day-btn'+(isActive?' active':'')+(effectiveOff?' weekend':'')+(isToday?' today-mark':'')+(hasData?' has-data':'')+(override==='work'?' forced-work':'')+(override==='off'?' forced-off':'');
     const sumStr=hasData?fmtShort(sum):'';
     btn.innerHTML=`<div class="day-dot"></div><span class="day-num">${d}</span><span class="day-dow">${DOW[dow]}</span><span class="day-sum">${sumStr}</span>`;
     btn.onclick=()=>selectDay(d);
@@ -1220,6 +1260,13 @@ function renderDayPanel(){
   document.getElementById('dpTitle').textContent=`${selectedDay} ${MG[month]}, ${DOW[date.getDay()]}`;
   const sum=daySum(selectedDay);
   document.getElementById('dpSum').textContent=sum>0?fmt(sum)+' ₽':'';
+  const btn=document.getElementById('dayTypeBtn');
+  if(btn){
+    const off=isDayOff(selectedDay,date);
+    const overridden=!!dayOverrides[String(selectedDay)];
+    btn.textContent=off?('Выходной'+(overridden?' ↺':'')):'Рабочий'+(overridden?' ↺':'');
+    btn.className='day-type-btn '+(off?'is-off':'is-work');
+  }
   const works=days[selectedDay]||[];
   const container=document.getElementById('dayWorks');
   if(!works.length){
@@ -1340,7 +1387,7 @@ function renderShiftTracker() {
   let workDaysLeft = 0;
   for (let d = today0.getDate(); d <= endDay; d++) {
     const dt = new Date(year, month, d);
-    if (dt.getDay() !== 0 && dt.getDay() !== 6) workDaysLeft++;
+    if (!isDayOff(d, dt)) workDaysLeft++;
   }
   const neededToday = workDaysLeft > 0 ? remaining / workDaysLeft : remaining;
   const earnedToday = daySum(selectedDay) * taxMult;
@@ -2007,7 +2054,7 @@ function resetAll(){
   const hasData=Object.values(days).some(ws=>ws.length>0)||bonuses.length>0;
   if(!hasData)return;
   if(confirm('Сбросить данные этого периода?')){
-    days={};bonuses={};bonuses=[];taxEnabled=false;selectedDay=null;
+    days={};bonuses={};bonuses=[];taxEnabled=false;selectedDay=null;dayOverrides={};
     document.getElementById('taxToggle').classList.remove('on');
     save();haptic('heavy');
     renderDayStrip();renderDayPanel();renderBonuses();renderTotal();renderChart();renderBreakdown();
