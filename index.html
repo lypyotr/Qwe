@@ -1112,30 +1112,15 @@ function save(){
 function load(){
   try{
     const raw=localStorage.getItem(saveKey());
-    if(!raw){
-      days={};bonuses=[];taxEnabled=false;dayOverrides={};
-      expenseItems=_migrateGlobalExpenses();
-      return;
-    }
+    if(!raw){days={};bonuses=[];taxEnabled=false;dayOverrides={};expenseItems=[];return}
     const data=JSON.parse(raw);
     days=data.days||{};bonuses=data.bonuses||[];taxEnabled=!!data.taxEnabled;
     dayOverrides=data.dayOverrides||{};
-    expenseItems=Array.isArray(data.expenseItems)?data.expenseItems:_migrateGlobalExpenses();
+    expenseItems=Array.isArray(data.expenseItems)?data.expenseItems:[];
     document.getElementById('taxToggle').classList.toggle('on',taxEnabled);
   }catch(e){days={};bonuses=[];taxEnabled=false;dayOverrides={};expenseItems=[]}
 }
-function _migrateGlobalExpenses(){
-  try{
-    const raw=localStorage.getItem('salary_expenses');
-    if(!raw)return[];
-    const parsed=JSON.parse(raw);
-    if(Array.isArray(parsed))return parsed;
-    const out=[];
-    if(parsed.commute>0)out.push({id:Date.now(),name:'Дорога на работу',amount:parsed.commute,mode:'period'});
-    if(parsed.credit>0) out.push({id:Date.now()+1,name:'Кредиты / ипотека',amount:parsed.credit,mode:'month'});
-    return out;
-  }catch(e){return[]}
-}
+function _migrateGlobalExpenses(){return[]}
 
 function onPeriodChange(){
   selectedDay=null;load();
