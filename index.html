@@ -25,12 +25,12 @@ body.light{
   --text:#111827;--muted:#9ca3af;--card-shadow:0 2px 12px rgba(0,0,0,.08);
 }
 
-html{overscroll-behavior:none;overflow-x:hidden}
+html{overscroll-behavior-x:none;overflow-x:hidden;width:100%}
 body{
   font-family:'Manrope',sans-serif;background:var(--bg);color:var(--text);
   min-height:100vh;padding-bottom:calc(50px + env(safe-area-inset-bottom));
   overflow-x:hidden;transition:background .3s,color .3s;
-  overscroll-behavior:none;
+  overscroll-behavior-x:none;width:100%;max-width:100vw;box-sizing:border-box;
 }
 
 /* ── HEADER ── */
