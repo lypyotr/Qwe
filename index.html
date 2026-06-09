@@ -804,6 +804,17 @@ body.light .rank-item-unit{color:#444}
 .rank-card.gold .rank-item-bar-fill{background:linear-gradient(90deg,#d97706,#fbbf24)}
 .rank-card.platinum .rank-item-bar-fill{background:linear-gradient(90deg,#0284c7,#38bdf8)}
 
+/* gyro activation button */
+.gyro-btn{
+  display:block;width:calc(100% - 32px);margin:0 16px 8px;
+  padding:10px;border-radius:14px;border:none;cursor:pointer;
+  background:rgba(255,255,255,.08);color:var(--text);
+  font-family:'Manrope',sans-serif;font-size:13px;font-weight:700;
+  letter-spacing:.3px;
+}
+body.light .gyro-btn{background:rgba(0,0,0,.07)}
+.gyro-btn.granted{background:rgba(56,189,248,.15);color:#38bdf8}
+
 /* ── BOTTOM NAV ── */
 .bottom-nav{
   position:fixed;bottom:0;left:0;right:0;
@@ -965,6 +976,7 @@ body.light .rank-item-unit{color:#444}
 <!-- ACHIEVEMENTS RANK CARD -->
 <div class="rank-wrapper" id="rankWrapper">
   <div class="pc-behind" id="rankBehind"></div>
+  <button class="gyro-btn" id="gyroBtn" onclick="activateGyro()" style="display:none">📡 Наклоняй телефон</button>
   <div class="rank-card" id="rankCard">
     <span class="edge-light"></span>
     <div class="pc-shine"></div>
@@ -2506,30 +2518,37 @@ function initBorderGlow(){
 
   // ── Gyroscope (iPhone) ──
   function onOrientation(e){
-    if(baseGamma===null){baseGamma=e.gamma||0;baseBeta=e.beta||0;}
+    if(e.gamma===null||e.beta===null)return;
+    if(baseGamma===null){baseGamma=e.gamma;baseBeta=e.beta;}
     const RANGE=20;
-    const dg=Math.max(-RANGE,Math.min(RANGE,(e.gamma||0)-baseGamma));
-    const db=Math.max(-RANGE,Math.min(RANGE,(e.beta||0)-baseBeta));
-    tx=dg/RANGE; ty=db/RANGE;
+    tx=Math.max(-1,Math.min(1,(e.gamma-baseGamma)/RANGE));
+    ty=Math.max(-1,Math.min(1,(e.beta-baseBeta)/RANGE));
     if(!gyroMode){gyroMode=true;card.classList.add('active');}
     startRaf();
   }
 
-  function enableGyro(){
-    if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){
-      DeviceOrientationEvent.requestPermission().then(s=>{
-        if(s==='granted')window.addEventListener('deviceorientation',onOrientation,{passive:true});
-      }).catch(()=>{});
-    } else if(typeof DeviceOrientationEvent!=='undefined'){
-      window.addEventListener('deviceorientation',onOrientation,{passive:true});
+  // show gyro button only on touch devices
+  const gyroBtn=document.getElementById('gyroBtn');
+  if('ontouchstart' in window&&gyroBtn){
+    if(typeof DeviceOrientationEvent!=='undefined'){
+      gyroBtn.style.display='block';
     }
   }
 
-  // request gyro on first touch anywhere on the page (iOS requires user gesture)
-  document.addEventListener('touchstart',function gyroInit(){
-    document.removeEventListener('touchstart',gyroInit);
-    enableGyro();
-  },{passive:true,once:true});
+  window.activateGyro=function(){
+    if(typeof DeviceOrientationEvent==='undefined')return;
+    if(typeof DeviceOrientationEvent.requestPermission==='function'){
+      DeviceOrientationEvent.requestPermission().then(s=>{
+        if(s==='granted'){
+          window.addEventListener('deviceorientation',onOrientation,{passive:true});
+          if(gyroBtn){gyroBtn.textContent='✅ Гироскоп активен';gyroBtn.classList.add('granted');gyroBtn.disabled=true;}
+        }
+      }).catch(()=>{});
+    } else {
+      window.addEventListener('deviceorientation',onOrientation,{passive:true});
+      if(gyroBtn){gyroBtn.textContent='✅ Гироскоп активен';gyroBtn.classList.add('granted');gyroBtn.disabled=true;}
+    }
+  };
 
   card.addEventListener('pointerenter',()=>{isOver=true;card.classList.add('active');startRaf();});
   card.addEventListener('pointermove',e=>{
