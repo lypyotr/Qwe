@@ -1529,9 +1529,9 @@ function renderShiftTracker() {
   if (isDayOff(selectedDay, selDate)) { el.innerHTML = ''; return; }
 
   const today0 = new Date(); today0.setHours(0, 0, 0, 0);
-  const isCurrentPeriod = today0.getFullYear() === year && today0.getMonth() === month
-    && today0.getDate() >= startDay && today0.getDate() <= endDay;
-  if (!isCurrentPeriod) { el.innerHTML = ''; return; }
+  const isToday = today0.getFullYear() === year && today0.getMonth() === month
+    && today0.getDate() === selectedDay;
+  if (!isToday) { el.innerHTML = ''; return; }
 
   // ── Active templates: selected ones, or ALL if none chosen ──
   const validTpls = templates.filter(t => (parseFloat(t.price) || 0) > 0);
