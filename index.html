@@ -231,13 +231,13 @@ body.light .tvt-opt.active{background:rgba(0,0,0,.1);color:var(--text)}
 .day-btn.has-data .day-sum{opacity:1}
 .day-btn.active .day-num{color:var(--accent)}
 .day-btn.active .day-dow{color:var(--accent);opacity:.7}
-.day-btn.weekend .day-dow{color:var(--danger);opacity:.7}
+.day-btn.day-off .day-num{color:var(--danger)}
+.day-btn.day-off .day-dow{color:var(--danger);opacity:.8}
+.day-btn.day-work{border-color:rgba(74,222,128,.4);background:rgba(74,222,128,.05)}
+.day-btn.day-work .day-num{color:var(--accent)}
+.day-btn.day-work .day-dow{color:var(--accent);opacity:.8}
 .day-btn.today-mark{border-color:var(--accent2)}
 .day-btn.today-mark .day-dow{color:var(--accent2)}
-.day-btn.forced-work{border-color:rgba(74,222,128,.5);background:rgba(74,222,128,.06)}
-.day-btn.forced-work .day-dow{color:var(--accent);opacity:.8}
-.day-btn.forced-off .day-num{color:var(--danger)}
-.day-btn.forced-off .day-dow{color:var(--danger);opacity:.7}
 .day-type-btn{
   font-size:11px;font-weight:700;
   background:var(--surface2);border:1px solid var(--border);
@@ -1384,7 +1384,7 @@ function renderDayStrip(){
     const override=dayOverrides[String(d)];
     const effectiveOff=isDayOff(d,date);
     const btn=document.createElement('div');
-    btn.className='day-btn'+(isActive?' active':'')+(effectiveOff?' weekend':'')+(isToday?' today-mark':'')+(hasData?' has-data':'')+(override==='work'?' forced-work':'')+(override==='off'?' forced-off':'');
+    btn.className='day-btn'+(isActive?' active':'')+(effectiveOff?' day-off':' day-work')+(isToday?' today-mark':'')+(hasData?' has-data':'');
     const sumStr=hasData?fmtShort(sum):'';
     btn.innerHTML=`<div class="day-dot"></div><span class="day-num">${d}</span><span class="day-dow">${DOW[dow]}</span><span class="day-sum">${sumStr}</span>`;
     btn.onclick=()=>selectDay(d);
@@ -1517,6 +1517,11 @@ function renderShiftTracker() {
   if (!hasGoal || !templates.length) { el.innerHTML = ''; return; }
 
   const { year, month, startDay, endDay } = getPeriod();
+
+  // не показывать счётчик смены в выходной день
+  const selDate = new Date(year, month, selectedDay);
+  if (isDayOff(selectedDay, selDate)) { el.innerHTML = ''; return; }
+
   const today0 = new Date(); today0.setHours(0, 0, 0, 0);
   const isCurrentPeriod = today0.getFullYear() === year && today0.getMonth() === month
     && today0.getDate() >= startDay && today0.getDate() <= endDay;
