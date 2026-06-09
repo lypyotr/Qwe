@@ -1803,6 +1803,7 @@ function renderTemplates(){
     <div class="tpl-chip" onclick="applyTemplate(${t.id})">
       <span>${esc(t.name)}</span>
       <span class="tpl-price">${fmt(t.price)} ₽</span>
+      <span class="tpl-del" onclick="deleteTpl(event,${t.id})">✕</span>
     </div>`).join('');
 }
 
