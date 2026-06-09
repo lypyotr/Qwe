@@ -1947,6 +1947,22 @@ function renderCompareBadge(total){
 // ══════════════════════════════════════════════
 //  CHART
 // ══════════════════════════════════════════════
+function calcTotalEarnedAllTime(){
+  let total=0;
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(!k||!/^salary_\d+_\d+_\d+$/.test(k))continue;
+      const data=JSON.parse(localStorage.getItem(k)||'{}');
+      const base=[].concat.apply([],Object.values(data.days||{})).reduce((s,w)=>s+(parseFloat(w.qty)||0)*(parseFloat(w.price)||0),0);
+      const bonus=(data.bonuses||[]).reduce((s,b)=>s+(parseFloat(b.amount)||0),0);
+      let t=base+bonus;if(data.taxEnabled)t*=0.87;
+      total+=Math.max(0,t);
+    }
+  }catch(e){}
+  return Math.round(total);
+}
+
 function calcTotalWorkedDaysAllTime(){
   let total=0;
   try{
@@ -2265,6 +2281,7 @@ function renderAchievements(){
   }).join('');
 
   const totalDays=calcTotalWorkedDaysAllTime();
+  const totalEarned=calcTotalEarnedAllTime();
   document.getElementById('rankCardInner').innerHTML=`
     <div class="rank-top">
       <div class="rank-badge">
@@ -2278,6 +2295,10 @@ function renderAchievements(){
         <div class="rank-stat-box">
           <div class="rank-total-num">${totalDays}</div>
           <div class="rank-total-lbl">раб. дней</div>
+        </div>
+        <div class="rank-stat-box">
+          <div class="rank-total-num" style="font-size:22px">${fmt(totalEarned)}</div>
+          <div class="rank-total-lbl">₽ заработано</div>
         </div>
       </div>
     </div>
