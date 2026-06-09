@@ -573,37 +573,109 @@ body.light .tvt-opt.active{background:rgba(0,0,0,.1);color:var(--text)}
 @keyframes slideIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
 
 /* ── ACHIEVEMENT RANK CARD ── */
+/* ── BORDER GLOW (ported from ReactBits) ── */
 .rank-card{
+  --edge-proximity:0;--cursor-angle:45deg;
+  --edge-sensitivity:30;--color-sensitivity:calc(var(--edge-sensitivity) + 20);
+  --border-radius:24px;--glow-padding:36px;--cone-spread:25;--fill-opacity:.5;
   margin:16px 16px 12px;
-  border-radius:24px;padding:22px 20px 18px;
-  position:relative;overflow:hidden;
-  box-shadow:0 8px 32px rgba(0,0,0,.45);
+  border-radius:var(--border-radius);
+  position:relative;overflow:visible;
+  isolation:isolate;transform:translate3d(0,0,.01px);display:grid;
+  border:1px solid rgb(255 255 255/15%);
+  box-shadow:rgba(0,0,0,.1) 0 1px 2px,rgba(0,0,0,.1) 0 4px 8px,rgba(0,0,0,.2) 0 16px 32px,rgba(0,0,0,.2) 0 32px 64px;
 }
-/* tier gradients */
-.rank-card.bronze{background:linear-gradient(135deg,#2a1a0e 0%,#3d2510 50%,#1e1208 100%);border:1px solid #7c4a1e}
-.rank-card.silver{background:linear-gradient(135deg,#1a1e26 0%,#252d3a 50%,#141820 100%);border:1px solid #4a5568}
-.rank-card.gold{background:linear-gradient(135deg,#2a2000 0%,#3d2e00 50%,#1e1800 100%);border:1px solid #b7860a}
-.rank-card.platinum{background:linear-gradient(135deg,#0d1a2a 0%,#0a2040 50%,#061018 100%);border:1px solid #38bdf8}
-body.light .rank-card.bronze{background:linear-gradient(135deg,#fdf0e0 0%,#f5dbb5 100%);border-color:#c47d2e}
-body.light .rank-card.silver{background:linear-gradient(135deg,#eef0f5 0%,#d8dce8 100%);border-color:#8896b0}
-body.light .rank-card.gold{background:linear-gradient(135deg,#fffbe6 0%,#fde68a 100%);border-color:#d97706}
-body.light .rank-card.platinum{background:linear-gradient(135deg,#e0f2fe 0%,#bae6fd 100%);border-color:#0284c7}
+/* tier backgrounds */
+.rank-card.bronze{background:linear-gradient(135deg,#2a1a0e 0%,#3d2510 50%,#1e1208 100%)}
+.rank-card.silver{background:linear-gradient(135deg,#1a1e26 0%,#252d3a 50%,#141820 100%)}
+.rank-card.gold{background:linear-gradient(135deg,#2a2000 0%,#3d2e00 50%,#1e1800 100%)}
+.rank-card.platinum{background:linear-gradient(135deg,#0d1a2a 0%,#0a2040 50%,#061018 100%)}
+body.light .rank-card.bronze{background:linear-gradient(135deg,#fdf0e0 0%,#f5dbb5 100%)}
+body.light .rank-card.silver{background:linear-gradient(135deg,#eef0f5 0%,#d8dce8 100%)}
+body.light .rank-card.gold{background:linear-gradient(135deg,#fffbe6 0%,#fde68a 100%)}
+body.light .rank-card.platinum{background:linear-gradient(135deg,#e0f2fe 0%,#bae6fd 100%)}
 
-/* shimmer overlay */
+/* mesh-gradient border */
 .rank-card::before{
-  content:'';position:absolute;inset:0;
-  background:linear-gradient(105deg,transparent 40%,rgba(255,255,255,.06) 50%,transparent 60%);
-  pointer-events:none;
+  content:'';position:absolute;inset:0;border-radius:inherit;z-index:-1;
+  border:1px solid transparent;
+  background:
+    linear-gradient(var(--card-bg,#161920) 0 100%) padding-box,
+    linear-gradient(rgb(255 255 255/0%) 0 100%) border-box,
+    var(--gradient-one) border-box,
+    var(--gradient-two) border-box,
+    var(--gradient-three) border-box,
+    var(--gradient-four) border-box,
+    var(--gradient-five) border-box,
+    var(--gradient-six) border-box,
+    var(--gradient-seven) border-box,
+    var(--gradient-base) border-box;
+  opacity:calc((var(--edge-proximity) - var(--color-sensitivity)) / (100 - var(--color-sensitivity)));
+  mask-image:conic-gradient(from var(--cursor-angle) at center,
+    black calc(var(--cone-spread) * 1%),
+    transparent calc((var(--cone-spread) + 15) * 1%),
+    transparent calc((100 - var(--cone-spread) - 15) * 1%),
+    black calc((100 - var(--cone-spread)) * 1%));
+  transition:opacity .25s ease-out;
 }
-/* decorative circle */
+.rank-card:not(:hover)::before{transition:opacity .75s ease-in-out}
+
+/* mesh fill */
 .rank-card::after{
-  content:'';position:absolute;top:-60px;right:-60px;width:200px;height:200px;
-  border-radius:50%;opacity:.15;pointer-events:none;
+  content:'';position:absolute;inset:0;border-radius:inherit;z-index:-1;
+  border:1px solid transparent;
+  background:
+    var(--gradient-one) padding-box,var(--gradient-two) padding-box,
+    var(--gradient-three) padding-box,var(--gradient-four) padding-box,
+    var(--gradient-five) padding-box,var(--gradient-six) padding-box,
+    var(--gradient-seven) padding-box,var(--gradient-base) padding-box;
+  mask-image:
+    linear-gradient(to bottom,black,black),
+    radial-gradient(ellipse at 50% 50%,black 40%,transparent 65%),
+    radial-gradient(ellipse at 66% 66%,black 5%,transparent 40%),
+    radial-gradient(ellipse at 33% 33%,black 5%,transparent 40%),
+    radial-gradient(ellipse at 66% 33%,black 5%,transparent 40%),
+    radial-gradient(ellipse at 33% 66%,black 5%,transparent 40%),
+    conic-gradient(from var(--cursor-angle) at center,transparent 5%,black 15%,black 85%,transparent 95%);
+  mask-composite:subtract,add,add,add,add,add;
+  opacity:calc(var(--fill-opacity,.5)*(var(--edge-proximity) - var(--color-sensitivity))/(100 - var(--color-sensitivity)));
+  mix-blend-mode:soft-light;
+  transition:opacity .25s ease-out;
 }
-.rank-card.bronze::after{background:radial-gradient(circle,#cd7f32,transparent)}
-.rank-card.silver::after{background:radial-gradient(circle,#c0c0c0,transparent)}
-.rank-card.gold::after{background:radial-gradient(circle,#ffd700,transparent)}
-.rank-card.platinum::after{background:radial-gradient(circle,#38bdf8,transparent)}
+.rank-card:not(:hover)::after{transition:opacity .75s ease-in-out}
+
+/* outer glow */
+.rank-card>.edge-light{
+  content:'';position:absolute;inset:calc(var(--glow-padding)*-1);
+  border-radius:inherit;pointer-events:none;z-index:1;
+  mask-image:conic-gradient(from var(--cursor-angle) at center,black 2.5%,transparent 10%,transparent 90%,black 97.5%);
+  opacity:calc((var(--edge-proximity) - var(--edge-sensitivity))/(100 - var(--edge-sensitivity)));
+  mix-blend-mode:plus-lighter;
+  transition:opacity .25s ease-out;
+}
+.rank-card:not(:hover)>.edge-light{transition:opacity .75s ease-in-out}
+.rank-card>.edge-light::before{
+  content:'';position:absolute;inset:var(--glow-padding);border-radius:inherit;
+  box-shadow:
+    inset 0 0 0 1px var(--glow-color),
+    inset 0 0 1px 0 var(--glow-color-60),
+    inset 0 0 3px 0 var(--glow-color-50),
+    inset 0 0 6px 0 var(--glow-color-40),
+    inset 0 0 15px 0 var(--glow-color-30),
+    inset 0 0 25px 2px var(--glow-color-20),
+    inset 0 0 50px 2px var(--glow-color-10),
+    0 0 1px 0 var(--glow-color-60),
+    0 0 3px 0 var(--glow-color-50),
+    0 0 6px 0 var(--glow-color-40),
+    0 0 15px 0 var(--glow-color-30),
+    0 0 25px 2px var(--glow-color-20),
+    0 0 50px 2px var(--glow-color-10);
+}
+.rank-card-inner{
+  display:flex;flex-direction:column;position:relative;
+  overflow:hidden;z-index:1;border-radius:var(--border-radius);
+  padding:22px 20px 18px;
+}
 
 .rank-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px}
 .rank-badge{
@@ -838,7 +910,8 @@ body.light .rank-item-unit{color:#444}
 
 <!-- ACHIEVEMENTS RANK CARD -->
 <div class="rank-card" id="rankCard">
-  <div id="rankCardInner"></div>
+  <span class="edge-light"></span>
+  <div class="rank-card-inner" id="rankCardInner"></div>
 </div>
 
 <!-- PERIOD CARD -->
@@ -2232,6 +2305,9 @@ function renderAchievements(){
   const totalQty=Math.round(entries.reduce((s,[,v])=>s+v.qty,0));
   const rank=getRank(totalQty);
   card.className='rank-card '+rank.cls;
+  applyBorderGlowTheme(card,rank.cls);
+  const bgMap={bronze:'#2a1a0e',silver:'#1a1e26',gold:'#2a2000',platinum:'#0d1a2a'};
+  card.style.setProperty('--card-bg',bgMap[rank.cls]||'#161920');
 
   // progress to next tier
   const nextRank=RANKS[RANKS.indexOf(rank)+1];
@@ -2305,6 +2381,57 @@ function renderAchievements(){
     ${progressHtml}
     <div class="rank-items">${itemsHtml}</div>
   `;
+}
+
+// ══════════════════════════════════════════════
+//  BORDER GLOW — pointer tracking
+// ══════════════════════════════════════════════
+const TIER_GLOW={
+  bronze:{hsl:'30 70 60',colors:['#cd7f32','#e8a855','#b8621a']},
+  silver:{hsl:'220 20 75',colors:['#94a3b8','#c8d0dc','#64748b']},
+  gold:  {hsl:'45 90 60',colors:['#d97706','#fbbf24','#f59e0b']},
+  platinum:{hsl:'200 80 65',colors:['#0284c7','#38bdf8','#7dd3fc']},
+};
+const GRAD_POSITIONS=['80% 55%','69% 34%','8% 6%','41% 38%','86% 85%','82% 18%','51% 4%'];
+const GRAD_KEYS=['--gradient-one','--gradient-two','--gradient-three','--gradient-four','--gradient-five','--gradient-six','--gradient-seven'];
+const COLOR_MAP=[0,1,2,0,1,2,1];
+
+function applyBorderGlowTheme(card,tier){
+  const t=TIER_GLOW[tier]||TIER_GLOW.bronze;
+  const[h,s,l]=t.hsl.split(' ');
+  const base=`${h}deg ${s}% ${l}%`;
+  const ops=[100,60,50,40,30,20,10];
+  const sfx=['','--glow-color-60','--glow-color-50','--glow-color-40','--glow-color-30','--glow-color-20','--glow-color-10'];
+  ops.forEach((o,i)=>{
+    const key=i===0?'--glow-color':sfx[i];
+    card.style.setProperty(key,`hsl(${base} / ${o}%)`);
+  });
+  GRAD_KEYS.forEach((k,i)=>{
+    const c=t.colors[Math.min(COLOR_MAP[i],t.colors.length-1)];
+    card.style.setProperty(k,`radial-gradient(at ${GRAD_POSITIONS[i]}, ${c} 0px, transparent 50%)`);
+  });
+  card.style.setProperty('--gradient-base',`linear-gradient(${t.colors[0]} 0 100%)`);
+}
+
+function initBorderGlow(){
+  const card=document.getElementById('rankCard');
+  if(!card)return;
+  card.addEventListener('pointermove',e=>{
+    const rect=card.getBoundingClientRect();
+    const x=e.clientX-rect.left, y=e.clientY-rect.top;
+    const cx=rect.width/2, cy=rect.height/2;
+    const dx=x-cx, dy=y-cy;
+    const kx=dx!==0?cx/Math.abs(dx):Infinity;
+    const ky=dy!==0?cy/Math.abs(dy):Infinity;
+    const edge=Math.min(Math.max(1/Math.min(kx,ky),0),1);
+    let deg=Math.atan2(dy,dx)*(180/Math.PI)+90;
+    if(deg<0)deg+=360;
+    card.style.setProperty('--edge-proximity',(edge*100).toFixed(2));
+    card.style.setProperty('--cursor-angle',deg.toFixed(2)+'deg');
+  });
+  card.addEventListener('pointerleave',()=>{
+    card.style.setProperty('--edge-proximity','0');
+  });
 }
 
 // ══════════════════════════════════════════════
@@ -2681,6 +2808,7 @@ renderHistory();
 renderExpenses();
 renderAchievements();
 restorePage();
+initBorderGlow();
 startShiftTimer();
 setupBioButton();
 </script>
