@@ -752,6 +752,10 @@ body.light .rank-item-unit{color:#444}
       onkeydown="if(event.key==='Enter')unlockApp()">
     <div class="lock-error" id="lockError"></div>
     <button class="lock-btn" onclick="unlockApp()">Войти</button>
+    <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);cursor:pointer;margin-top:4px">
+      <input type="checkbox" id="lockSkipCheck" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent)">
+      Не спрашивать пароль снова
+    </label>
   </div>
 </div>
 
@@ -1009,8 +1013,12 @@ body.light .rank-item-unit{color:#444}
       Быстрый вход по биометрии без ввода пароля.
     </div>
     <button class="modal-btn" style="width:100%;padding:13px;margin-bottom:10px" onclick="enableBio()">Включить</button>
-    <button class="modal-btn" style="width:100%;padding:13px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="document.getElementById('bioOfferModal').classList.remove('open')">Позже</button>
-    <div id="bioOfferMsg" style="margin-top:12px;font-size:13px;text-align:center;font-weight:600;color:var(--danger);min-height:18px"></div>
+    <button class="modal-btn" style="width:100%;padding:13px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="dismissBioOffer()">Позже</button>
+    <label style="display:flex;align-items:center;justify-content:center;gap:8px;font-size:12px;color:var(--muted);cursor:pointer;margin-top:10px">
+      <input type="checkbox" id="bioOfferSkipCheck" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent)">
+      Больше не предлагать
+    </label>
+    <div id="bioOfferMsg" style="margin-top:8px;font-size:13px;text-align:center;font-weight:600;color:var(--danger);min-height:18px"></div>
   </div>
 </div>
 
@@ -1039,6 +1047,13 @@ function switchPage(name){
   document.getElementById('page-'+name).classList.add('active');
   document.getElementById('nav'+name.charAt(0).toUpperCase()+name.slice(1)).classList.add('active');
   window.scrollTo({top:0,behavior:'smooth'});
+  try{localStorage.setItem('salary_page',name)}catch(e){}
+}
+function restorePage(){
+  try{
+    const p=localStorage.getItem('salary_page');
+    if(p==='detail')switchPage('detail');
+  }catch(e){}
 }
 
 let days={}, bonuses=[], taxEnabled=false, selectedDay=null;
@@ -2433,6 +2448,8 @@ async function hashPassword(str){
 }
 
 function doUnlock(){
+  const skip=document.getElementById('lockSkipCheck');
+  if(skip&&skip.checked) try{localStorage.setItem('salary_skip_lock','1')}catch(e){}
   const overlay=document.getElementById('lockOverlay');
   overlay.classList.add('hidden');
   document.getElementById('lockError').textContent='';
@@ -2552,7 +2569,15 @@ async function setupBioButton(){
   divider.style.display=show?'flex':'none';
 }
 
-function openBioOffer(){document.getElementById('bioOfferModal').classList.add('open')}
+function openBioOffer(){
+  try{if(localStorage.getItem('salary_bio_offer_skip')==='1')return}catch(e){}
+  document.getElementById('bioOfferModal').classList.add('open');
+}
+function dismissBioOffer(){
+  const skip=document.getElementById('bioOfferSkipCheck');
+  if(skip&&skip.checked) try{localStorage.setItem('salary_bio_offer_skip','1')}catch(e){}
+  document.getElementById('bioOfferModal').classList.remove('open');
+}
 function closeBioOffer(e){
   if(e.target===document.getElementById('bioOfferModal'))
     document.getElementById('bioOfferModal').classList.remove('open');
@@ -2616,6 +2641,8 @@ async function toggleBio(){
 //  INIT
 // ══════════════════════════════════════════════
 loadTheme();
+// пропустить экран блокировки если пользователь отметил чекбокс
+try{if(localStorage.getItem('salary_skip_lock')==='1'){doUnlock()}}catch(e){}
 document.getElementById('lockInput').focus();
 initMonths();
 loadTemplates();
@@ -2636,6 +2663,7 @@ renderHistory();
 
 renderExpenses();
 renderAchievements();
+restorePage();
 startShiftTimer();
 setupBioButton();
 </script>
