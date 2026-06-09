@@ -193,6 +193,20 @@ body.light .tvt-opt.active{background:rgba(0,0,0,.1);color:var(--text)}
 .chart-stat-label{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
 .chart-stat-val{font-size:14px;font-weight:800;color:var(--text)}
 
+/* ── TODAY SUMMARY ── */
+.today-summary{
+  margin:0 16px 12px;padding:12px 16px;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:16px;box-shadow:var(--card-shadow);
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+}
+.ts-left{display:flex;flex-direction:column;gap:2px}
+.ts-date{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;opacity:.5}
+.ts-works{font-size:13px;font-weight:600;opacity:.8}
+.ts-right{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.ts-amount{font-size:22px;font-weight:800;color:var(--accent2)}
+.ts-qty{font-size:11px;font-weight:600;opacity:.45}
+
 /* ── TAX TOGGLE ── */
 .tax-row{
   display:flex;align-items:center;justify-content:space-between;
@@ -768,6 +782,23 @@ body.light .rank-item-unit{color:#444}
 .rank-card.gold .rank-item-bar-fill{background:linear-gradient(90deg,#d97706,#fbbf24)}
 .rank-card.platinum .rank-item-bar-fill{background:linear-gradient(90deg,#0284c7,#38bdf8)}
 
+/* ── ARCHIVE ── */
+.archive-section{margin:0 16px 12px}
+.archive-title{font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;opacity:.4;margin-bottom:8px;padding:0 4px}
+.archive-list{display:flex;flex-direction:column;gap:6px}
+.archive-item{
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px 14px;
+  cursor:pointer;transition:opacity .15s;
+}
+.archive-item:active{opacity:.7}
+.archive-item-left{display:flex;flex-direction:column;gap:2px}
+.archive-item-month{font-size:14px;font-weight:700}
+.archive-item-period{font-size:11px;font-weight:600;opacity:.45}
+.archive-item-right{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.archive-item-total{font-size:16px;font-weight:800;color:var(--accent2)}
+.archive-item-cur{font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--accent);opacity:.7}
+
 /* ── BOTTOM NAV ── */
 .bottom-nav{
   position:fixed;bottom:0;left:0;right:0;
@@ -871,6 +902,9 @@ body.light .rank-item-unit{color:#444}
   <div id="compareBadge"></div>
 </div>
 
+<!-- TODAY SUMMARY -->
+<div class="today-summary" id="todaySummaryCard" style="display:none"></div>
+
 <!-- CHART -->
 <div class="chart-wrap" id="chartWrap" style="display:none">
   <div class="chart-title">По дням периода</div>
@@ -933,6 +967,12 @@ body.light .rank-item-unit{color:#444}
     <span class="edge-light"></span>
     <div class="rank-card-inner" id="rankCardInner"></div>
   </div>
+</div>
+
+<!-- ALL PERIODS ARCHIVE -->
+<div class="archive-section" id="archiveSection">
+  <div class="archive-title">Все периоды</div>
+  <div class="archive-list" id="archiveList"></div>
 </div>
 
 <!-- PERIOD CARD -->
@@ -1132,6 +1172,7 @@ body.light .rank-item-unit{color:#444}
 //  PAGE NAVIGATION
 // ══════════════════════════════════════════════
 function switchPage(name){
+  haptic('light');
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
@@ -1201,12 +1242,8 @@ const DOW=['вс','пн','вт','ср','чт','пт','сб'];
 // ══════════════════════════════════════════════
 //  HAPTICS
 // ══════════════════════════════════════════════
-function haptic(type='light'){
-  try{
-    if(window.navigator&&window.navigator.vibrate){
-      window.navigator.vibrate(type==='heavy'?[10,5,10]:type==='medium'?10:5);
-    }
-  }catch(e){}
+function haptic(style){
+  if(navigator.vibrate){navigator.vibrate(style==='light'?10:style==='medium'?20:[15,10,15]);}
 }
 
 // ══════════════════════════════════════════════
@@ -1565,7 +1602,7 @@ function renderDayPanel(){
       </div>`).join('');
   }
   renderShiftTracker();
-  
+  renderTodaySummary();
 }
 
 // ══════════════════════════════════════════════
@@ -1789,9 +1826,10 @@ function plWD(n){if(n%10===1&&n%100!==11)return'рабочий день';if([2,3
 
 function addWork(){
   if(selectedDay===null)return;
+  haptic('medium');
   if(!days[selectedDay])days[selectedDay]=[];
   days[selectedDay].push({id:Date.now(),name:'',qty:'',price:''});
-  save();haptic('light');
+  save();
   renderDayPanel();renderDayStrip();renderTotal();renderChart();renderBreakdown();renderGoals();
   setTimeout(()=>{const inputs=document.querySelectorAll('.dw-name');if(inputs.length)inputs[inputs.length-1].focus()},50);
 }
@@ -1921,6 +1959,7 @@ function plWorks(n){if(n%10===1&&n%100!==11)return'работа';if([2,3,4].incl
 //  BONUSES
 // ══════════════════════════════════════════════
 function addBonus(){
+  haptic('medium');
   bonuses.push({id:Date.now(),name:'',amount:''});
   save();renderBonuses();renderTotal();renderBreakdown();renderGoals();
   setTimeout(()=>{const els=document.querySelectorAll('.bonus-name');if(els.length)els[els.length-1].focus()},50);
@@ -1958,6 +1997,7 @@ function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').repla
 //  TOGGLE
 // ══════════════════════════════════════════════
 function toggleTax(){
+  haptic('light');
   taxEnabled=!taxEnabled;
   document.getElementById('taxToggle').classList.toggle('on',taxEnabled);
   save();renderTotal();renderBreakdown();renderGoals();
@@ -2000,6 +2040,37 @@ function renderTotal(){
   if(hasExp)meta.push(`<div class="meta-item" style="color:var(--danger)">Расходы: <strong>−${fmt(expTotal)} ₽</strong></div>`);
   document.getElementById('totalMeta').innerHTML=meta.join('');
   renderCompareBadge(disp);
+  renderTodaySummary();
+}
+
+function renderTodaySummary(){
+  const card=document.getElementById('todaySummaryCard');
+  if(!card)return;
+  const today=new Date();
+  const{year,month,startDay,endDay}=getPeriod();
+  // only show if today is within current period
+  if(today.getFullYear()!==year||today.getMonth()!==month||today.getDate()<startDay||today.getDate()>endDay){
+    card.style.display='none';return;
+  }
+  const d=today.getDate();
+  const works=days[d]||[];
+  const sum=daySum(d);
+  if(works.length===0&&sum===0){card.style.display='none';return;}
+  card.style.display='';
+  const DOW2=['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
+  const MG2=['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];
+  const dateStr=`Сегодня, ${d} ${MG2[month]} — ${DOW2[today.getDay()]}`;
+  const names=[...new Set(works.filter(w=>w.name).map(w=>w.name.trim()))].join(', ')||'Работы';
+  const totalQty=works.reduce((s,w)=>s+(parseFloat(w.qty)||0),0);
+  card.innerHTML=`
+    <div class="ts-left">
+      <div class="ts-date">${dateStr}</div>
+      <div class="ts-works">${esc(names)}</div>
+    </div>
+    <div class="ts-right">
+      <div class="ts-amount">${fmt(sum)} ₽</div>
+      ${totalQty>0?`<div class="ts-qty">${Math.round(totalQty)} шт</div>`:''}
+    </div>`;
 }
 
 function renderCompareBadge(total){
@@ -2137,6 +2208,42 @@ function renderHistory(){
       <div class="hist-month">${MS[m]} ${y}</div>
       <div class="hist-period">${pLabel}</div>
       <div class="hist-total">${total>0?fmt(total)+' ₽':'—'}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderArchive(){
+  const list=document.getElementById('archiveList');
+  if(!list)return;
+  const MN=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+  const currentKey=saveKey();
+  const allKeys=[];
+  try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&/^salary_\d+_\d+_\d+$/.test(k))allKeys.push(k);}}catch(e){}
+  const items=allKeys.map(k=>{
+    try{
+      const parts=k.replace('salary_','').split('_');
+      const y=parseInt(parts[0]),m=parseInt(parts[1]),p=parseInt(parts[2]);
+      const data=JSON.parse(localStorage.getItem(k)||'{}');
+      const base=[].concat(...Object.values(data.days||{})).reduce((s,w)=>s+(parseFloat(w.qty)||0)*(parseFloat(w.price)||0),0);
+      const bonus=(data.bonuses||[]).reduce((s,b)=>s+(parseFloat(b.amount)||0),0);
+      let total=base+bonus;if(data.taxEnabled)total*=0.87;total=Math.max(0,total);
+      return{k,y,m,p,total};
+    }catch(e){return null;}
+  }).filter(Boolean).sort((a,b)=>b.y-a.y||b.m-a.m||b.p-a.p);
+  if(!items.length){list.innerHTML='<div style="opacity:.4;font-size:13px;padding:8px 4px">Нет сохранённых периодов</div>';return;}
+  list.innerHTML=items.map(({k,y,m,p,total})=>{
+    const isCur=k===currentKey;
+    const endD=new Date(y,m+1,0).getDate();
+    const pLabel=p===1?'1 – 15 · Аванс':`16 – ${endD} · Зарплата`;
+    return`<div class="archive-item" onclick="goToHistory('${y}-${m}',${p});switchPage('main')">
+      <div class="archive-item-left">
+        <div class="archive-item-month">${MN[m]} ${y}</div>
+        <div class="archive-item-period">${pLabel}</div>
+      </div>
+      <div class="archive-item-right">
+        <div class="archive-item-total">${total>0?fmt(total)+' ₽':'—'}</div>
+        ${isCur?'<div class="archive-item-cur">Текущий</div>':''}
+      </div>
     </div>`;
   }).join('');
 }
@@ -2462,10 +2569,11 @@ function initBorderGlow(){
 function resetAll(){
   const hasData=Object.values(days).some(ws=>ws.length>0)||bonuses.length>0;
   if(!hasData)return;
+  haptic('medium');
   if(confirm('Сбросить данные этого периода?')){
     days={};bonuses={};bonuses=[];taxEnabled=false;selectedDay=null;dayOverrides={};
     document.getElementById('taxToggle').classList.remove('on');
-    save();haptic('heavy');
+    save();haptic('medium');
     renderDayStrip();renderDayPanel();renderBonuses();renderTotal();renderChart();renderBreakdown();
   }
 }
