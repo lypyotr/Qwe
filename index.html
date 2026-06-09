@@ -1536,10 +1536,8 @@ function renderShiftTracker() {
   // ── Active templates: selected ones, or ALL if none chosen ──
   const validTpls = templates.filter(t => (parseFloat(t.price) || 0) > 0);
   if (!validTpls.length) { el.innerHTML = ''; return; }
-  const workingTpls = selectedShiftTpls.size > 0
-    ? validTpls.filter(t => selectedShiftTpls.has(t.id))
-    : validTpls;
-  const activeTpls = workingTpls.length > 0 ? workingTpls : validTpls;
+  const workingTpls = validTpls.filter(t => selectedShiftTpls.has(t.id));
+  const activeTpls = workingTpls;
 
   // ── Time ──
   const minLeft = shiftMinutesLeft();
@@ -1566,13 +1564,22 @@ function renderShiftTracker() {
   const stillNeeded = Math.max(neededToday - earnedToday, 0);
 
   // ── Chips: all templates, togglable, checked = in activeTpls ──
-  const noneSelected = selectedShiftTpls.size === 0;
   const chips = validTpls.map(t => {
-    const active = noneSelected || selectedShiftTpls.has(t.id);
+    const active = selectedShiftTpls.has(t.id);
     return `<div class="shift-tpl-chip${active?' selected':''}" onclick="toggleShiftTpl(${t.id})">
       <span class="chip-check">${active?'☑':'☐'}</span> ${esc(t.name)} · ${fmt(t.price)} ₽
     </div>`;
   }).join('');
+
+  // ── Ничего не выбрано ──
+  if (activeTpls.length === 0) {
+    el.innerHTML = `<div class="shift-block">
+      <div class="shift-title">⏱ Счётчик смены (20:00 – 08:00)</div>
+      <div class="shift-tpl-row">${chips}</div>
+      <div class="shift-note">Выбери изделия для счётчика</div>
+    </div>`;
+    return;
+  }
 
   // ── Plan done? ──
   if (stillNeeded <= 0) {
