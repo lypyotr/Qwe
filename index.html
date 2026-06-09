@@ -590,50 +590,12 @@ body.light .tvt-opt.active{background:rgba(0,0,0,.1);color:var(--text)}
   --edge-proximity:0;--cursor-angle:45deg;
   --edge-sensitivity:30;--color-sensitivity:calc(var(--edge-sensitivity) + 20);
   --border-radius:24px;--glow-padding:36px;--cone-spread:25;--fill-opacity:.5;
-  --rotate-x:0deg;--rotate-y:0deg;
-  --pointer-x:50%;--pointer-y:50%;
-  --background-x:50%;--background-y:50%;
   border-radius:var(--border-radius);
   position:relative;overflow:visible;
   isolation:isolate;display:grid;
   border:1px solid rgb(255 255 255/15%);
   box-shadow:rgba(0,0,0,.1) 0 1px 2px,rgba(0,0,0,.1) 0 4px 8px,rgba(0,0,0,.2) 0 16px 32px,rgba(0,0,0,.2) 0 32px 64px;
-  transform-style:preserve-3d;
-  transform:translateZ(0) rotateX(var(--rotate-y)) rotateY(var(--rotate-x));
-  will-change:transform;
 }
-/* holographic shine */
-.pc-shine{
-  position:absolute;inset:0;z-index:4;border-radius:inherit;
-  pointer-events:none;opacity:0;mix-blend-mode:overlay;
-  background:
-    repeating-linear-gradient(0deg,
-      rgba(255,255,255,0) 0%,rgba(255,255,255,.04) 10%,
-      rgba(255,90,30,0) 25%,rgba(255,0,220,.05) 45%,
-      rgba(30,200,255,.05) 55%,rgba(255,255,255,0) 70%,
-      rgba(255,255,255,.04) 85%,rgba(255,255,255,0) 100%),
-    repeating-linear-gradient(133deg,
-      rgba(255,255,255,.12) 0%,rgba(255,255,255,0) 20%,
-      rgba(255,255,255,.04) 30%,rgba(255,255,255,.12) 55%,
-      rgba(255,255,255,0) 75%,rgba(255,255,255,.12) 90%);
-  background-size:100% 200%,100% 200%;
-  background-position:50% var(--background-y),50% var(--background-y);
-  transition:opacity .5s;
-}
-.rank-card.active .pc-shine{opacity:1}
-/* cursor glare */
-.pc-glare{
-  position:absolute;inset:0;z-index:5;border-radius:inherit;
-  pointer-events:none;opacity:0;
-  background:radial-gradient(
-    circle at var(--pointer-x) var(--pointer-y),
-    rgba(255,255,255,.18) 0%,
-    rgba(255,255,255,.06) 28%,
-    transparent 58%
-  );
-  transition:opacity .5s;
-}
-.rank-card.active .pc-glare{opacity:1}
 /* large semi-transparent background icon */
 .rank-bg-icon{
   position:absolute;top:50%;left:50%;
@@ -806,17 +768,6 @@ body.light .rank-item-unit{color:#444}
 .rank-card.gold .rank-item-bar-fill{background:linear-gradient(90deg,#d97706,#fbbf24)}
 .rank-card.platinum .rank-item-bar-fill{background:linear-gradient(90deg,#0284c7,#38bdf8)}
 
-/* gyro activation button */
-.gyro-btn{
-  display:block;width:calc(100% - 32px);margin:0 16px 8px;
-  padding:10px;border-radius:14px;border:none;cursor:pointer;
-  background:rgba(255,255,255,.08);color:var(--text);
-  font-family:'Manrope',sans-serif;font-size:13px;font-weight:700;
-  letter-spacing:.3px;
-}
-body.light .gyro-btn{background:rgba(0,0,0,.07)}
-.gyro-btn.granted{background:rgba(56,189,248,.15);color:#38bdf8}
-
 /* ── BOTTOM NAV ── */
 .bottom-nav{
   position:fixed;bottom:0;left:0;right:0;
@@ -978,11 +929,8 @@ body.light .gyro-btn{background:rgba(0,0,0,.07)}
 <!-- ACHIEVEMENTS RANK CARD -->
 <div class="rank-wrapper" id="rankWrapper">
   <div class="pc-behind" id="rankBehind"></div>
-  <button class="gyro-btn" id="gyroBtn" onclick="activateGyro()" style="display:none">📡 Наклоняй телефон</button>
   <div class="rank-card" id="rankCard">
     <span class="edge-light"></span>
-    <div class="pc-shine"></div>
-    <div class="pc-glare"></div>
     <div class="rank-card-inner" id="rankCardInner"></div>
   </div>
 </div>
@@ -2490,76 +2438,9 @@ function applyBorderGlowTheme(card,tier){
 function initBorderGlow(){
   const card=document.getElementById('rankCard');
   if(!card)return;
-
-  let rafId=null,isOver=false,gyroMode=false,startTime=null;
-  let tx=0,ty=0,rx=0,ry=0,bx=50,by=50;
-  let baseGamma=null,baseBeta=null;
-  const MAX_TILT=6, TAU_H=0.14, TAU_L=0.55;
-
-  function tick(ts){
-    if(!startTime)startTime=ts;
-    const dt=Math.min((ts-startTime)/1000,0.1);
-    startTime=ts;
-    const active=isOver||gyroMode;
-    const k=1-Math.exp(-dt/(active?TAU_H:TAU_L));
-    const trx=active?ty*MAX_TILT:0;
-    const try_=active?tx*MAX_TILT:0;
-    rx+=(trx-rx)*k; ry+=(try_-ry)*k;
-    bx+=((active?50-tx*10:50)-bx)*k;
-    by+=((active?50-ty*10:50)-by)*k;
-    card.style.setProperty('--rotate-x',ry.toFixed(2)+'deg');
-    card.style.setProperty('--rotate-y',rx.toFixed(2)+'deg');
-    card.style.setProperty('--background-x',bx.toFixed(2)+'%');
-    card.style.setProperty('--background-y',by.toFixed(2)+'%');
-    const settled=!active&&Math.abs(rx)<0.05&&Math.abs(ry)<0.05;
-    if(settled){rafId=null;card.classList.remove('active');}
-    else rafId=requestAnimationFrame(tick);
-  }
-
-  function startRaf(){if(!rafId){startTime=null;rafId=requestAnimationFrame(tick);}}
-
-  // ── Gyroscope (iPhone) ──
-  function onOrientation(e){
-    if(e.gamma===null||e.beta===null)return;
-    if(baseGamma===null){baseGamma=e.gamma;baseBeta=e.beta;}
-    const RANGE=20;
-    tx=Math.max(-1,Math.min(1,(e.gamma-baseGamma)/RANGE));
-    ty=Math.max(-1,Math.min(1,(e.beta-baseBeta)/RANGE));
-    if(!gyroMode){gyroMode=true;card.classList.add('active');}
-    startRaf();
-  }
-
-  // show gyro button only on touch devices
-  const gyroBtn=document.getElementById('gyroBtn');
-  if('ontouchstart' in window&&gyroBtn){
-    if(typeof DeviceOrientationEvent!=='undefined'){
-      gyroBtn.style.display='block';
-    }
-  }
-
-  window.activateGyro=function(){
-    if(typeof DeviceOrientationEvent==='undefined')return;
-    if(typeof DeviceOrientationEvent.requestPermission==='function'){
-      DeviceOrientationEvent.requestPermission().then(s=>{
-        if(s==='granted'){
-          window.addEventListener('deviceorientation',onOrientation,{passive:true});
-          if(gyroBtn){gyroBtn.textContent='✅ Гироскоп активен';gyroBtn.classList.add('granted');gyroBtn.disabled=true;}
-        }
-      }).catch(()=>{});
-    } else {
-      window.addEventListener('deviceorientation',onOrientation,{passive:true});
-      if(gyroBtn){gyroBtn.textContent='✅ Гироскоп активен';gyroBtn.classList.add('granted');gyroBtn.disabled=true;}
-    }
-  };
-
-  card.addEventListener('pointerenter',()=>{isOver=true;card.classList.add('active');startRaf();});
   card.addEventListener('pointermove',e=>{
     const rect=card.getBoundingClientRect();
     const x=e.clientX-rect.left, y=e.clientY-rect.top;
-    tx=(x/rect.width)*2-1; ty=(y/rect.height)*2-1;
-    card.style.setProperty('--pointer-x',((x/rect.width)*100).toFixed(2)+'%');
-    card.style.setProperty('--pointer-y',((y/rect.height)*100).toFixed(2)+'%');
-    // BorderGlow
     const cx=rect.width/2, cy=rect.height/2;
     const dx=x-cx, dy=y-cy;
     const kx=dx!==0?cx/Math.abs(dx):Infinity;
@@ -2571,9 +2452,7 @@ function initBorderGlow(){
     card.style.setProperty('--cursor-angle',deg.toFixed(2)+'deg');
   });
   card.addEventListener('pointerleave',()=>{
-    isOver=false;
     card.style.setProperty('--edge-proximity','0');
-    startRaf();
   });
 }
 
