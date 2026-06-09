@@ -731,7 +731,7 @@ body.light .rank-card.platinum{background:linear-gradient(135deg,#e0f2fe 0%,#bae
   padding:22px 20px 18px;
 }
 
-.rank-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px}
+.rank-top{display:flex;align-items:stretch;justify-content:center;gap:10px;margin-bottom:16px}
 .rank-badge{
   display:flex;flex-direction:column;align-items:center;gap:4px;
 }
@@ -2425,22 +2425,17 @@ function renderAchievements(){
   document.getElementById('rankCardInner').innerHTML=`
     <div class="rank-bg-icon">${rank.icon}</div>
     <div class="rank-top">
-      <div class="rank-badge">
-        <div class="rank-icon">${rank.icon}</div>
+      <div class="rank-stat-box">
+        <div class="rank-total-num">${fmt(totalQty)}</div>
+        <div class="rank-total-lbl">изделий</div>
       </div>
-      <div class="rank-right" style="display:flex;gap:8px;align-items:stretch">
-        <div class="rank-stat-box">
-          <div class="rank-total-num">${fmt(totalQty)}</div>
-          <div class="rank-total-lbl">изделий</div>
-        </div>
-        <div class="rank-stat-box">
-          <div class="rank-total-num">${totalDays}</div>
-          <div class="rank-total-lbl">раб. дней</div>
-        </div>
-        <div class="rank-stat-box">
-          <div class="rank-total-num" style="font-size:22px">${fmt(totalEarned)}</div>
-          <div class="rank-total-lbl">₽ заработано</div>
-        </div>
+      <div class="rank-stat-box">
+        <div class="rank-total-num">${totalDays}</div>
+        <div class="rank-total-lbl">раб. дней</div>
+      </div>
+      <div class="rank-stat-box">
+        <div class="rank-total-num" style="font-size:22px">${fmt(totalEarned)}</div>
+        <div class="rank-total-lbl">₽ заработано</div>
       </div>
     </div>
     ${progressHtml}
