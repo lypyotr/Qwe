@@ -813,7 +813,6 @@ body.light .rank-item-unit{color:#444}
   </div>
   <div class="day-works" id="dayWorks"></div>
   <div id="dayShiftTracker"></div>
-  <div id="dayMotivation"></div>
   <button class="add-work-btn" onclick="addWork()">
     <span style="font-size:18px;line-height:1">+</span> Добавить работу
   </button>
@@ -1178,7 +1177,7 @@ function saveGoals(){
   try{localStorage.setItem('salary_goals',JSON.stringify(goals))}catch(e){}
   haptic('light');
   document.getElementById('goalsModal').classList.remove('open');
-  renderGoals();renderDayMotivation();renderShiftTracker();
+  renderGoals();renderShiftTracker();
 }
 function openGoalsModal(){
   document.getElementById('goalPeriodIn').value=goals.period||'';
@@ -1457,7 +1456,7 @@ function renderDayPanel(){
       </div>`).join('');
   }
   renderShiftTracker();
-  renderDayMotivation();
+  
 }
 
 // ══════════════════════════════════════════════
@@ -1677,93 +1676,6 @@ function startShiftTimer() {
 //  MOTIVATIONAL PHRASES
 // ══════════════════════════════════════════════
 
-function renderDayMotivation(){
-  const el=document.getElementById('dayMotivation');
-  if(!el||selectedDay===null){return}
-
-  const hasGoal=goals.period>0||goals.week>0;
-  if(!hasGoal){el.innerHTML='';return}
-
-  const{year,month,startDay,endDay}=getPeriod();
-  const today=new Date();today.setHours(0,0,0,0);
-  const inPeriodWindow=today.getFullYear()===year&&today.getMonth()===month;
-  if(!inPeriodWindow){el.innerHTML='';return}
-  if(today.getDate()>endDay){el.innerHTML='';return}
-
-  // Calendar days remaining (from today inclusive to end of period)
-  const daysLeft=endDay-today.getDate()+1;
-
-  const earned=calcTotal();
-  const taxMult=taxEnabled?0.87:1;
-  let goalTarget=0,goalLabel='';
-  if(goals.period>0){goalTarget=goals.period;goalLabel='периода'}
-  else if(goals.week>0){goalTarget=goals.week;goalLabel='недели'}
-
-  const remaining=Math.max(goalTarget-earned,0);
-
-  // Avg rate from selected day's works, then templates, then all period days
-  const works=days[selectedDay]||[];
-  const validWorks=works.filter(w=>(parseFloat(w.price)||0)>0);
-  let avgRate=0;
-  if(validWorks.length){
-    avgRate=validWorks.reduce((s,w)=>s+(parseFloat(w.price)||0),0)/validWorks.length*taxMult;
-  } else {
-    if(templates.length){
-      const validTpls=templates.filter(t=>(parseFloat(t.price)||0)>0);
-      if(validTpls.length)
-        avgRate=validTpls.reduce((s,t)=>s+(parseFloat(t.price)||0),0)/validTpls.length*taxMult;
-    }
-    if(!avgRate){
-      let rateSum=0,rateCount=0;
-      for(let d=startDay;d<=endDay;d++){
-        (days[d]||[]).forEach(w=>{const p=parseFloat(w.price)||0;if(p>0){rateSum+=p;rateCount++;}});
-      }
-      if(rateCount>0)avgRate=(rateSum/rateCount)*taxMult;
-    }
-  }
-
-  const earnedToday=daySum(selectedDay)*taxMult;
-
-  if(goalTarget>0&&earned>=goalTarget){
-    el.innerHTML=`<div class="motivation-block">
-      <div class="motivation-done">🏆 Цель ${goalLabel} выполнена! Ты молодец!</div>
-    </div>`;
-    return;
-  }
-
-  const neededPerDay=daysLeft>0?remaining/daysLeft:remaining;
-  let pillsHtml='';
-  if(avgRate>0&&neededPerDay>0){
-    const unitsNeeded=Math.ceil(neededPerDay/avgRate);
-    const unitsLeft=Math.max(0,Math.ceil((neededPerDay-earnedToday)/avgRate));
-    pillsHtml=`<div class="motivation-target">
-      <div class="motivation-pill">
-        <span class="mp-count">${unitsNeeded}</span>
-        <span class="mp-label">шт/день для плана</span>
-      </div>`;
-    if(unitsLeft>0&&earnedToday<neededPerDay){
-      pillsHtml+=`<div class="motivation-pill">
-        <span class="mp-count" style="color:var(--accent2)">${unitsLeft}</span>
-        <span class="mp-label">шт ещё сегодня</span>
-      </div>`;
-    } else if(earnedToday>=neededPerDay&&earnedToday>0){
-      pillsHtml+=`<div class="motivation-pill">
-        <span class="mp-count" style="color:var(--accent)">✓</span>
-        <span class="mp-label">на сегодня хватит!</span>
-      </div>`;
-    }
-    pillsHtml+=`</div>`;
-    if(remaining>0&&daysLeft>0){
-      pillsHtml+=`<div class="motivation-need">Нужно ещё <strong>${fmt(Math.ceil(neededPerDay))} ₽/день</strong> · осталось ${daysLeft} дн. в периоде</div>`;
-    }
-  } else if(neededPerDay>0){
-    pillsHtml=`<div class="motivation-need">Нужно заработать <strong>${fmt(Math.ceil(neededPerDay))} ₽</strong> сегодня для выполнения плана</div>`;
-  }
-
-  if(pillsHtml) el.innerHTML=`<div class="motivation-block">${pillsHtml}</div>`;
-  else el.innerHTML='';
-}
-
 function plWD(n){if(n%10===1&&n%100!==11)return'рабочий день';if([2,3,4].includes(n%10)&&![12,13,14].includes(n%100))return'рабочих дня';return'рабочих дней'}
 
 function addWork(){
@@ -1787,7 +1699,7 @@ function updateWork(day,id,field,value){
   const sum=daySum(day);
   document.getElementById('dpSum').textContent=sum>0?fmt(sum)+' ₽':'';
   renderDayStrip();renderTotal();renderChart();renderBreakdown();renderGoals();
-  renderShiftTracker();renderDayMotivation();
+  renderShiftTracker();
 }
 
 // ══════════════════════════════════════════════
@@ -2484,7 +2396,7 @@ function importData(e){
       load();
       renderPeriodCard();renderDayStrip();renderDayPanel();renderBonuses();
       renderTemplates();renderTotal();renderChart();renderGoals();
-      renderBreakdown();renderHistory();renderDayMotivation();renderShiftTracker();
+      renderBreakdown();renderHistory();renderShiftTracker();
       setupBioButton();renderBioSection();
       renderExpenses();renderAchievements();
       haptic('medium');
@@ -2717,7 +2629,7 @@ renderChart();
 renderGoals();
 renderBreakdown();
 renderHistory();
-renderDayMotivation();
+
 renderExpenses();
 renderAchievements();
 startShiftTimer();
