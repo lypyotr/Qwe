@@ -759,45 +759,6 @@ body.light .rank-item-unit{color:#444}
   </div>
 </div>
 
-<!-- PERIOD CARD -->
-<div class="period-card">
-  <div class="period-header">
-    <div class="period-title">Расчётный период</div>
-    <div class="period-badge" id="periodBadge">—</div>
-  </div>
-  <div class="period-selectors">
-    <div class="sel-group">
-      <div class="sel-label">Месяц</div>
-      <div class="sel-wrap"><select id="monthSel" onchange="onPeriodChange()"></select></div>
-    </div>
-    <div class="sel-group">
-      <div class="sel-label">Период</div>
-      <div class="sel-wrap">
-        <select id="periodSel" onchange="onPeriodChange()">
-          <option value="1">1–15 (аванс)</option>
-          <option value="2">16–31 (зарплата)</option>
-        </select>
-      </div>
-    </div>
-  </div>
-  <div class="paydate-box">
-    <div class="paydate-row">
-      <div>
-        <div class="paydate-period-name" id="pdName">—</div>
-        <div class="paydate-period-range" id="pdRange">—</div>
-      </div>
-      <div class="paydate-right">
-        <div class="paydate-label">Дата выплаты</div>
-        <div class="paydate-date" id="pdDate">—</div>
-      </div>
-    </div>
-    <div class="paydate-note hidden" id="pdNote">⚠ Перенесено с выходного или праздника</div>
-    <div id="pdBadge"></div>
-    <!-- COUNTDOWN -->
-    <div class="period-countdown" id="periodCountdown"></div>
-  </div>
-</div>
-
 <!-- TOTAL CARD -->
 <div class="total-card">
   <div class="total-label" id="totalLabel">Итого к получению</div>
@@ -871,8 +832,47 @@ body.light .rank-item-unit{color:#444}
   <div id="rankCardInner"></div>
 </div>
 
+<!-- PERIOD CARD -->
+<div class="period-card">
+  <div class="period-header">
+    <div class="period-title">Расчётный период</div>
+    <div class="period-badge" id="periodBadge">—</div>
+  </div>
+  <div class="period-selectors">
+    <div class="sel-group">
+      <div class="sel-label">Месяц</div>
+      <div class="sel-wrap"><select id="monthSel" onchange="onPeriodChange()"></select></div>
+    </div>
+    <div class="sel-group">
+      <div class="sel-label">Период</div>
+      <div class="sel-wrap">
+        <select id="periodSel" onchange="onPeriodChange()">
+          <option value="1">1–15 (аванс)</option>
+          <option value="2">16–31 (зарплата)</option>
+        </select>
+      </div>
+    </div>
+  </div>
+  <div class="paydate-box">
+    <div class="paydate-row">
+      <div>
+        <div class="paydate-period-name" id="pdName">—</div>
+        <div class="paydate-period-range" id="pdRange">—</div>
+      </div>
+      <div class="paydate-right">
+        <div class="paydate-label">Дата выплаты</div>
+        <div class="paydate-date" id="pdDate">—</div>
+      </div>
+    </div>
+    <div class="paydate-note hidden" id="pdNote">⚠ Перенесено с выходного или праздника</div>
+    <div id="pdBadge"></div>
+    <!-- COUNTDOWN -->
+    <div class="period-countdown" id="periodCountdown"></div>
+  </div>
+</div>
+
 <!-- GOALS CARD -->
-<div class="goals-card" id="goalsCard" style="margin-top:16px">
+<div class="goals-card" id="goalsCard">
   <div class="goals-header">
     <div class="goals-title">🎯 Цели и прогресс</div>
     <div class="goals-edit-btn" onclick="openGoalsModal()">Изменить</div>
