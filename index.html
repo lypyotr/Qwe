@@ -2210,6 +2210,7 @@ function renderHistory(){
       <div class="hist-total">${total>0?fmt(total)+' ₽':'—'}</div>
     </div>`;
   }).join('');
+  renderArchive();
 }
 
 function renderArchive(){
@@ -2934,6 +2935,7 @@ renderChart();
 renderGoals();
 renderBreakdown();
 renderHistory();
+renderArchive();
 
 renderExpenses();
 renderAchievements();
