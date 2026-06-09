@@ -2477,30 +2477,59 @@ function initBorderGlow(){
   const card=document.getElementById('rankCard');
   if(!card)return;
 
-  let rafId=null,isOver=false,startTime=null;
+  let rafId=null,isOver=false,gyroMode=false,startTime=null;
   let tx=0,ty=0,rx=0,ry=0,bx=50,by=50;
+  let baseGamma=null,baseBeta=null;
   const MAX_TILT=6, TAU_H=0.14, TAU_L=0.55;
 
   function tick(ts){
     if(!startTime)startTime=ts;
     const dt=Math.min((ts-startTime)/1000,0.1);
     startTime=ts;
-    const k=1-Math.exp(-dt/(isOver?TAU_H:TAU_L));
-    const trx=isOver?ty*MAX_TILT:0;
-    const try_=isOver?tx*MAX_TILT:0;
+    const active=isOver||gyroMode;
+    const k=1-Math.exp(-dt/(active?TAU_H:TAU_L));
+    const trx=active?ty*MAX_TILT:0;
+    const try_=active?tx*MAX_TILT:0;
     rx+=(trx-rx)*k; ry+=(try_-ry)*k;
-    bx+=((isOver?50-tx*10:50)-bx)*k;
-    by+=((isOver?50-ty*10:50)-by)*k;
+    bx+=((active?50-tx*10:50)-bx)*k;
+    by+=((active?50-ty*10:50)-by)*k;
     card.style.setProperty('--rotate-x',ry.toFixed(2)+'deg');
     card.style.setProperty('--rotate-y',rx.toFixed(2)+'deg');
     card.style.setProperty('--background-x',bx.toFixed(2)+'%');
     card.style.setProperty('--background-y',by.toFixed(2)+'%');
-    const settled=!isOver&&Math.abs(rx)<0.05&&Math.abs(ry)<0.05;
+    const settled=!active&&Math.abs(rx)<0.05&&Math.abs(ry)<0.05;
     if(settled){rafId=null;card.classList.remove('active');}
     else rafId=requestAnimationFrame(tick);
   }
 
   function startRaf(){if(!rafId){startTime=null;rafId=requestAnimationFrame(tick);}}
+
+  // ── Gyroscope (iPhone) ──
+  function onOrientation(e){
+    if(baseGamma===null){baseGamma=e.gamma||0;baseBeta=e.beta||0;}
+    const RANGE=20;
+    const dg=Math.max(-RANGE,Math.min(RANGE,(e.gamma||0)-baseGamma));
+    const db=Math.max(-RANGE,Math.min(RANGE,(e.beta||0)-baseBeta));
+    tx=dg/RANGE; ty=db/RANGE;
+    if(!gyroMode){gyroMode=true;card.classList.add('active');}
+    startRaf();
+  }
+
+  function enableGyro(){
+    if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){
+      DeviceOrientationEvent.requestPermission().then(s=>{
+        if(s==='granted')window.addEventListener('deviceorientation',onOrientation,{passive:true});
+      }).catch(()=>{});
+    } else if(typeof DeviceOrientationEvent!=='undefined'){
+      window.addEventListener('deviceorientation',onOrientation,{passive:true});
+    }
+  }
+
+  // request gyro permission on first tap (required by iOS)
+  let gyroAsked=false;
+  card.addEventListener('touchstart',()=>{
+    if(!gyroAsked){gyroAsked=true;enableGyro();}
+  },{passive:true,once:false});
 
   card.addEventListener('pointerenter',()=>{isOver=true;card.classList.add('active');startRaf();});
   card.addEventListener('pointermove',e=>{
