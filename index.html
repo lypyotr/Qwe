@@ -2006,6 +2006,20 @@ function renderCompareBadge(total){
 // ══════════════════════════════════════════════
 //  CHART
 // ══════════════════════════════════════════════
+function calcTotalWorkedDaysAllTime(){
+  let total=0;
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(!k||!/^salary_\d+_\d+_\d+$/.test(k))continue;
+      const data=JSON.parse(localStorage.getItem(k)||'{}');
+      const d=data.days||{};
+      total+=Object.keys(d).filter(day=>(d[day]||[]).reduce((s,w)=>s+(parseFloat(w.qty)||0)*(parseFloat(w.price)||0),0)>0).length;
+    }
+  }catch(e){}
+  return total;
+}
+
 function renderChart(){
   const{startDay,endDay}=getPeriod();
   const{month}=getPeriod();
@@ -2034,7 +2048,8 @@ function renderChart(){
   let statsHtml='';
   statsHtml+=`<div class="chart-stat"><div class="chart-stat-label">Средний день</div><div class="chart-stat-val">${fmt(avg)} ₽</div></div>`;
   if(maxDay.d)statsHtml+=`<div class="chart-stat"><div class="chart-stat-label">Лучший день</div><div class="chart-stat-val">${maxDay.d} ${MS[month]} · ${fmt(maxDay.s)} ₽</div></div>`;
-  statsHtml+=`<div class="chart-stat"><div class="chart-stat-label">Рабочих дней</div><div class="chart-stat-val">${nonZero.length}</div></div>`;
+  statsHtml+=`<div class="chart-stat"><div class="chart-stat-label">В этом периоде</div><div class="chart-stat-val">${nonZero.length} дн.</div></div>`;
+  statsHtml+=`<div class="chart-stat"><div class="chart-stat-label">Всего рабочих дней</div><div class="chart-stat-val">${calcTotalWorkedDaysAllTime()} дн.</div></div>`;
   document.getElementById('chartStats').innerHTML=statsHtml;
 }
 
