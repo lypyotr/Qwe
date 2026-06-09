@@ -572,6 +572,35 @@ body.light .tvt-opt.active{background:rgba(0,0,0,.1);color:var(--text)}
 
 @keyframes slideIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
 
+/* ── ACHIEVEMENTS CARD ── */
+.achievements-card{
+  margin:0 16px 12px;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:20px;padding:16px 18px;box-shadow:var(--card-shadow);
+  position:relative;overflow:hidden;
+}
+.achievements-card::before{
+  content:'';position:absolute;top:-40px;right:-40px;width:130px;height:130px;
+  background:radial-gradient(circle,rgba(251,191,36,.08) 0%,transparent 70%);pointer-events:none;
+}
+.achievements-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.achievements-title{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--warn);opacity:.9}
+.achievements-total{font-size:11px;font-weight:700;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:3px 10px}
+.ach-list{display:flex;flex-direction:column;gap:8px}
+.ach-row{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  background:var(--surface2);border:1px solid var(--border);border-radius:12px;
+  padding:10px 14px;
+}
+.ach-row-left{display:flex;flex-direction:column;gap:2px;min-width:0}
+.ach-name{font-size:14px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ach-periods{font-size:10px;font-weight:600;color:var(--muted)}
+.ach-qty{font-size:26px;font-weight:800;line-height:1;color:var(--warn);flex-shrink:0}
+.ach-qty-lbl{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-top:1px;text-align:right}
+.ach-bar-wrap{margin-top:6px}
+.ach-bar-bg{height:4px;background:var(--border);border-radius:2px;overflow:hidden}
+.ach-bar-fill{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--warn),#facc15);transition:width .5s cubic-bezier(.4,0,.2,1)}
+
 /* ── LOCK SCREEN ── */
 .lock-overlay{position:fixed;inset:0;background:var(--bg);z-index:200;
   display:flex;align-items:center;justify-content:center;transition:opacity .3s}
@@ -760,6 +789,15 @@ body.light .tvt-opt.active{background:rgba(0,0,0,.1);color:var(--text)}
   <button class="add-btn" onclick="addBonus()">
     <span style="font-size:20px;line-height:1">+</span> Добавить доплату / вычет
   </button>
+</div>
+
+<!-- ACHIEVEMENTS -->
+<div class="achievements-card" id="achievementsCard">
+  <div class="achievements-header">
+    <div class="achievements-title">🏅 Мои достижения</div>
+    <div class="achievements-total" id="achTotal"></div>
+  </div>
+  <div class="ach-list" id="achList"></div>
 </div>
 
 <!-- HISTORY -->
@@ -980,7 +1018,7 @@ function saveKey(){const{year,month,period}=getPeriod();return`salary_${year}_${
 function save(){
   try{
     localStorage.setItem(saveKey(),JSON.stringify({days,bonuses,taxEnabled,dayOverrides}));
-    renderHistory();
+    renderHistory();renderAchievements();
   }catch(e){}
 }
 function load(){
@@ -2048,6 +2086,70 @@ function calcExpensesTotal(){
 function calcNetTotal(){return calcTotal()-calcExpensesTotal()}
 
 // ══════════════════════════════════════════════
+//  ACHIEVEMENTS
+// ══════════════════════════════════════════════
+function renderAchievements(){
+  const card=document.getElementById('achievementsCard');
+  const list=document.getElementById('achList');
+  const totalEl=document.getElementById('achTotal');
+  if(!card||!list)return;
+
+  // aggregate qty by work name across all period keys
+  const stats={}; // name -> {qty, periods: Set, earnings}
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(!k||!/^salary_\d+_\d+_\d+$/.test(k))continue;
+      const data=JSON.parse(localStorage.getItem(k)||'{}');
+      const periodDays=data.days||{};
+      const periodKey=k;
+      Object.values(periodDays).forEach(works=>{
+        (works||[]).forEach(w=>{
+          const name=(w.name||'').trim();
+          if(!name)return;
+          const qty=parseFloat(w.qty)||0;
+          const price=parseFloat(w.price)||0;
+          if(qty<=0)return;
+          if(!stats[name])stats[name]={qty:0,periods:new Set(),earnings:0};
+          stats[name].qty+=qty;
+          stats[name].earnings+=qty*price;
+          stats[name].periods.add(periodKey);
+        });
+      });
+    }
+  }catch(e){}
+
+  const entries=Object.entries(stats).sort((a,b)=>b[1].qty-a[1].qty);
+  if(!entries.length){
+    card.style.display='none';return;
+  }
+  card.style.display='';
+
+  const totalQty=entries.reduce((s,[,v])=>s+v.qty,0);
+  totalEl.textContent='Всего: '+Math.round(totalQty)+' шт';
+
+  const maxQty=entries[0][1].qty;
+  list.innerHTML=entries.map(([name,v])=>{
+    const barW=Math.round(v.qty/maxQty*100);
+    const periodCount=v.periods.size;
+    const pLabel=periodCount===1?'1 период':periodCount<=4?periodCount+' периода':periodCount+' периодов';
+    return`<div class="ach-row">
+      <div class="ach-row-left">
+        <div class="ach-name">${esc(name)}</div>
+        <div class="ach-periods">${pLabel} · ${fmt(v.earnings)} ₽</div>
+        <div class="ach-bar-wrap">
+          <div class="ach-bar-bg"><div class="ach-bar-fill" style="width:${barW}%"></div></div>
+        </div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div class="ach-qty">${Math.round(v.qty)}</div>
+        <div class="ach-qty-lbl">шт</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════
 //  RESET
 // ══════════════════════════════════════════════
 function resetAll(){
@@ -2174,7 +2276,7 @@ function importData(e){
       renderTemplates();renderTotal();renderChart();renderGoals();
       renderBreakdown();renderHistory();renderDayMotivation();renderShiftTracker();
       setupBioButton();renderBioSection();
-      renderExpenses();
+      renderExpenses();renderAchievements();
       haptic('medium');
       showDataMsg(`✓ Импортировано: ${n}`,'ok');
       // refresh stats in modal
@@ -2407,6 +2509,7 @@ renderBreakdown();
 renderHistory();
 renderDayMotivation();
 renderExpenses();
+renderAchievements();
 startShiftTimer();
 setupBioButton();
 </script>
