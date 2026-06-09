@@ -2323,16 +2323,24 @@ function renderAchievements(){
     </div>`;
   }).join('');
 
+  const totalDays=calcTotalWorkedDaysAllTime();
   document.getElementById('rankCardInner').innerHTML=`
     <div class="rank-top">
       <div class="rank-badge">
         <div class="rank-icon">${rank.icon}</div>
-        <div class="rank-tier-name">${rank.name}</div>
       </div>
       <div class="rank-right">
         <div class="rank-label">Всего сделано</div>
-        <div class="rank-total-num">${fmt(totalQty)}</div>
-        <div class="rank-total-lbl">изделий · ${calcTotalWorkedDaysAllTime()} раб. дн.</div>
+        <div style="display:flex;align-items:baseline;gap:14px;justify-content:flex-end">
+          <div style="text-align:right">
+            <div class="rank-total-num">${fmt(totalQty)}</div>
+            <div class="rank-total-lbl">изделий</div>
+          </div>
+          <div style="text-align:right">
+            <div class="rank-total-num">${totalDays}</div>
+            <div class="rank-total-lbl">раб. дней</div>
+          </div>
+        </div>
       </div>
     </div>
     ${progressHtml}
