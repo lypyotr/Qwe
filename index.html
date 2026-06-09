@@ -747,14 +747,14 @@ body.light .rank-card.platinum{background:linear-gradient(135deg,#e0f2fe 0%,#bae
 
 .rank-right{text-align:right}
 .rank-stat-box{
-  text-align:center;padding:8px 12px;border-radius:12px;
+  text-align:center;padding:8px 10px;border-radius:12px;
   background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);
-  min-width:64px;
+  flex:1;min-width:0;
 }
 body.light .rank-stat-box{background:rgba(0,0,0,.06);border-color:rgba(0,0,0,.1)}
 .rank-label{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.5;margin-bottom:4px}
 body.light .rank-label{color:#444}
-.rank-total-num{font-size:42px;font-weight:800;line-height:1;letter-spacing:-1px}
+.rank-total-num{font-size:clamp(18px,6vw,42px);font-weight:800;line-height:1;letter-spacing:-0.5px;word-break:break-all}
 .rank-card.bronze .rank-total-num{color:#e8a855}
 .rank-card.silver .rank-total-num{color:#c8d0dc}
 .rank-card.gold .rank-total-num{color:#fbbf24}
