@@ -2525,11 +2525,11 @@ function initBorderGlow(){
     }
   }
 
-  // request gyro permission on first tap (required by iOS)
-  let gyroAsked=false;
-  card.addEventListener('touchstart',()=>{
-    if(!gyroAsked){gyroAsked=true;enableGyro();}
-  },{passive:true,once:false});
+  // request gyro on first touch anywhere on the page (iOS requires user gesture)
+  document.addEventListener('touchstart',function gyroInit(){
+    document.removeEventListener('touchstart',gyroInit);
+    enableGyro();
+  },{passive:true,once:true});
 
   card.addEventListener('pointerenter',()=>{isOver=true;card.classList.add('active');startRaf();});
   card.addEventListener('pointermove',e=>{
