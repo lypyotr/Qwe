@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Зарплата">
-<meta name="theme-color" content="#0d0f14">
+<meta name="theme-color" content="#0a0c12">
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230d0f14'/><text y='.9em' font-size='72' x='12'>💰</text></svg>">
 <title>Зарплата</title>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -15,14 +15,14 @@
 
 /* ── THEME VARS ── */
 :root{
-  --bg:#0d0f14;--surface:#161920;--surface2:#1e2230;--border:#2a2f42;
+  --bg:#0a0c12;--surface:rgba(255,255,255,.055);--surface2:rgba(255,255,255,.08);--border:rgba(255,255,255,.08);
   --accent:#4ade80;--accent2:#22d3ee;--accent3:#f472b6;
-  --text:#f0f2ff;--muted:#6b7280;--danger:#f87171;--warn:#fbbf24;
-  --card-shadow:0 4px 24px rgba(0,0,0,.4);
+  --text:#f0f2ff;--muted:#9aa3b8;--danger:#f87171;--warn:#fbbf24;
+  --card-shadow:0 12px 36px rgba(0,0,0,.22);
 }
 body.light{
-  --bg:#f0f2f5;--surface:#ffffff;--surface2:#f5f7fa;--border:#e2e6ef;
-  --text:#111827;--muted:#9ca3af;--card-shadow:0 2px 12px rgba(0,0,0,.08);
+  --bg:#eef0f6;--surface:rgba(255,255,255,.55);--surface2:rgba(255,255,255,.6);--border:rgba(17,24,39,.07);
+  --text:#111827;--muted:#6b7280;--card-shadow:0 12px 36px rgba(31,38,135,.1);
 }
 
 html{overscroll-behavior-x:none;overflow-x:hidden;width:100%}
@@ -850,9 +850,118 @@ body.light .rank-item-unit{color:#444}
 .lock-error{font-size:13px;color:var(--danger);font-weight:700;min-height:18px}
 @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
 .shake{animation:shake .35s ease}
+
+/* ══ FROSTED GLASS DESIGN ══ */
+/* aurora background: colorful soft blobs the glass cards blur through */
+.bg-aurora{
+  position:fixed;inset:0;z-index:-2;overflow:hidden;pointer-events:none;
+  will-change:transform,filter;transform:translate3d(0,0,0);
+}
+.bg-aurora::before,.bg-aurora::after{
+  content:'';position:absolute;inset:-35%;will-change:transform;
+  background:
+    radial-gradient(40% 34% at 20% 24%,rgba(74,222,128,.17) 0%,transparent 70%),
+    radial-gradient(44% 38% at 82% 14%,rgba(34,211,238,.15) 0%,transparent 70%),
+    radial-gradient(42% 36% at 76% 76%,rgba(244,114,182,.14) 0%,transparent 70%),
+    radial-gradient(38% 32% at 16% 82%,rgba(129,140,248,.16) 0%,transparent 70%);
+  animation:auroraDrift 28s ease-in-out infinite alternate;
+}
+.bg-aurora::after{
+  background:
+    radial-gradient(34% 30% at 64% 36%,rgba(34,211,238,.10) 0%,transparent 70%),
+    radial-gradient(36% 32% at 30% 58%,rgba(244,114,182,.09) 0%,transparent 70%),
+    radial-gradient(32% 28% at 52% 86%,rgba(74,222,128,.10) 0%,transparent 70%);
+  animation:auroraDrift2 36s ease-in-out infinite alternate;
+}
+body.light .bg-aurora::before{
+  background:
+    radial-gradient(40% 34% at 20% 24%,rgba(74,222,128,.30) 0%,transparent 70%),
+    radial-gradient(44% 38% at 82% 14%,rgba(34,211,238,.26) 0%,transparent 70%),
+    radial-gradient(42% 36% at 76% 76%,rgba(244,114,182,.24) 0%,transparent 70%),
+    radial-gradient(38% 32% at 16% 82%,rgba(129,140,248,.26) 0%,transparent 70%);
+}
+body.light .bg-aurora::after{
+  background:
+    radial-gradient(34% 30% at 64% 36%,rgba(34,211,238,.18) 0%,transparent 70%),
+    radial-gradient(36% 32% at 30% 58%,rgba(244,114,182,.15) 0%,transparent 70%),
+    radial-gradient(32% 28% at 52% 86%,rgba(74,222,128,.16) 0%,transparent 70%);
+}
+@keyframes auroraDrift{
+  0%{transform:translate3d(-3%,-2%,0) rotate(-4deg) scale(1)}
+  100%{transform:translate3d(3%,3%,0) rotate(5deg) scale(1.1)}
+}
+@keyframes auroraDrift2{
+  0%{transform:translate3d(2%,3%,0) rotate(6deg) scale(1.05)}
+  100%{transform:translate3d(-3%,-2%,0) rotate(-5deg) scale(1)}
+}
+@media (prefers-reduced-motion:reduce){
+  .bg-aurora::before,.bg-aurora::after{animation:none}
+}
+
+/* glass cards: translucent, borderless, frosted */
+.period-card,.goals-card,.total-card,.chart-wrap,.today-summary,.tax-row,
+.day-panel,.breakdown,.expenses-card,.bonus-item,.hist-card,.archive-item{
+  background:var(--surface);
+  border:1px solid transparent;
+  -webkit-backdrop-filter:blur(22px) saturate(160%);
+  backdrop-filter:blur(22px) saturate(160%);
+  box-shadow:0 12px 36px rgba(0,0,0,.22),
+    inset 0 1px 0 rgba(255,255,255,.10),
+    inset 0 0 0 .5px rgba(255,255,255,.04);
+}
+body.light .period-card,body.light .goals-card,body.light .total-card,
+body.light .chart-wrap,body.light .today-summary,body.light .tax-row,
+body.light .day-panel,body.light .breakdown,body.light .expenses-card,
+body.light .bonus-item,body.light .hist-card,body.light .archive-item{
+  box-shadow:0 12px 36px rgba(31,38,135,.10),
+    inset 0 1px 0 rgba(255,255,255,.85),
+    inset 0 0 0 .5px rgba(255,255,255,.4);
+}
+.total-card{background:linear-gradient(135deg,rgba(74,222,128,.13),rgba(34,211,238,.09))}
+body.light .total-card{background:linear-gradient(135deg,rgba(74,222,128,.18),rgba(34,211,238,.13));border-color:transparent}
+
+/* small controls: translucent without heavy blur (perf on mobile) */
+.icon-btn,.day-btn{border-color:transparent;box-shadow:inset 0 1px 0 rgba(255,255,255,.07)}
+body.light .icon-btn,body.light .day-btn{box-shadow:inset 0 1px 0 rgba(255,255,255,.8)}
+.day-work-row{background:transparent}
+.goal-bar-bg,.shift-progress-bg{border:none}
+
+/* glass bottom nav */
+.bottom-nav{
+  background:rgba(13,16,24,.55);border-top:none;
+  -webkit-backdrop-filter:blur(28px) saturate(180%);
+  backdrop-filter:blur(28px) saturate(180%);
+  box-shadow:0 -8px 30px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.06);
+}
+body.light .bottom-nav{
+  background:rgba(255,255,255,.6);
+  box-shadow:0 -8px 30px rgba(31,38,135,.08),inset 0 1px 0 rgba(255,255,255,.8);
+}
+
+/* glass modals */
+.modal-overlay{background:rgba(8,10,16,.45);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.modal{
+  background:rgba(22,27,40,.78);
+  -webkit-backdrop-filter:blur(30px) saturate(170%);
+  backdrop-filter:blur(30px) saturate(170%);
+  box-shadow:0 -10px 40px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.1);
+}
+body.light .modal{background:rgba(255,255,255,.78)}
+
+/* fix-ups for elements that leaned on the old opaque --border */
+.chart-bar{background:rgba(255,255,255,.10)}
+body.light .chart-bar{background:rgba(17,24,39,.10)}
+.toggle{background:rgba(255,255,255,.14)}
+body.light .toggle{background:rgba(17,24,39,.14)}
+.modal-handle{background:rgba(255,255,255,.18)}
+body.light .modal-handle{background:rgba(17,24,39,.15)}
+.dw-qty-wrap input::placeholder,.dw-price-wrap input::placeholder{color:var(--muted);opacity:.45}
 </style>
 </head>
 <body>
+
+<!-- AURORA BACKGROUND (shines through frosted glass cards) -->
+<div class="bg-aurora" id="bgAurora"></div>
 
 <!-- LOCK SCREEN -->
 <div class="lock-overlay" id="lockOverlay">
@@ -2911,6 +3020,29 @@ async function toggleBio(){
     }
   }
 }
+
+// ══════════════════════════════════════════════
+//  SCROLL SHIMMER (aurora hue-shift + parallax)
+// ══════════════════════════════════════════════
+(function(){
+  const aurora=document.getElementById('bgAurora');
+  if(!aurora)return;
+  if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  let cur=0,target=0,raf=null;
+  function frame(){
+    cur+=(target-cur)*0.07;
+    const hue=(cur*0.14)%360;
+    const y=Math.max(-60,Math.min(60,cur*-0.06));
+    aurora.style.filter=`hue-rotate(${hue}deg)`;
+    aurora.style.transform=`translate3d(0,${y}px,0)`;
+    if(Math.abs(target-cur)>0.5){raf=requestAnimationFrame(frame)}
+    else{cur=target;raf=null}
+  }
+  window.addEventListener('scroll',()=>{
+    target=window.scrollY||0;
+    if(raf===null)raf=requestAnimationFrame(frame);
+  },{passive:true});
+})();
 
 // ══════════════════════════════════════════════
 //  INIT
