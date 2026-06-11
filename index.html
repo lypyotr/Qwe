@@ -1782,10 +1782,13 @@ function renderShiftTracker() {
   const selDate = new Date(year, month, selectedDay);
   if (isDayOff(selectedDay, selDate)) { el.innerHTML = ''; return; }
 
-  const today0 = new Date(); today0.setHours(0, 0, 0, 0);
-  const isToday = today0.getFullYear() === year && today0.getMonth() === month
-    && today0.getDate() === selectedDay;
-  if (!isToday) { el.innerHTML = ''; return; }
+  // День смены: до 08:00 текущая смена относится к предыдущему дню (началась в 20:00),
+  // поэтому счётчик не исчезает при смене календарного дня в 00:00
+  const shiftDay0 = new Date(Date.now() - SHIFT_END_H * 60 * 60 * 1000);
+  shiftDay0.setHours(0, 0, 0, 0);
+  const isShiftDay = shiftDay0.getFullYear() === year && shiftDay0.getMonth() === month
+    && shiftDay0.getDate() === selectedDay;
+  if (!isShiftDay) { el.innerHTML = ''; return; }
 
   // ── Active templates: selected ones, or ALL if none chosen ──
   const validTpls = templates.filter(t => (parseFloat(t.price) || 0) > 0);
@@ -1809,7 +1812,7 @@ function renderShiftTracker() {
   const goalTarget = goals.period > 0 ? goals.period : goals.week;
   const remaining  = Math.max(goalTarget - earned, 0);
   let workDaysLeft = 0;
-  for (let d = today0.getDate(); d <= endDay; d++) {
+  for (let d = shiftDay0.getDate(); d <= endDay; d++) {
     const dt = new Date(year, month, d);
     if (!isDayOff(d, dt)) workDaysLeft++;
   }
