@@ -1684,8 +1684,7 @@ function renderDayPanel(){
   const btn=document.getElementById('dayTypeBtn');
   if(btn){
     const off=isDayOff(selectedDay,date);
-    const overridden=!!dayOverrides[String(selectedDay)];
-    btn.textContent=off?('В'+(overridden?' ↺':'')):'Р'+(overridden?' ↺':'');
+    btn.textContent=off?'В':'Р';
     btn.className='day-type-btn '+(off?'is-off':'is-work');
   }
   const works=days[selectedDay]||[];
