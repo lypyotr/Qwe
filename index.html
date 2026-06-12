@@ -1043,7 +1043,7 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
       <div class="day-panel-title" id="dpTitle">—</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px">
-      <div class="copy-day-btn" onclick="openCopyModal()">📋 Копировать с дня</div>
+      <div class="copy-day-btn" onclick="openCopyModal()" title="Копировать с дня">📋</div>
       <div class="day-type-btn" id="dayTypeBtn" onclick="toggleDayWorkStatus()"></div>
       <div class="day-panel-sum" id="dpSum"></div>
     </div>
@@ -1685,7 +1685,7 @@ function renderDayPanel(){
   if(btn){
     const off=isDayOff(selectedDay,date);
     const overridden=!!dayOverrides[String(selectedDay)];
-    btn.textContent=off?('Выходной'+(overridden?' ↺':'')):'Рабочий'+(overridden?' ↺':'');
+    btn.textContent=off?('В'+(overridden?' ↺':'')):'Р'+(overridden?' ↺':'');
     btn.className='day-type-btn '+(off?'is-off':'is-work');
   }
   const works=days[selectedDay]||[];
