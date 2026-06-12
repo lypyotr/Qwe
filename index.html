@@ -891,6 +891,33 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
 .compare-badge.up,.day-type-btn.is-work{color:var(--accent-ink)}
 .ts-amount,.paydate-date,.archive-item-total,.day-panel-sum,
 .period-title,.period-badge{color:var(--accent2-ink)}
+
+/* ── DAY PHOTO REPORT ── */
+.photo-section{padding:10px 14px;border-top:1px solid var(--border)}
+.photo-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.photo-title{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
+.photo-add-btn{
+  font-size:12px;font-weight:700;color:var(--accent-ink);cursor:pointer;
+  background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.2);
+  border-radius:8px;padding:4px 10px;
+}
+.photo-add-btn:active{opacity:.7}
+.photo-grid{display:flex;gap:8px;flex-wrap:wrap}
+.photo-thumb{
+  width:64px;height:64px;border-radius:10px;object-fit:cover;cursor:pointer;
+  box-shadow:0 2px 10px rgba(0,0,0,.25);transition:transform .15s;
+}
+.photo-thumb:active{transform:scale(.93)}
+.photo-empty{font-size:12px;color:var(--muted)}
+.photo-viewer{
+  position:fixed;inset:0;background:rgba(5,7,12,.92);z-index:300;
+  display:none;align-items:center;justify-content:center;flex-direction:column;
+  gap:16px;padding:20px;
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+}
+.photo-viewer.open{display:flex}
+.photo-viewer img{max-width:100%;max-height:72vh;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.5)}
+.photo-viewer-actions{display:flex;gap:10px}
 </style>
 </head>
 <body>
@@ -983,6 +1010,14 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
   </div>
   <div class="day-works" id="dayWorks"></div>
   <div id="dayShiftTracker"></div>
+  <div class="photo-section">
+    <div class="photo-header">
+      <div class="photo-title">📷 Фото-отчёт<span id="photoCount"></span></div>
+      <div class="photo-add-btn" onclick="document.getElementById('photoFileIn').click()">+ Добавить</div>
+    </div>
+    <div class="photo-grid" id="photoGrid"></div>
+    <input type="file" id="photoFileIn" accept="image/*" multiple style="display:none" onchange="addDayPhotos(event)">
+  </div>
   <button class="add-work-btn" onclick="addWork()">
     <span style="font-size:18px;line-height:1">+</span> Добавить работу
   </button>
@@ -1171,6 +1206,15 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
       <button class="modal-btn" id="bioToggleBtn" style="width:100%;padding:12px" onclick="toggleBio()"></button>
     </div>
     <div id="dataMsg" style="margin-top:12px;font-size:13px;text-align:center;font-weight:600;min-height:18px"></div>
+  </div>
+</div>
+
+<!-- PHOTO VIEWER -->
+<div class="photo-viewer" id="photoViewer" onclick="closePhotoViewer(event)">
+  <img id="photoViewerImg" alt="Фото-отчёт">
+  <div class="photo-viewer-actions">
+    <button class="modal-btn" style="background:rgba(248,113,113,.9);color:#fff" onclick="deleteCurrentPhoto()">🗑 Удалить</button>
+    <button class="modal-btn" style="background:var(--surface2);color:#fff;border:1px solid rgba(255,255,255,.2)" onclick="closePhotoViewer()">Закрыть</button>
   </div>
 </div>
 
@@ -1643,6 +1687,124 @@ function renderDayPanel(){
   }
   renderShiftTracker();
   renderTodaySummary();
+  renderDayPhotos();
+}
+
+// ══════════════════════════════════════════════
+//  DAY PHOTO REPORT  (stored in IndexedDB)
+// ══════════════════════════════════════════════
+let photoDB=null;
+function openPhotoDB(){
+  return new Promise((res,rej)=>{
+    if(photoDB)return res(photoDB);
+    const req=indexedDB.open('salary_photos',1);
+    req.onupgradeneeded=()=>{
+      const store=req.result.createObjectStore('photos',{keyPath:'id',autoIncrement:true});
+      store.createIndex('dayKey','dayKey',{unique:false});
+    };
+    req.onsuccess=()=>{photoDB=req.result;res(photoDB)};
+    req.onerror=()=>rej(req.error);
+  });
+}
+function photoDayKey(d){const{year,month,period}=getPeriod();return`${year}_${month}_${period}_${d}`}
+
+// уменьшить фото до разумного размера перед сохранением
+function compressPhoto(file){
+  return new Promise((res,rej)=>{
+    const url=URL.createObjectURL(file);
+    const img=new Image();
+    img.onload=()=>{
+      const MAX=1600;
+      let w=img.naturalWidth,h=img.naturalHeight;
+      if(w>MAX||h>MAX){const k=MAX/Math.max(w,h);w=Math.round(w*k);h=Math.round(h*k)}
+      const c=document.createElement('canvas');c.width=w;c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      URL.revokeObjectURL(url);
+      c.toBlob(b=>b?res(b):rej(new Error('ошибка сжатия')),'image/jpeg',.78);
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('не удалось открыть изображение'))};
+    img.src=url;
+  });
+}
+
+async function addDayPhotos(ev){
+  if(selectedDay===null)return;
+  const files=Array.from(ev.target.files||[]);
+  ev.target.value='';
+  if(!files.length)return;
+  try{
+    const db=await openPhotoDB();
+    const dayKey=photoDayKey(selectedDay);
+    for(const f of files){
+      let blob;
+      try{blob=await compressPhoto(f)}catch(e){continue}
+      await new Promise((res,rej)=>{
+        const tx=db.transaction('photos','readwrite');
+        tx.objectStore('photos').add({dayKey,blob,ts:Date.now()});
+        tx.oncomplete=res;tx.onerror=()=>rej(tx.error);
+      });
+    }
+    haptic('light');
+    renderDayPhotos();
+  }catch(e){alert('Не удалось сохранить фото: '+(e&&e.message||e))}
+}
+
+function getDayPhotos(d){
+  return openPhotoDB().then(db=>new Promise((res,rej)=>{
+    const req=db.transaction('photos').objectStore('photos').index('dayKey').getAll(photoDayKey(d));
+    req.onsuccess=()=>res(req.result||[]);
+    req.onerror=()=>rej(req.error);
+  })).catch(()=>[]);
+}
+
+let photoObjUrls=[];
+async function renderDayPhotos(){
+  const grid=document.getElementById('photoGrid');
+  if(!grid)return;
+  photoObjUrls.forEach(u=>URL.revokeObjectURL(u));photoObjUrls=[];
+  const day=selectedDay;
+  if(day===null){grid.innerHTML='';return}
+  const photos=await getDayPhotos(day);
+  if(day!==selectedDay)return; // день успели переключить
+  const cnt=document.getElementById('photoCount');
+  if(cnt)cnt.textContent=photos.length?` (${photos.length})`:'';
+  if(!photos.length){grid.innerHTML='<div class="photo-empty">Нет фото за этот день</div>';return}
+  grid.innerHTML='';
+  photos.sort((a,b)=>a.ts-b.ts).forEach(p=>{
+    const u=URL.createObjectURL(p.blob);photoObjUrls.push(u);
+    const img=document.createElement('img');
+    img.className='photo-thumb';img.src=u;
+    img.onclick=()=>openPhotoViewer(p.id,u);
+    grid.appendChild(img);
+  });
+}
+
+let viewerPhotoId=null;
+function openPhotoViewer(id,url){
+  viewerPhotoId=id;
+  document.getElementById('photoViewerImg').src=url;
+  document.getElementById('photoViewer').classList.add('open');
+}
+function closePhotoViewer(ev){
+  if(ev&&ev.target!==ev.currentTarget)return;
+  document.getElementById('photoViewer').classList.remove('open');
+  document.getElementById('photoViewerImg').src='';
+  viewerPhotoId=null;
+}
+async function deleteCurrentPhoto(){
+  if(viewerPhotoId===null)return;
+  if(!confirm('Удалить фото?'))return;
+  try{
+    const db=await openPhotoDB();
+    await new Promise((res,rej)=>{
+      const tx=db.transaction('photos','readwrite');
+      tx.objectStore('photos').delete(viewerPhotoId);
+      tx.oncomplete=res;tx.onerror=()=>rej(tx.error);
+    });
+  }catch(e){}
+  haptic('medium');
+  closePhotoViewer();
+  renderDayPhotos();
 }
 
 // ══════════════════════════════════════════════
