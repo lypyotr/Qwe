@@ -19,10 +19,12 @@
   --accent:#4ade80;--accent2:#22d3ee;--accent3:#f472b6;
   --text:#f0f2ff;--muted:#9aa3b8;--danger:#f87171;--warn:#fbbf24;
   --card-shadow:0 12px 36px rgba(0,0,0,.22);
+  --accent-ink:var(--accent);--accent2-ink:var(--accent2);
 }
 body.light{
   --bg:#eef0f6;--surface:rgba(255,255,255,.55);--surface2:rgba(255,255,255,.6);--border:rgba(17,24,39,.07);
   --text:#111827;--muted:#6b7280;--card-shadow:0 12px 36px rgba(31,38,135,.1);
+  --accent-ink:#1d4ed8;--accent2-ink:#0369a1;
 }
 
 html{overscroll-behavior-x:none;overflow-x:hidden;width:100%}
@@ -956,6 +958,17 @@ body.light .toggle{background:rgba(17,24,39,.14)}
 .modal-handle{background:rgba(255,255,255,.18)}
 body.light .modal-handle{background:rgba(17,24,39,.15)}
 .dw-qty-wrap input::placeholder,.dw-price-wrap input::placeholder{color:var(--muted);opacity:.45}
+
+/* readable accent text: bright on dark theme, deep blue on light theme */
+.total-label,.total-amount,.hist-total,.nav-btn.active,.nav-btn.active .nav-lbl,
+.day-btn .day-sum,.day-btn.active .day-num,.day-btn.active .day-dow,
+.day-btn.day-work .day-num,.day-btn.day-work .day-dow,
+.chart-bar-wrap.active .chart-bar-lbl,.breakdown-row.total-row .val,
+.goal-note.fire,.motivation-done,.stri-count.ok,.countdown-pill.ok .cp-val,
+.shift-stat-pill.ok .ssp-val,.expenses-add-btn,.archive-item-cur,
+.compare-badge.up,.day-type-btn.is-work{color:var(--accent-ink)}
+.ts-amount,.paydate-date,.archive-item-total,.day-panel-sum,
+.period-title,.period-badge{color:var(--accent2-ink)}
 </style>
 </head>
 <body>
@@ -990,9 +1003,7 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
 
 <!-- HEADER -->
 <div class="header">
-  <div class="header-left">
-    <div class="header-label">Калькулятор V0.0.1</div>
-  </div>
+  <div class="header-left"></div>
   <div class="header-actions">
     <div class="icon-btn" onclick="openDataModal()" title="Импорт / Экспорт" id="dataBtn">💾</div>
     <div class="icon-btn" onclick="toggleTheme()" title="Тема" id="themeBtn">🌙</div>
