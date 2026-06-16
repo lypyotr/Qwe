@@ -1007,6 +1007,9 @@ body.light .share-card-btn{background:rgba(0,0,0,.07)}
 <!-- TODAY SUMMARY -->
 <div class="today-summary" id="todaySummaryCard" style="display:none"></div>
 
+<!-- SHIFT TRACKER -->
+<div id="shiftTrackerWrap" style="display:none"></div>
+
 <!-- CHART -->
 <div class="chart-wrap" id="chartWrap" style="display:none">
   <div class="chart-title">По дням периода</div>
@@ -1042,7 +1045,6 @@ body.light .share-card-btn{background:rgba(0,0,0,.07)}
     </div>
   </div>
   <div class="day-works" id="dayWorks"></div>
-  <div id="dayShiftTracker"></div>
   <div class="photo-section">
     <div class="photo-header">
       <div class="photo-title">📷 Фото-отчёт<span id="photoCount"></span></div>
@@ -1848,106 +1850,94 @@ const SHIFT_START_H = 20; // 20:00
 const SHIFT_END_H   = 8;  // 08:00 next day
 const SHIFT_DURATION_MIN = 12 * 60; // 720 min
 
-let selectedShiftTplOld = null; // unused, kept for compat
 let shiftTimerInterval = null;
+let shiftTestOffset = 0; // ms added to Date.now() for testing
 
-// Returns minutes remaining in shift from now
-// Shift: 20:00 today → 08:00 tomorrow
+function shiftNow() { return new Date(Date.now() + shiftTestOffset); }
+
 function shiftMinutesLeft() {
-  const now = new Date();
-  const h = now.getHours(), m = now.getMinutes();
-  const nowMin = h * 60 + m;
+  const now = shiftNow();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
   const startMin = SHIFT_START_H * 60; // 1200
-  const endMin   = SHIFT_END_H   * 60; // 480 (next day)
-
-  // During shift: 20:00–23:59 OR 00:00–07:59
-  if (nowMin >= startMin) {
-    // after 20:00: time left = (24:00 - now) + endMin
-    return (24 * 60 - nowMin) + endMin;
-  } else if (nowMin < endMin) {
-    // before 08:00: time left = endMin - now
-    return endMin - nowMin;
-  }
-  return -1; // outside shift
+  const endMin   = SHIFT_END_H   * 60; // 480
+  if (nowMin >= startMin) return (24 * 60 - nowMin) + endMin;
+  if (nowMin < endMin)    return endMin - nowMin;
+  return -1;
 }
 
-function shiftMinutesElapsed() {
-  const left = shiftMinutesLeft();
-  if (left < 0) return -1;
-  return SHIFT_DURATION_MIN - left;
+// Returns the calendar day the current shift belongs to (shift starts at 20:00)
+function shiftCalDay() {
+  const now = shiftNow();
+  // if before 08:00, the shift started yesterday
+  if (now.getHours() < SHIFT_END_H) {
+    const d = new Date(now); d.setDate(d.getDate() - 1); return d.getDate();
+  }
+  return now.getDate();
 }
 
 function isInShift() { return shiftMinutesLeft() > 0; }
 
 function fmtTime(totalMin) {
-  const h = Math.floor(totalMin / 60);
-  const m = totalMin % 60;
-  if (h > 0) return `${h}ч ${m}м`;
-  return `${m}м`;
+  const h = Math.floor(totalMin / 60), m = totalMin % 60;
+  return h > 0 ? `${h}ч ${m}м` : `${m}м`;
 }
 
 function toggleShiftTpl(id) {
-  if (selectedShiftTpls.has(id)) {
-    selectedShiftTpls.delete(id);
-  } else {
-    selectedShiftTpls.add(id);
-  }
+  if (selectedShiftTpls.has(id)) selectedShiftTpls.delete(id);
+  else selectedShiftTpls.add(id);
   haptic('light');
   renderShiftTracker();
 }
 
+function activateTestShift() {
+  // jump clock to 22:00 today for testing
+  const now = new Date();
+  const target = new Date(now); target.setHours(22, 0, 0, 0);
+  shiftTestOffset = target - now;
+  renderShiftTracker();
+  setTimeout(() => { shiftTestOffset = 0; renderShiftTracker(); }, 5 * 60 * 1000);
+}
+
 function renderShiftTracker() {
-  const el = document.getElementById('dayShiftTracker');
-  if (!el || selectedDay === null) return;
+  const wrap = document.getElementById('shiftTrackerWrap');
+  if (!wrap) return;
 
-  const hasGoal = goals.period > 0 || goals.week > 0;
-  if (!hasGoal || !templates.length) { el.innerHTML = ''; return; }
-
-  const { year, month, startDay, endDay } = getPeriod();
-
-  // не показывать счётчик смены в выходной день
-  const selDate = new Date(year, month, selectedDay);
-  if (isDayOff(selectedDay, selDate)) { el.innerHTML = ''; return; }
-
-  // День смены: до 08:00 текущая смена относится к предыдущему дню (началась в 20:00),
-  // поэтому счётчик не исчезает при смене календарного дня в 00:00
-  const shiftDay0 = new Date(Date.now() - SHIFT_END_H * 60 * 60 * 1000);
-  shiftDay0.setHours(0, 0, 0, 0);
-  const isShiftDay = shiftDay0.getFullYear() === year && shiftDay0.getMonth() === month
-    && shiftDay0.getDate() === selectedDay;
-  if (!isShiftDay) { el.innerHTML = ''; return; }
-
-  // ── Active templates: selected ones, or ALL if none chosen ──
   const validTpls = templates.filter(t => (parseFloat(t.price) || 0) > 0);
-  if (!validTpls.length) { el.innerHTML = ''; return; }
-  const workingTpls = validTpls.filter(t => selectedShiftTpls.has(t.id));
-  const activeTpls = workingTpls;
+  const inShift = isInShift();
+  const now = shiftNow();
 
-  // ── Time ──
+  // Show only: during shift (20:00–08:00) OR all day today so it's always accessible
+  const todayDate = now.getDate();
+  const { year, month, startDay, endDay } = getPeriod();
+  const isToday = now.getFullYear() === year && now.getMonth() === month
+    && todayDate >= startDay && todayDate <= endDay;
+
+  if (!isToday && !inShift) { wrap.style.display = 'none'; return; }
+  if (!validTpls.length) { wrap.style.display = 'none'; return; }
+
+  wrap.style.display = '';
+
+  // Which day's data to show (shift day: before 08:00 → yesterday's data)
+  const dataDay = shiftCalDay();
+  const taxMult = taxEnabled ? 0.87 : 1;
+
+  // Time info
   const minLeft = shiftMinutesLeft();
-  const inShift = minLeft > 0;
-  const hLeft   = Math.floor(Math.max(0, minLeft) / 60);
-  const mLeft   = Math.max(0, minLeft) % 60;
+  const hLeft = Math.floor(Math.max(0, minLeft) / 60);
+  const mLeft = Math.max(0, minLeft) % 60;
   const elapsed = Math.max(0, SHIFT_DURATION_MIN - Math.max(0, minLeft));
-  const pct     = Math.round(elapsed / SHIFT_DURATION_MIN * 100);
-  const pctCls  = pct > 80 ? 'high' : pct > 50 ? 'mid' : 'low';
+  const pct = Math.min(100, Math.round(elapsed / SHIFT_DURATION_MIN * 100));
+  const pctCls = pct > 80 ? 'high' : pct > 50 ? 'mid' : 'low';
   const timeCls = hLeft <= 1 ? 'urgent' : hLeft <= 3 ? 'warn' : 'ok';
 
-  // ── How much still needed today ──
-  const taxMult    = taxEnabled ? 0.87 : 1;
-  const earned     = calcTotal();
-  const goalTarget = goals.period > 0 ? goals.period : goals.week;
-  const remaining  = Math.max(goalTarget - earned, 0);
-  let workDaysLeft = 0;
-  for (let d = shiftDay0.getDate(); d <= endDay; d++) {
-    const dt = new Date(year, month, d);
-    if (!isDayOff(d, dt)) workDaysLeft++;
-  }
-  const neededToday = workDaysLeft > 0 ? remaining / workDaysLeft : remaining;
-  const earnedToday = daySum(selectedDay) * taxMult;
-  const stillNeeded = Math.max(neededToday - earnedToday, 0);
+  // Goal info
+  const goalTarget = goals.period > 0 ? goals.period : goals.week > 0 ? goals.week : 0;
+  const earned = calcTotal();
+  const earnedToday = daySum(dataDay) * taxMult;
 
-  // ── Chips: all templates, togglable, checked = in activeTpls ──
+  const activeTpls = validTpls.filter(t => selectedShiftTpls.has(t.id));
+
+  // Chips
   const chips = validTpls.map(t => {
     const active = selectedShiftTpls.has(t.id);
     return `<div class="shift-tpl-chip${active?' selected':''}" onclick="toggleShiftTpl(${t.id})">
@@ -1955,106 +1945,84 @@ function renderShiftTracker() {
     </div>`;
   }).join('');
 
-  // ── Ничего не выбрано ──
-  if (activeTpls.length === 0) {
-    el.innerHTML = `<div class="shift-block">
-      <div class="shift-title">⏱ Счётчик смены (20:00 – 08:00)</div>
-      <div class="shift-tpl-row">${chips}</div>
-      <div class="shift-note">Выбери изделия для счётчика</div>
-    </div>`;
-    return;
-  }
-
-  // ── Plan done? ──
-  if (stillNeeded <= 0) {
-    el.innerHTML = `<div class="shift-block">
-      <div class="shift-title">⏱ Счётчик смены (20:00 – 08:00)</div>
-      <div class="shift-tpl-row">${chips}</div>
-      <div class="motivation-done" style="padding:2px 0">🎉 Дневной план выполнен! Всё что сверху — бонус!</div>
-      ${inShift?`<div class="shift-progress-bg" style="margin-top:10px">
-        <div class="shift-progress-fill ${pctCls}" style="width:${pct}%"></div>
-      </div><div class="shift-note" style="margin-top:6px">${hLeft}ч ${mLeft}м до конца смены</div>`:''}
-    </div>`;
-    return;
-  }
-
-  // ── Time header ──
-  const timeHeader = inShift
-    ? `<div class="shift-stats" style="margin-bottom:10px">
+  // Time block
+  const timeBlock = inShift
+    ? `<div class="shift-stats">
         <div class="shift-stat-pill ${timeCls}">
           <div class="ssp-val">${hLeft}ч ${mLeft}м</div>
           <div class="ssp-lbl">до конца смены</div>
         </div>
-        <div class="shift-stat-pill warn">
-          <div class="ssp-val">${fmt(Math.ceil(stillNeeded))} ₽</div>
-          <div class="ssp-lbl">нужно заработать</div>
+        <div class="shift-stat-pill ok">
+          <div class="ssp-val">${fmt(earnedToday)} ₽</div>
+          <div class="ssp-lbl">заработано сегодня</div>
         </div>
+        ${goalTarget > 0 ? `<div class="shift-stat-pill warn">
+          <div class="ssp-val">${fmt(Math.max(0, goalTarget - earned))} ₽</div>
+          <div class="ssp-lbl">до цели</div>
+        </div>` : ''}
       </div>
-      <div class="shift-progress-bg" style="margin-bottom:12px">
+      <div class="shift-progress-bg">
         <div class="shift-progress-fill ${pctCls}" style="width:${pct}%"></div>
       </div>`
-    : `<div class="shift-note" style="margin-bottom:10px;text-align:left">
-        Смена начнётся в 20:00 · нужно заработать
-        <strong style="color:var(--warn)"> ${fmt(Math.ceil(stillNeeded))} ₽</strong>
+    : `<div class="shift-note" style="text-align:left;margin-bottom:6px">
+        Смена начнётся в 20:00 · сегодня заработано: <strong>${fmt(earnedToday)} ₽</strong>
       </div>`;
 
-  // ── Per-template rows (only active ones) ──
-  let totalUnitsLeft = 0;
-  const rows = activeTpls.map(t => {
-    const rate        = parseFloat(t.price) * taxMult;
-    const unitsNeeded = Math.ceil(neededToday / activeTpls.length / rate);
-    const madeSoFar   = (days[selectedDay] || [])
-      .filter(w => w.name === t.name)
-      .reduce((s, w) => s + (parseFloat(w.qty) || 0), 0);
-    const unitsLeft   = Math.max(0, unitsNeeded - madeSoFar);
-    totalUnitsLeft   += unitsLeft;
-    const done        = unitsLeft === 0;
-    const paceNeeded  = (inShift && minLeft > 0 && unitsLeft > 0)
-      ? unitsLeft / (minLeft / 60) : 0;
-    const urgency     = done ? 'ok' : !inShift ? 'ok'
-      : paceNeeded > 12 ? 'urgent' : paceNeeded > 6 ? 'warn' : 'ok';
+  // Per-template rows (only if chips selected)
+  let rows = '';
+  if (activeTpls.length > 0 && goalTarget > 0) {
+    const remaining = Math.max(goalTarget - earned, 0);
+    let wdLeft = 0;
+    for (let d = dataDay; d <= endDay; d++) {
+      if (!isDayOff(d, new Date(year, month, d))) wdLeft++;
+    }
+    const neededToday = wdLeft > 0 ? remaining / wdLeft : remaining;
+    rows = activeTpls.map(t => {
+      const rate = parseFloat(t.price) * taxMult;
+      const unitsNeeded = rate > 0 ? Math.ceil(neededToday / activeTpls.length / rate) : 0;
+      const madeSoFar = (days[dataDay] || [])
+        .filter(w => w.name === t.name)
+        .reduce((s, w) => s + (parseFloat(w.qty) || 0), 0);
+      const unitsLeft = Math.max(0, unitsNeeded - madeSoFar);
+      const done = unitsLeft === 0;
+      const pace = (inShift && minLeft > 0 && unitsLeft > 0) ? unitsLeft / (minLeft / 60) : 0;
+      const urgency = done ? 'ok' : pace > 12 ? 'urgent' : pace > 6 ? 'warn' : 'ok';
+      return `<div class="shift-tpl-row-item">
+        <div class="stri-left">
+          <div class="stri-name">${esc(t.name)}</div>
+          <div class="stri-price">${fmt(t.price)} ₽/шт${pace > 0 ? ` · темп: ${pace.toFixed(1)} шт/ч` : ''}</div>
+          ${madeSoFar > 0 ? `<div class="stri-made">сделано: ${Math.round(madeSoFar)} шт</div>` : ''}
+        </div>
+        <div class="stri-right">
+          ${done
+            ? `<span class="stri-badge done">✓</span>`
+            : `<span class="stri-count ${urgency}">${unitsLeft}</span>
+               <span class="stri-lbl">шт</span>`}
+        </div>
+      </div>`;
+    }).join('');
+  }
 
-    return `<div class="shift-tpl-row-item">
-      <div class="stri-left">
-        <div class="stri-name">${esc(t.name)}</div>
-        <div class="stri-price">${fmt(t.price)} ₽/шт${inShift && !done && paceNeeded > 0
-          ? ` · темп: ${paceNeeded.toFixed(1)} шт/ч` : ''}</div>
-        ${madeSoFar > 0 ? `<div class="stri-made">сделано: ${madeSoFar} шт</div>` : ''}
-      </div>
-      <div class="stri-right">
-        ${done
-          ? `<span class="stri-badge done">✓ готово</span>`
-          : `<span class="stri-count ${urgency}">${unitsLeft}</span>
-             <span class="stri-lbl">шт осталось</span>`}
-      </div>
-    </div>`;
-  }).join('');
+  const testBtn = `<button onclick="activateTestShift()" style="
+    margin-top:10px;width:100%;padding:8px;border-radius:10px;border:1px dashed var(--border);
+    background:transparent;color:var(--muted);font-family:'Manrope',sans-serif;
+    font-size:11px;font-weight:700;cursor:pointer;letter-spacing:.5px">
+    🧪 Тест (симулировать 22:00)
+  </button>`;
 
-  // ── Overall urgency ──
-  const overallPace = (inShift && minLeft > 0 && totalUnitsLeft > 0)
-    ? totalUnitsLeft / (minLeft / 60) : 0;
-  const overallNote = !inShift ? ''
-    : overallPace > 12
-      ? `<div class="shift-note" style="margin-top:8px">🔴 Нужно ускориться!</div>`
-    : overallPace > 6
-      ? `<div class="shift-note" style="margin-top:8px">🟡 Держи темп, ты справляешься!</div>`
-      : `<div class="shift-note" style="margin-top:8px">🟢 Отличный темп — план под контролем!</div>`;
-
-  el.innerHTML = `<div class="shift-block">
+  wrap.innerHTML = `<div class="shift-block" style="margin:0 16px 12px">
     <div class="shift-title">⏱ Счётчик смены (20:00 – 08:00)</div>
     <div class="shift-tpl-row">${chips}</div>
-    ${timeHeader}
-    <div class="stri-list">${rows}</div>
-    ${overallNote}
+    ${timeBlock}
+    ${rows ? `<div class="stri-list" style="margin-top:10px">${rows}</div>` : ''}
+    ${testBtn}
   </div>`;
 }
 
-// ── auto-refresh shift timer every minute ──
+// ── auto-refresh shift tracker every minute ──
 function startShiftTimer() {
   if (shiftTimerInterval) clearInterval(shiftTimerInterval);
-  shiftTimerInterval = setInterval(() => {
-    if (selectedDay !== null) { renderShiftTracker(); }
-  }, 60000);
+  shiftTimerInterval = setInterval(renderShiftTracker, 60000);
 }
 
 // ══════════════════════════════════════════════
@@ -3205,6 +3173,7 @@ renderArchive();
 
 renderExpenses();
 renderAchievements();
+renderShiftTracker();
 restorePage();
 startShiftTimer();
 setupBioButton();
