@@ -8,6 +8,9 @@
 <meta name="apple-mobile-web-app-title" content="Зарплата">
 <meta name="theme-color" content="#6366f1">
 <link rel="manifest" href="manifest.json">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230d0f14'/><text y='.9em' font-size='72' x='12'>💰</text></svg>">
 <title>Зарплата</title>
@@ -748,32 +751,41 @@ body.light .rank-item-unit{color:#444}
 .page{display:none}
 .page.active{display:block}
 
-/* ── LOCK SCREEN ── */
-.lock-overlay{position:fixed;inset:0;background:var(--bg);z-index:200;
-  display:flex;align-items:center;justify-content:center;transition:opacity .3s}
-.lock-overlay.hidden{opacity:0;pointer-events:none}
-.lock-box{display:flex;flex-direction:column;align-items:center;
-  gap:16px;padding:32px 24px;max-width:320px;width:100%}
-.lock-icon{font-size:56px;line-height:1}
-.lock-title{font-size:22px;font-weight:800;color:var(--text)}
-.lock-subtitle{font-size:13px;color:var(--muted);margin-top:-8px}
-.lock-input{width:100%;font-family:'Manrope',sans-serif;font-size:16px;
-  font-weight:600;color:var(--text);background:var(--surface2);
-  border:1px solid var(--border);border-radius:14px;padding:14px 16px;
-  outline:none;transition:border-color .15s;text-align:center;letter-spacing:3px}
-.lock-input:focus{border-color:var(--accent)}
-.lock-input.error{border-color:var(--danger)}
-.lock-btn{width:100%;padding:14px;background:var(--accent);color:#0d1a0f;
+/* ── FIREBASE AUTH SCREEN ── */
+.auth-overlay{
+  position:fixed;inset:0;z-index:1000;
+  background:var(--bg);
+  display:flex;align-items:center;justify-content:center;
+  padding:20px;
+}
+.auth-overlay.hidden{display:none}
+.auth-box{
+  width:100%;max-width:360px;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:24px;padding:32px 24px;
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+}
+.auth-logo{font-size:48px;margin-bottom:4px}
+.auth-title{font-size:20px;font-weight:800;margin-bottom:16px;text-align:center}
+.auth-input{
+  width:100%;padding:13px 16px;border-radius:14px;
+  border:1px solid var(--border);background:var(--surface2);
+  color:var(--text);font-family:'Manrope',sans-serif;font-size:15px;
+  outline:none;margin-bottom:8px;
+}
+.auth-input:focus{border-color:var(--accent)}
+.auth-btn{
+  width:100%;padding:14px;border-radius:14px;border:none;cursor:pointer;
+  background:var(--accent);color:#000;
   font-family:'Manrope',sans-serif;font-size:15px;font-weight:800;
-  border:none;border-radius:14px;cursor:pointer;transition:all .15s}
-.lock-btn:active{transform:scale(.97)}
-.lock-btn.secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border);
-  display:flex;align-items:center;justify-content:center;gap:8px}
-.lock-btn.secondary[disabled]{opacity:.5;pointer-events:none}
-.lock-divider{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:10px;
-  font-weight:700;letter-spacing:1.5px;text-transform:uppercase;width:100%;margin:0}
-.lock-divider::before,.lock-divider::after{content:'';flex:1;height:1px;background:var(--border)}
-.lock-error{font-size:13px;color:var(--danger);font-weight:700;min-height:18px}
+  margin-top:4px;transition:opacity .15s;
+}
+.auth-btn:active{opacity:.8}
+.auth-error{font-size:12px;color:var(--danger);font-weight:600;min-height:16px;text-align:center;width:100%}
+.auth-link{font-size:13px;color:var(--muted);cursor:pointer;margin-top:6px;text-align:center}
+.auth-link span{color:var(--accent);font-weight:700}
+.auth-loading{font-size:14px;color:var(--muted);font-weight:600}
+#authLoginForm, #authRegisterForm, #authForgotForm{width:100%}
 @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
 .shake{animation:shake .35s ease}
 
@@ -958,25 +970,45 @@ body.light .share-card-btn{background:rgba(0,0,0,.07)}
   <button class="notif-banner-ok" onclick="dismissNotifBanner()">OK</button>
 </div>
 
-<!-- LOCK SCREEN -->
-<div class="lock-overlay" id="lockOverlay">
-  <div class="lock-box">
-    <div class="lock-icon">🔒</div>
-    <div class="lock-title">Зарплата</div>
-    <div class="lock-subtitle">Введите пароль для входа</div>
-    <button class="lock-btn secondary" id="bioBtn" onclick="tryBioAuth()" style="display:none">
-      <span style="font-size:18px">🔐</span><span>Войти по Face ID</span>
-    </button>
-    <div class="lock-divider" id="bioDivider" style="display:none">или</div>
-    <input class="lock-input" id="lockInput" type="password"
-      placeholder="••••••" autocomplete="current-password"
-      onkeydown="if(event.key==='Enter')unlockApp()">
-    <div class="lock-error" id="lockError"></div>
-    <button class="lock-btn" onclick="unlockApp()">Войти</button>
-    <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);cursor:pointer;margin-top:4px">
-      <input type="checkbox" id="lockSkipCheck" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent)">
-      Не спрашивать пароль снова
-    </label>
+<!-- AUTH SCREEN -->
+<div class="auth-overlay" id="authOverlay">
+  <div class="auth-box">
+    <div class="auth-logo">💰</div>
+    <div class="auth-title">Калькулятор зарплаты</div>
+
+    <!-- Login form -->
+    <div id="authLoginForm">
+      <input class="auth-input" id="authEmail" type="email" placeholder="Email" autocomplete="email">
+      <input class="auth-input" id="authPassword" type="password" placeholder="Пароль" autocomplete="current-password"
+        onkeydown="if(event.key==='Enter')doFirebaseLogin()">
+      <div class="auth-error" id="authError"></div>
+      <button class="auth-btn" onclick="doFirebaseLogin()">Войти</button>
+      <div class="auth-link" onclick="showAuthRegister()">Нет аккаунта? <span>Зарегистрироваться</span></div>
+      <div class="auth-link" onclick="showAuthForgot()">Забыли пароль?</div>
+    </div>
+
+    <!-- Register form -->
+    <div id="authRegisterForm" style="display:none">
+      <input class="auth-input" id="regEmail" type="email" placeholder="Email" autocomplete="email">
+      <input class="auth-input" id="regPassword" type="password" placeholder="Пароль (минимум 6 символов)" autocomplete="new-password">
+      <input class="auth-input" id="regPassword2" type="password" placeholder="Повтори пароль" autocomplete="new-password"
+        onkeydown="if(event.key==='Enter')doFirebaseRegister()">
+      <div class="auth-error" id="regError"></div>
+      <button class="auth-btn" onclick="doFirebaseRegister()">Создать аккаунт</button>
+      <div class="auth-link" onclick="showAuthLogin()">Уже есть аккаунт? <span>Войти</span></div>
+    </div>
+
+    <!-- Forgot password form -->
+    <div id="authForgotForm" style="display:none">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:12px;text-align:center">Введи email — пришлём ссылку для сброса пароля</div>
+      <input class="auth-input" id="forgotEmail" type="email" placeholder="Email" autocomplete="email"
+        onkeydown="if(event.key==='Enter')doForgotPassword()">
+      <div class="auth-error" id="forgotMsg"></div>
+      <button class="auth-btn" onclick="doForgotPassword()">Сбросить пароль</button>
+      <div class="auth-link" onclick="showAuthLogin()">← Назад</div>
+    </div>
+
+    <div class="auth-loading" id="authLoading" style="display:none">Входим…</div>
   </div>
 </div>
 
@@ -987,6 +1019,7 @@ body.light .share-card-btn{background:rgba(0,0,0,.07)}
 <div class="header">
   <div class="header-left"></div>
   <div class="header-actions">
+    <div class="icon-btn" onclick="doFirebaseLogout()" title="Выйти" id="logoutBtn">👤</div>
     <div class="icon-btn" onclick="openDataModal()" title="Импорт / Экспорт" id="dataBtn">💾</div>
     <div class="icon-btn" onclick="toggleTheme()" title="Тема" id="themeBtn">🌙</div>
   </div>
@@ -1254,24 +1287,6 @@ body.light .share-card-btn{background:rgba(0,0,0,.07)}
   </div>
 </div>
 
-<!-- BIO OFFER MODAL -->
-<div class="modal-overlay" id="bioOfferModal" onclick="closeBioOffer(event)">
-  <div class="modal">
-    <div class="modal-handle"></div>
-    <div style="text-align:center;font-size:52px;margin-bottom:6px">🔐</div>
-    <div class="modal-title" style="text-align:center">Включить Face ID?</div>
-    <div style="font-size:13px;color:var(--muted);line-height:1.5;text-align:center;margin-bottom:16px">
-      Быстрый вход по биометрии без ввода пароля.
-    </div>
-    <button class="modal-btn" style="width:100%;padding:13px;margin-bottom:10px" onclick="enableBio()">Включить</button>
-    <button class="modal-btn" style="width:100%;padding:13px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="dismissBioOffer()">Позже</button>
-    <label style="display:flex;align-items:center;justify-content:center;gap:8px;font-size:12px;color:var(--muted);cursor:pointer;margin-top:10px">
-      <input type="checkbox" id="bioOfferSkipCheck" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent)">
-      Больше не предлагать
-    </label>
-    <div id="bioOfferMsg" style="margin-top:8px;font-size:13px;text-align:center;font-weight:600;color:var(--danger);min-height:18px"></div>
-  </div>
-</div>
 
 <!-- BOTTOM NAV -->
 <nav class="bottom-nav">
@@ -1314,6 +1329,10 @@ let templates=[]; // [{id,name,price}]
 let lightTheme=false;
 let goals={period:0,week:0,month:0}; // plan targets in ₽
 let selectedShiftTpls=new Set(); // IDs of templates active in shift tracker
+let fbApp = null, fbAuth = null, fbDb = null;
+let currentUser = null;
+let firestoreUnsubscribe = null;
+let saveDebounceTimer = null;
 
 // ══════════════════════════════════════════════
 //  HOLIDAYS
@@ -1375,6 +1394,7 @@ function toggleTheme(){
   document.body.classList.toggle('light',lightTheme);
   document.getElementById('themeBtn').textContent=lightTheme?'🌙':'☀️';
   try{localStorage.setItem('salary_theme',lightTheme?'light':'dark')}catch(e){}
+  saveSettingsToFirestore();
 }
 function loadTheme(){
   try{
@@ -1415,6 +1435,7 @@ function save(){
     localStorage.setItem(saveKey(),JSON.stringify({days,bonuses,taxEnabled,dayOverrides}));
     renderHistory();renderAchievements();
   }catch(e){}
+  scheduleSaveToFirestore();
 }
 function load(){
   try{
@@ -1431,6 +1452,9 @@ function onPeriodChange(){
   selectedDay=null;load();
   renderPeriodCard();renderDayStrip();renderDayPanel();renderBonuses();
   renderTotal();renderChart();renderBreakdown();renderHistory();renderGoals();
+  if (currentUser && fbDb) {
+    loadAllUserData().then(() => { renderAll(); startFirestoreSync(); });
+  }
 }
 
 // ══════════════════════════════════════════════
@@ -1445,6 +1469,7 @@ function saveGoals(){
   haptic('light');
   document.getElementById('goalsModal').classList.remove('open');
   renderGoals();renderShiftTracker();
+  saveSettingsToFirestore();
 }
 function openGoalsModal(){
   document.getElementById('goalPeriodIn').value=goals.period||'';
@@ -2060,7 +2085,7 @@ function updateWork(day,id,field,value){
 //  TEMPLATES
 // ══════════════════════════════════════════════
 function loadTemplates(){try{templates=JSON.parse(localStorage.getItem('salary_templates')||'[]')}catch(e){templates=[]}}
-function saveTemplates(){try{localStorage.setItem('salary_templates',JSON.stringify(templates))}catch(e){}}
+function saveTemplates(){try{localStorage.setItem('salary_templates',JSON.stringify(templates))}catch(e){}saveSettingsToFirestore();}
 
 function renderTemplates(){
   const list=document.getElementById('tplList');
@@ -2533,6 +2558,7 @@ function loadExpenses(){
 }
 function saveExpenses(){
   try{localStorage.setItem('salary_expenses',JSON.stringify(expenseItems))}catch(e){}
+  saveSettingsToFirestore();
 }
 function addExpenseItem(){
   expenseItems.push({id:Date.now(),name:'',amount:'',mode:'period'});
@@ -3147,37 +3173,121 @@ function dismissNotifBanner(){
 }
 
 // ══════════════════════════════════════════════
+//  FIREBASE AUTH + FIRESTORE
+// ══════════════════════════════════════════════
+let firestoreUnsubscribe=null,saveDebounceTimer=null,settingsSaveTimer=null;
+const firebaseConfig={apiKey:"AIzaSyBUxrj-FUBv2ZkJ9S4e5oT9DRDEoA3Ftcg",authDomain:"salary-7b203.firebaseapp.com",projectId:"salary-7b203",storageBucket:"salary-7b203.firebasestorage.app",messagingSenderId:"311277450560",appId:"1:311277450560:web:844b2aadf1185009d5f6a5"};
+
+function initFirebase(){
+  try{
+    firebase.initializeApp(firebaseConfig);
+    fbAuth=firebase.auth();fbDb=firebase.firestore();
+    fbAuth.onAuthStateChanged(async user=>{
+      if(user){
+        currentUser=user;showAuthOverlay(false);
+        await loadAllUserData();renderAll();startFirestoreSync();checkDailyReminder();
+      }else{
+        currentUser=null;
+        if(firestoreUnsubscribe){firestoreUnsubscribe();firestoreUnsubscribe=null;}
+        showAuthOverlay(true);showAuthLogin();
+      }
+    });
+  }catch(e){console.error('Firebase init',e);}
+}
+function showAuthOverlay(show){const el=document.getElementById('authOverlay');if(el)el.classList.toggle('hidden',!show);}
+function showAuthLogin(){document.getElementById('authLoginForm').style.display='';document.getElementById('authRegisterForm').style.display='none';document.getElementById('authForgotForm').style.display='none';document.getElementById('authError').textContent='';}
+function showAuthRegister(){document.getElementById('authLoginForm').style.display='none';document.getElementById('authRegisterForm').style.display='';document.getElementById('authForgotForm').style.display='none';document.getElementById('regError').textContent='';}
+function showAuthForgot(){document.getElementById('authLoginForm').style.display='none';document.getElementById('authRegisterForm').style.display='none';document.getElementById('authForgotForm').style.display='';document.getElementById('forgotMsg').textContent='';}
+async function doFirebaseLogin(){
+  const email=document.getElementById('authEmail').value.trim(),pass=document.getElementById('authPassword').value,errEl=document.getElementById('authError');
+  errEl.textContent='';if(!email||!pass){errEl.textContent='Введи email и пароль';return;}
+  document.getElementById('authLoading').style.display='';
+  try{await fbAuth.signInWithEmailAndPassword(email,pass);}
+  catch(e){document.getElementById('authLoading').style.display='none';errEl.textContent=firebaseErrMsg(e.code);}
+}
+async function doFirebaseRegister(){
+  const email=document.getElementById('regEmail').value.trim(),pass=document.getElementById('regPassword').value,pass2=document.getElementById('regPassword2').value,errEl=document.getElementById('regError');
+  errEl.textContent='';if(!email||!pass){errEl.textContent='Заполни все поля';return;}
+  if(pass!==pass2){errEl.textContent='Пароли не совпадают';return;}
+  if(pass.length<6){errEl.textContent='Минимум 6 символов';return;}
+  document.getElementById('authLoading').style.display='';
+  try{await fbAuth.createUserWithEmailAndPassword(email,pass);}
+  catch(e){document.getElementById('authLoading').style.display='none';errEl.textContent=firebaseErrMsg(e.code);}
+}
+async function doForgotPassword(){
+  const email=document.getElementById('forgotEmail').value.trim(),msgEl=document.getElementById('forgotMsg');
+  if(!email){msgEl.textContent='Введи email';return;}
+  try{await fbAuth.sendPasswordResetEmail(email);msgEl.style.color='var(--accent)';msgEl.textContent='Письмо отправлено! Проверь почту.';}
+  catch(e){msgEl.style.color='var(--danger)';msgEl.textContent=firebaseErrMsg(e.code);}
+}
+function doFirebaseLogout(){if(confirm('Выйти из аккаунта?'))fbAuth.signOut();}
+function firebaseErrMsg(code){return({'auth/user-not-found':'Пользователь не найден','auth/wrong-password':'Неверный пароль','auth/invalid-email':'Неверный формат email','auth/email-already-in-use':'Email уже используется','auth/weak-password':'Пароль слишком простой','auth/too-many-requests':'Слишком много попыток','auth/invalid-credential':'Неверный email или пароль','auth/network-request-failed':'Ошибка сети'})[code]||'Ошибка: '+code;}
+function userDoc(){return fbDb.collection('users').doc(currentUser.uid);}
+function periodFsKey(){return saveKey().replace('salary_','');}
+async function loadAllUserData(){
+  if(!currentUser||!fbDb)return;
+  try{
+    const sd=await userDoc().collection('data').doc('settings').get();
+    if(sd.exists){const s=sd.data();
+      if(s.templates){templates=s.templates;localStorage.setItem('salary_templates',JSON.stringify(templates));}
+      if(s.goals){goals=s.goals;localStorage.setItem('salary_goals',JSON.stringify(goals));}
+      if(s.expenses){expenseItems=s.expenses;localStorage.setItem('salary_expenses',JSON.stringify(expenseItems));}
+      if(s.theme){localStorage.setItem('salary_theme',s.theme);lightTheme=s.theme==='light';document.body.classList.toggle('light',lightTheme);document.getElementById('themeBtn').textContent=lightTheme?'🌙':'☀️';}
+    }
+    const ps=await userDoc().collection('periods').get();
+    ps.forEach(doc=>localStorage.setItem('salary_'+doc.id,JSON.stringify(doc.data())));
+    const pd=await userDoc().collection('periods').doc(periodFsKey()).get();
+    if(pd.exists){const p=pd.data();days=p.days||{};bonuses=p.bonuses||[];taxEnabled=!!p.taxEnabled;dayOverrides=p.dayOverrides||{};}
+    else load();
+  }catch(e){console.error('loadAllUserData',e);load();}
+}
+function startFirestoreSync(){
+  if(!currentUser||!fbDb)return;
+  if(firestoreUnsubscribe){firestoreUnsubscribe();firestoreUnsubscribe=null;}
+  firestoreUnsubscribe=userDoc().collection('periods').doc(periodFsKey()).onSnapshot(doc=>{
+    if(doc.exists&&!doc.metadata.hasPendingWrites){
+      const p=doc.data();days=p.days||{};bonuses=p.bonuses||[];taxEnabled=!!p.taxEnabled;dayOverrides=p.dayOverrides||{};
+      localStorage.setItem(saveKey(),JSON.stringify({days,bonuses,taxEnabled,dayOverrides}));
+      renderAll();
+    }
+  },err=>console.error('snapshot',err));
+}
+function scheduleSaveToFirestore(){
+  if(!currentUser||!fbDb)return;
+  clearTimeout(saveDebounceTimer);
+  saveDebounceTimer=setTimeout(async()=>{
+    try{await userDoc().collection('periods').doc(periodFsKey()).set({days,bonuses,taxEnabled,dayOverrides,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});}
+    catch(e){console.error('save period',e);}
+  },2000);
+}
+function scheduleSettingsSave(){
+  if(!currentUser||!fbDb)return;
+  clearTimeout(settingsSaveTimer);
+  settingsSaveTimer=setTimeout(async()=>{
+    try{await userDoc().collection('data').doc('settings').set({templates,goals,expenses:expenseItems,theme:lightTheme?'light':'dark',updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});}
+    catch(e){console.error('save settings',e);}
+  },2000);
+}
+function saveSettingsToFirestore(){scheduleSettingsSave();}
+function renderAll(){
+  renderTotal();renderChart();renderBreakdown();renderGoals();
+  renderDayStrip();renderDayPanel();renderBonuses();renderTemplates();
+  renderHistory();renderArchive();renderShiftTracker();renderTodaySummary();renderAchievements();
+}
+
+// ══════════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════════
 loadTheme();
-// пропустить экран блокировки если пользователь отметил чекбокс
-try{if(localStorage.getItem('salary_skip_lock')==='1'){doUnlock()}}catch(e){}
-document.getElementById('lockInput').focus();
 initMonths();
-loadTemplates();
-loadGoals();
-loadExpenses();
+loadTemplates();loadGoals();loadExpenses();
 document.getElementById('periodSel').value=new Date().getDate()<=15?'1':'2';
 load();
-renderPeriodCard();
-renderDayStrip();
-renderDayPanel();
-renderBonuses();
-renderTemplates();
-renderTotal();
-renderChart();
-renderGoals();
-renderBreakdown();
-renderHistory();
-renderArchive();
-
-renderExpenses();
-renderAchievements();
-renderShiftTracker();
-restorePage();
-startShiftTimer();
-setupBioButton();
-initPWA();
+renderPeriodCard();renderDayStrip();renderDayPanel();renderBonuses();renderTemplates();
+renderTotal();renderChart();renderGoals();renderBreakdown();renderHistory();renderArchive();
+renderExpenses();renderAchievements();renderShiftTracker();renderTodaySummary();
+restorePage();startShiftTimer();initPWA();
+initFirebase();
 </script>
 </body>
 </html>
