@@ -17,14 +17,16 @@
 
 /* ── THEME VARS ── */
 :root{
-  --bg:#0d0f14;--surface:#161920;--surface2:#1e2230;--border:#2a2f42;
+  --bg:#0a0c12;--surface:rgba(255,255,255,.055);--surface2:rgba(255,255,255,.08);--border:rgba(255,255,255,.08);
   --accent:#4ade80;--accent2:#22d3ee;--accent3:#f472b6;
-  --text:#f0f2ff;--muted:#6b7280;--danger:#f87171;--warn:#fbbf24;
-  --card-shadow:0 4px 24px rgba(0,0,0,.4);
+  --text:#f0f2ff;--muted:#9aa3b8;--danger:#f87171;--warn:#fbbf24;
+  --card-shadow:0 12px 36px rgba(0,0,0,.22);
+  --accent-ink:var(--accent);--accent2-ink:var(--accent2);
 }
 body.light{
-  --bg:#f0f2f5;--surface:#ffffff;--surface2:#f5f7fa;--border:#e2e6ef;
-  --text:#111827;--muted:#9ca3af;--card-shadow:0 2px 12px rgba(0,0,0,.08);
+  --bg:#eef0f6;--surface:rgba(255,255,255,.55);--surface2:rgba(255,255,255,.6);--border:rgba(17,24,39,.07);
+  --text:#111827;--muted:#6b7280;--card-shadow:0 12px 36px rgba(31,38,135,.1);
+  --accent-ink:#1d4ed8;--accent2-ink:#0369a1;
 }
 
 html{overscroll-behavior-x:none;overflow-x:hidden;width:100%}
@@ -591,7 +593,7 @@ body.light .tvt-opt.active{background:rgba(0,0,0,.1);color:var(--text)}
 @keyframes slideIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
 
 /* ── ACHIEVEMENT RANK CARD ── */
-/* ── BORDER GLOW + PROFILE CARD 3D (ported from ReactBits) ── */
+/* ── RANK CARD ── */
 .rank-wrapper{
   position:relative;
   perspective:700px;
@@ -603,9 +605,7 @@ body.light .tvt-opt.active{background:rgba(0,0,0,.1);color:var(--text)}
   transition:background .5s;
 }
 .rank-card{
-  --edge-proximity:0;--cursor-angle:45deg;
-  --edge-sensitivity:30;--color-sensitivity:calc(var(--edge-sensitivity) + 20);
-  --border-radius:24px;--glow-padding:36px;--cone-spread:25;--fill-opacity:.5;
+  --border-radius:24px;
   border-radius:var(--border-radius);
   position:relative;overflow:visible;
   isolation:isolate;display:grid;
@@ -629,82 +629,6 @@ body.light .rank-card.silver{background:linear-gradient(135deg,#eef0f5 0%,#d8dce
 body.light .rank-card.gold{background:linear-gradient(135deg,#fffbe6 0%,#fde68a 100%)}
 body.light .rank-card.platinum{background:linear-gradient(135deg,#e0f2fe 0%,#bae6fd 100%)}
 
-/* mesh-gradient border */
-.rank-card::before{
-  content:'';position:absolute;inset:0;border-radius:inherit;z-index:-1;
-  border:1px solid transparent;
-  background:
-    linear-gradient(var(--card-bg,#161920) 0 100%) padding-box,
-    linear-gradient(rgb(255 255 255/0%) 0 100%) border-box,
-    var(--gradient-one) border-box,
-    var(--gradient-two) border-box,
-    var(--gradient-three) border-box,
-    var(--gradient-four) border-box,
-    var(--gradient-five) border-box,
-    var(--gradient-six) border-box,
-    var(--gradient-seven) border-box,
-    var(--gradient-base) border-box;
-  opacity:calc((var(--edge-proximity) - var(--color-sensitivity)) / (100 - var(--color-sensitivity)));
-  mask-image:conic-gradient(from var(--cursor-angle) at center,
-    black calc(var(--cone-spread) * 1%),
-    transparent calc((var(--cone-spread) + 15) * 1%),
-    transparent calc((100 - var(--cone-spread) - 15) * 1%),
-    black calc((100 - var(--cone-spread)) * 1%));
-  transition:opacity .25s ease-out;
-}
-.rank-card:not(:hover)::before{transition:opacity .75s ease-in-out}
-
-/* mesh fill */
-.rank-card::after{
-  content:'';position:absolute;inset:0;border-radius:inherit;z-index:-1;
-  border:1px solid transparent;
-  background:
-    var(--gradient-one) padding-box,var(--gradient-two) padding-box,
-    var(--gradient-three) padding-box,var(--gradient-four) padding-box,
-    var(--gradient-five) padding-box,var(--gradient-six) padding-box,
-    var(--gradient-seven) padding-box,var(--gradient-base) padding-box;
-  mask-image:
-    linear-gradient(to bottom,black,black),
-    radial-gradient(ellipse at 50% 50%,black 40%,transparent 65%),
-    radial-gradient(ellipse at 66% 66%,black 5%,transparent 40%),
-    radial-gradient(ellipse at 33% 33%,black 5%,transparent 40%),
-    radial-gradient(ellipse at 66% 33%,black 5%,transparent 40%),
-    radial-gradient(ellipse at 33% 66%,black 5%,transparent 40%),
-    conic-gradient(from var(--cursor-angle) at center,transparent 5%,black 15%,black 85%,transparent 95%);
-  mask-composite:subtract,add,add,add,add,add;
-  opacity:calc(var(--fill-opacity,.5)*(var(--edge-proximity) - var(--color-sensitivity))/(100 - var(--color-sensitivity)));
-  mix-blend-mode:soft-light;
-  transition:opacity .25s ease-out;
-}
-.rank-card:not(:hover)::after{transition:opacity .75s ease-in-out}
-
-/* outer glow */
-.rank-card>.edge-light{
-  content:'';position:absolute;inset:calc(var(--glow-padding)*-1);
-  border-radius:inherit;pointer-events:none;z-index:1;
-  mask-image:conic-gradient(from var(--cursor-angle) at center,black 2.5%,transparent 10%,transparent 90%,black 97.5%);
-  opacity:calc((var(--edge-proximity) - var(--edge-sensitivity))/(100 - var(--edge-sensitivity)));
-  mix-blend-mode:plus-lighter;
-  transition:opacity .25s ease-out;
-}
-.rank-card:not(:hover)>.edge-light{transition:opacity .75s ease-in-out}
-.rank-card>.edge-light::before{
-  content:'';position:absolute;inset:var(--glow-padding);border-radius:inherit;
-  box-shadow:
-    inset 0 0 0 1px var(--glow-color),
-    inset 0 0 1px 0 var(--glow-color-60),
-    inset 0 0 3px 0 var(--glow-color-50),
-    inset 0 0 6px 0 var(--glow-color-40),
-    inset 0 0 15px 0 var(--glow-color-30),
-    inset 0 0 25px 2px var(--glow-color-20),
-    inset 0 0 50px 2px var(--glow-color-10),
-    0 0 1px 0 var(--glow-color-60),
-    0 0 3px 0 var(--glow-color-50),
-    0 0 6px 0 var(--glow-color-40),
-    0 0 15px 0 var(--glow-color-30),
-    0 0 25px 2px var(--glow-color-20),
-    0 0 50px 2px var(--glow-color-10);
-}
 .rank-card-inner{
   display:flex;flex-direction:column;position:relative;
   overflow:hidden;z-index:1;border-radius:var(--border-radius);
@@ -853,6 +777,150 @@ body.light .rank-item-unit{color:#444}
 @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
 .shake{animation:shake .35s ease}
 
+/* ══ FROSTED GLASS DESIGN ══ */
+/* aurora background: colorful soft blobs the glass cards blur through */
+.bg-aurora{
+  position:fixed;inset:0;z-index:-2;overflow:hidden;pointer-events:none;
+  will-change:transform,filter;transform:translate3d(0,0,0);
+}
+.bg-aurora::before,.bg-aurora::after{
+  content:'';position:absolute;inset:-35%;will-change:transform;
+  background:
+    radial-gradient(40% 34% at 20% 24%,rgba(74,222,128,.17) 0%,transparent 70%),
+    radial-gradient(44% 38% at 82% 14%,rgba(34,211,238,.15) 0%,transparent 70%),
+    radial-gradient(42% 36% at 76% 76%,rgba(244,114,182,.14) 0%,transparent 70%),
+    radial-gradient(38% 32% at 16% 82%,rgba(129,140,248,.16) 0%,transparent 70%);
+  animation:auroraDrift 28s ease-in-out infinite alternate;
+}
+.bg-aurora::after{
+  background:
+    radial-gradient(34% 30% at 64% 36%,rgba(34,211,238,.10) 0%,transparent 70%),
+    radial-gradient(36% 32% at 30% 58%,rgba(244,114,182,.09) 0%,transparent 70%),
+    radial-gradient(32% 28% at 52% 86%,rgba(74,222,128,.10) 0%,transparent 70%);
+  animation:auroraDrift2 36s ease-in-out infinite alternate;
+}
+body.light .bg-aurora::before{
+  background:
+    radial-gradient(40% 34% at 20% 24%,rgba(74,222,128,.30) 0%,transparent 70%),
+    radial-gradient(44% 38% at 82% 14%,rgba(34,211,238,.26) 0%,transparent 70%),
+    radial-gradient(42% 36% at 76% 76%,rgba(244,114,182,.24) 0%,transparent 70%),
+    radial-gradient(38% 32% at 16% 82%,rgba(129,140,248,.26) 0%,transparent 70%);
+}
+body.light .bg-aurora::after{
+  background:
+    radial-gradient(34% 30% at 64% 36%,rgba(34,211,238,.18) 0%,transparent 70%),
+    radial-gradient(36% 32% at 30% 58%,rgba(244,114,182,.15) 0%,transparent 70%),
+    radial-gradient(32% 28% at 52% 86%,rgba(74,222,128,.16) 0%,transparent 70%);
+}
+@keyframes auroraDrift{
+  0%{transform:translate3d(-3%,-2%,0) rotate(-4deg) scale(1)}
+  100%{transform:translate3d(3%,3%,0) rotate(5deg) scale(1.1)}
+}
+@keyframes auroraDrift2{
+  0%{transform:translate3d(2%,3%,0) rotate(6deg) scale(1.05)}
+  100%{transform:translate3d(-3%,-2%,0) rotate(-5deg) scale(1)}
+}
+@media (prefers-reduced-motion:reduce){
+  .bg-aurora::before,.bg-aurora::after{animation:none}
+}
+
+/* glass cards: translucent, borderless, frosted */
+.period-card,.goals-card,.total-card,.chart-wrap,.today-summary,.tax-row,
+.day-panel,.breakdown,.expenses-card,.bonus-item,.hist-card,.archive-item{
+  background:var(--surface);
+  border:1px solid transparent;
+  -webkit-backdrop-filter:blur(22px) saturate(160%);
+  backdrop-filter:blur(22px) saturate(160%);
+  box-shadow:0 12px 36px rgba(0,0,0,.22),
+    inset 0 1px 0 rgba(255,255,255,.10),
+    inset 0 0 0 .5px rgba(255,255,255,.04);
+}
+body.light .period-card,body.light .goals-card,body.light .total-card,
+body.light .chart-wrap,body.light .today-summary,body.light .tax-row,
+body.light .day-panel,body.light .breakdown,body.light .expenses-card,
+body.light .bonus-item,body.light .hist-card,body.light .archive-item{
+  box-shadow:0 12px 36px rgba(31,38,135,.10),
+    inset 0 1px 0 rgba(255,255,255,.85),
+    inset 0 0 0 .5px rgba(255,255,255,.4);
+}
+.total-card{background:linear-gradient(135deg,rgba(74,222,128,.13),rgba(34,211,238,.09))}
+body.light .total-card{background:linear-gradient(135deg,rgba(74,222,128,.18),rgba(34,211,238,.13));border-color:transparent}
+
+/* small controls: translucent without heavy blur (perf on mobile) */
+.icon-btn,.day-btn{border-color:transparent;box-shadow:inset 0 1px 0 rgba(255,255,255,.07)}
+body.light .icon-btn,body.light .day-btn{box-shadow:inset 0 1px 0 rgba(255,255,255,.8)}
+.day-work-row{background:transparent}
+.goal-bar-bg,.shift-progress-bg{border:none}
+
+/* glass bottom nav */
+.bottom-nav{
+  background:rgba(13,16,24,.55);border-top:none;
+  -webkit-backdrop-filter:blur(28px) saturate(180%);
+  backdrop-filter:blur(28px) saturate(180%);
+  box-shadow:0 -8px 30px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.06);
+}
+body.light .bottom-nav{
+  background:rgba(255,255,255,.6);
+  box-shadow:0 -8px 30px rgba(31,38,135,.08),inset 0 1px 0 rgba(255,255,255,.8);
+}
+
+/* glass modals */
+.modal-overlay{background:rgba(8,10,16,.45);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.modal{
+  background:rgba(22,27,40,.78);
+  -webkit-backdrop-filter:blur(30px) saturate(170%);
+  backdrop-filter:blur(30px) saturate(170%);
+  box-shadow:0 -10px 40px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.1);
+}
+body.light .modal{background:rgba(255,255,255,.78)}
+
+/* fix-ups for elements that leaned on the old opaque --border */
+.chart-bar{background:rgba(255,255,255,.10)}
+body.light .chart-bar{background:rgba(17,24,39,.10)}
+.toggle{background:rgba(255,255,255,.14)}
+body.light .toggle{background:rgba(17,24,39,.14)}
+.modal-handle{background:rgba(255,255,255,.18)}
+body.light .modal-handle{background:rgba(17,24,39,.15)}
+.dw-qty-wrap input::placeholder,.dw-price-wrap input::placeholder{color:var(--muted);opacity:.45}
+
+/* readable accent text: bright on dark theme, deep blue on light theme */
+.total-label,.total-amount,.hist-total,.nav-btn.active,.nav-btn.active .nav-lbl,
+.day-btn .day-sum,.day-btn.active .day-num,.day-btn.active .day-dow,
+.day-btn.day-work .day-num,.day-btn.day-work .day-dow,
+.chart-bar-wrap.active .chart-bar-lbl,.breakdown-row.total-row .val,
+.goal-note.fire,.motivation-done,.stri-count.ok,.countdown-pill.ok .cp-val,
+.shift-stat-pill.ok .ssp-val,.expenses-add-btn,.archive-item-cur,
+.compare-badge.up,.day-type-btn.is-work{color:var(--accent-ink)}
+.ts-amount,.paydate-date,.archive-item-total,.day-panel-sum,
+.period-title,.period-badge{color:var(--accent2-ink)}
+
+/* ── DAY PHOTO REPORT ── */
+.photo-section{padding:10px 14px;border-top:1px solid var(--border)}
+.photo-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.photo-title{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
+.photo-add-btn{
+  font-size:12px;font-weight:700;color:var(--accent-ink);cursor:pointer;
+  background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.2);
+  border-radius:8px;padding:4px 10px;
+}
+.photo-add-btn:active{opacity:.7}
+.photo-grid{display:flex;gap:8px;flex-wrap:wrap}
+.photo-thumb{
+  width:64px;height:64px;border-radius:10px;object-fit:cover;cursor:pointer;
+  box-shadow:0 2px 10px rgba(0,0,0,.25);transition:transform .15s;
+}
+.photo-thumb:active{transform:scale(.93)}
+.photo-empty{font-size:12px;color:var(--muted)}
+.photo-viewer{
+  position:fixed;inset:0;background:rgba(5,7,12,.92);z-index:300;
+  display:none;align-items:center;justify-content:center;flex-direction:column;
+  gap:16px;padding:20px;
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+}
+.photo-viewer.open{display:flex}
+.photo-viewer img{max-width:100%;max-height:72vh;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.5)}
+.photo-viewer-actions{display:flex;gap:10px}
+
 .share-card-btn{
   display:block;width:calc(100% - 32px);margin:8px 16px 0;
   padding:10px;border-radius:14px;border:none;cursor:pointer;
@@ -880,6 +948,9 @@ body.light .share-card-btn{background:rgba(0,0,0,.07)}
 </style>
 </head>
 <body>
+
+<!-- AURORA BACKGROUND (shines through frosted glass cards) -->
+<div class="bg-aurora" id="bgAurora"></div>
 
 <!-- NOTIFICATION BANNER -->
 <div class="notif-banner" id="notifBanner" style="display:none">
@@ -914,9 +985,7 @@ body.light .share-card-btn{background:rgba(0,0,0,.07)}
 
 <!-- HEADER -->
 <div class="header">
-  <div class="header-left">
-    <div class="header-label">Калькулятор V0.0.1</div>
-  </div>
+  <div class="header-left"></div>
   <div class="header-actions">
     <div class="icon-btn" onclick="openDataModal()" title="Импорт / Экспорт" id="dataBtn">💾</div>
     <div class="icon-btn" onclick="toggleTheme()" title="Тема" id="themeBtn">🌙</div>
@@ -967,13 +1036,21 @@ body.light .share-card-btn{background:rgba(0,0,0,.07)}
       <div class="day-panel-title" id="dpTitle">—</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px">
-      <div class="copy-day-btn" onclick="openCopyModal()">📋 Копировать с дня</div>
+      <div class="copy-day-btn" onclick="openCopyModal()" title="Копировать с дня">📋</div>
       <div class="day-type-btn" id="dayTypeBtn" onclick="toggleDayWorkStatus()"></div>
       <div class="day-panel-sum" id="dpSum"></div>
     </div>
   </div>
   <div class="day-works" id="dayWorks"></div>
   <div id="dayShiftTracker"></div>
+  <div class="photo-section">
+    <div class="photo-header">
+      <div class="photo-title">📷 Фото-отчёт<span id="photoCount"></span></div>
+      <div class="photo-add-btn" onclick="document.getElementById('photoFileIn').click()">+ Добавить</div>
+    </div>
+    <div class="photo-grid" id="photoGrid"></div>
+    <input type="file" id="photoFileIn" accept="image/*" multiple style="display:none" onchange="addDayPhotos(event)">
+  </div>
   <button class="add-work-btn" onclick="addWork()">
     <span style="font-size:18px;line-height:1">+</span> Добавить работу
   </button>
@@ -997,7 +1074,6 @@ body.light .share-card-btn{background:rgba(0,0,0,.07)}
 <div class="rank-wrapper" id="rankWrapper">
   <div class="pc-behind" id="rankBehind"></div>
   <div class="rank-card" id="rankCard">
-    <span class="edge-light"></span>
     <div class="rank-card-inner" id="rankCardInner"></div>
   </div>
   <button class="share-card-btn" onclick="shareRankCard()" id="shareCardBtn">📤 Поделиться</button>
@@ -1164,6 +1240,15 @@ body.light .share-card-btn{background:rgba(0,0,0,.07)}
       <button class="modal-btn" id="bioToggleBtn" style="width:100%;padding:12px" onclick="toggleBio()"></button>
     </div>
     <div id="dataMsg" style="margin-top:12px;font-size:13px;text-align:center;font-weight:600;min-height:18px"></div>
+  </div>
+</div>
+
+<!-- PHOTO VIEWER -->
+<div class="photo-viewer" id="photoViewer" onclick="closePhotoViewer(event)">
+  <img id="photoViewerImg" alt="Фото-отчёт">
+  <div class="photo-viewer-actions">
+    <button class="modal-btn" style="background:rgba(248,113,113,.9);color:#fff" onclick="deleteCurrentPhoto()">🗑 Удалить</button>
+    <button class="modal-btn" style="background:var(--surface2);color:#fff;border:1px solid rgba(255,255,255,.2)" onclick="closePhotoViewer()">Закрыть</button>
   </div>
 </div>
 
@@ -1609,8 +1694,7 @@ function renderDayPanel(){
   const btn=document.getElementById('dayTypeBtn');
   if(btn){
     const off=isDayOff(selectedDay,date);
-    const overridden=!!dayOverrides[String(selectedDay)];
-    btn.textContent=off?('Выходной'+(overridden?' ↺':'')):'Рабочий'+(overridden?' ↺':'');
+    btn.textContent=off?'В':'Р';
     btn.className='day-type-btn '+(off?'is-off':'is-work');
   }
   const works=days[selectedDay]||[];
@@ -1637,6 +1721,124 @@ function renderDayPanel(){
   }
   renderShiftTracker();
   renderTodaySummary();
+  renderDayPhotos();
+}
+
+// ══════════════════════════════════════════════
+//  DAY PHOTO REPORT  (stored in IndexedDB)
+// ══════════════════════════════════════════════
+let photoDB=null;
+function openPhotoDB(){
+  return new Promise((res,rej)=>{
+    if(photoDB)return res(photoDB);
+    const req=indexedDB.open('salary_photos',1);
+    req.onupgradeneeded=()=>{
+      const store=req.result.createObjectStore('photos',{keyPath:'id',autoIncrement:true});
+      store.createIndex('dayKey','dayKey',{unique:false});
+    };
+    req.onsuccess=()=>{photoDB=req.result;res(photoDB)};
+    req.onerror=()=>rej(req.error);
+  });
+}
+function photoDayKey(d){const{year,month,period}=getPeriod();return`${year}_${month}_${period}_${d}`}
+
+// уменьшить фото до разумного размера перед сохранением
+function compressPhoto(file){
+  return new Promise((res,rej)=>{
+    const url=URL.createObjectURL(file);
+    const img=new Image();
+    img.onload=()=>{
+      const MAX=1600;
+      let w=img.naturalWidth,h=img.naturalHeight;
+      if(w>MAX||h>MAX){const k=MAX/Math.max(w,h);w=Math.round(w*k);h=Math.round(h*k)}
+      const c=document.createElement('canvas');c.width=w;c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      URL.revokeObjectURL(url);
+      c.toBlob(b=>b?res(b):rej(new Error('ошибка сжатия')),'image/jpeg',.78);
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('не удалось открыть изображение'))};
+    img.src=url;
+  });
+}
+
+async function addDayPhotos(ev){
+  if(selectedDay===null)return;
+  const files=Array.from(ev.target.files||[]);
+  ev.target.value='';
+  if(!files.length)return;
+  try{
+    const db=await openPhotoDB();
+    const dayKey=photoDayKey(selectedDay);
+    for(const f of files){
+      let blob;
+      try{blob=await compressPhoto(f)}catch(e){continue}
+      await new Promise((res,rej)=>{
+        const tx=db.transaction('photos','readwrite');
+        tx.objectStore('photos').add({dayKey,blob,ts:Date.now()});
+        tx.oncomplete=res;tx.onerror=()=>rej(tx.error);
+      });
+    }
+    haptic('light');
+    renderDayPhotos();
+  }catch(e){alert('Не удалось сохранить фото: '+(e&&e.message||e))}
+}
+
+function getDayPhotos(d){
+  return openPhotoDB().then(db=>new Promise((res,rej)=>{
+    const req=db.transaction('photos').objectStore('photos').index('dayKey').getAll(photoDayKey(d));
+    req.onsuccess=()=>res(req.result||[]);
+    req.onerror=()=>rej(req.error);
+  })).catch(()=>[]);
+}
+
+let photoObjUrls=[];
+async function renderDayPhotos(){
+  const grid=document.getElementById('photoGrid');
+  if(!grid)return;
+  photoObjUrls.forEach(u=>URL.revokeObjectURL(u));photoObjUrls=[];
+  const day=selectedDay;
+  if(day===null){grid.innerHTML='';return}
+  const photos=await getDayPhotos(day);
+  if(day!==selectedDay)return; // день успели переключить
+  const cnt=document.getElementById('photoCount');
+  if(cnt)cnt.textContent=photos.length?` (${photos.length})`:'';
+  if(!photos.length){grid.innerHTML='<div class="photo-empty">Нет фото за этот день</div>';return}
+  grid.innerHTML='';
+  photos.sort((a,b)=>a.ts-b.ts).forEach(p=>{
+    const u=URL.createObjectURL(p.blob);photoObjUrls.push(u);
+    const img=document.createElement('img');
+    img.className='photo-thumb';img.src=u;
+    img.onclick=()=>openPhotoViewer(p.id,u);
+    grid.appendChild(img);
+  });
+}
+
+let viewerPhotoId=null;
+function openPhotoViewer(id,url){
+  viewerPhotoId=id;
+  document.getElementById('photoViewerImg').src=url;
+  document.getElementById('photoViewer').classList.add('open');
+}
+function closePhotoViewer(ev){
+  if(ev&&ev.target!==ev.currentTarget)return;
+  document.getElementById('photoViewer').classList.remove('open');
+  document.getElementById('photoViewerImg').src='';
+  viewerPhotoId=null;
+}
+async function deleteCurrentPhoto(){
+  if(viewerPhotoId===null)return;
+  if(!confirm('Удалить фото?'))return;
+  try{
+    const db=await openPhotoDB();
+    await new Promise((res,rej)=>{
+      const tx=db.transaction('photos','readwrite');
+      tx.objectStore('photos').delete(viewerPhotoId);
+      tx.oncomplete=res;tx.onerror=()=>rej(tx.error);
+    });
+  }catch(e){}
+  haptic('medium');
+  closePhotoViewer();
+  renderDayPhotos();
 }
 
 // ══════════════════════════════════════════════
@@ -1707,10 +1909,13 @@ function renderShiftTracker() {
   const selDate = new Date(year, month, selectedDay);
   if (isDayOff(selectedDay, selDate)) { el.innerHTML = ''; return; }
 
-  const today0 = new Date(); today0.setHours(0, 0, 0, 0);
-  const isToday = today0.getFullYear() === year && today0.getMonth() === month
-    && today0.getDate() === selectedDay;
-  if (!isToday) { el.innerHTML = ''; return; }
+  // День смены: до 08:00 текущая смена относится к предыдущему дню (началась в 20:00),
+  // поэтому счётчик не исчезает при смене календарного дня в 00:00
+  const shiftDay0 = new Date(Date.now() - SHIFT_END_H * 60 * 60 * 1000);
+  shiftDay0.setHours(0, 0, 0, 0);
+  const isShiftDay = shiftDay0.getFullYear() === year && shiftDay0.getMonth() === month
+    && shiftDay0.getDate() === selectedDay;
+  if (!isShiftDay) { el.innerHTML = ''; return; }
 
   // ── Active templates: selected ones, or ALL if none chosen ──
   const validTpls = templates.filter(t => (parseFloat(t.price) || 0) > 0);
@@ -1734,7 +1939,7 @@ function renderShiftTracker() {
   const goalTarget = goals.period > 0 ? goals.period : goals.week;
   const remaining  = Math.max(goalTarget - earned, 0);
   let workDaysLeft = 0;
-  for (let d = today0.getDate(); d <= endDay; d++) {
+  for (let d = shiftDay0.getDate(); d <= endDay; d++) {
     const dt = new Date(year, month, d);
     if (!isDayOff(d, dt)) workDaysLeft++;
   }
@@ -2468,9 +2673,6 @@ function renderAchievements(){
   const totalQty=Math.round(entries.reduce((s,[,v])=>s+v.qty,0));
   const rank=getRank(totalQty);
   card.className='rank-card '+rank.cls;
-  applyBorderGlowTheme(card,rank.cls);
-  const bgMap={bronze:'#2a1a0e',silver:'#1a1e26',gold:'#2a2000',platinum:'#0d1a2a'};
-  card.style.setProperty('--card-bg',bgMap[rank.cls]||'#161920');
   const behindEl=document.getElementById('rankBehind');
   if(behindEl){
     const glowBg={bronze:'radial-gradient(ellipse,#cd7f32,transparent 70%)',silver:'radial-gradient(ellipse,#94a3b8,transparent 70%)',gold:'radial-gradient(ellipse,#d97706,transparent 70%)',platinum:'radial-gradient(ellipse,#0284c7,transparent 70%)'};
@@ -2545,57 +2747,6 @@ function renderAchievements(){
     ${progressHtml}
     <div class="rank-items">${itemsHtml}</div>
   `;
-}
-
-// ══════════════════════════════════════════════
-//  BORDER GLOW — pointer tracking
-// ══════════════════════════════════════════════
-const TIER_GLOW={
-  bronze:{hsl:'30 70 60',colors:['#cd7f32','#e8a855','#b8621a']},
-  silver:{hsl:'220 20 75',colors:['#94a3b8','#c8d0dc','#64748b']},
-  gold:  {hsl:'45 90 60',colors:['#d97706','#fbbf24','#f59e0b']},
-  platinum:{hsl:'200 80 65',colors:['#0284c7','#38bdf8','#7dd3fc']},
-};
-const GRAD_POSITIONS=['80% 55%','69% 34%','8% 6%','41% 38%','86% 85%','82% 18%','51% 4%'];
-const GRAD_KEYS=['--gradient-one','--gradient-two','--gradient-three','--gradient-four','--gradient-five','--gradient-six','--gradient-seven'];
-const COLOR_MAP=[0,1,2,0,1,2,1];
-
-function applyBorderGlowTheme(card,tier){
-  const t=TIER_GLOW[tier]||TIER_GLOW.bronze;
-  const[h,s,l]=t.hsl.split(' ');
-  const base=`${h}deg ${s}% ${l}%`;
-  const ops=[100,60,50,40,30,20,10];
-  const sfx=['','--glow-color-60','--glow-color-50','--glow-color-40','--glow-color-30','--glow-color-20','--glow-color-10'];
-  ops.forEach((o,i)=>{
-    const key=i===0?'--glow-color':sfx[i];
-    card.style.setProperty(key,`hsl(${base} / ${o}%)`);
-  });
-  GRAD_KEYS.forEach((k,i)=>{
-    const c=t.colors[Math.min(COLOR_MAP[i],t.colors.length-1)];
-    card.style.setProperty(k,`radial-gradient(at ${GRAD_POSITIONS[i]}, ${c} 0px, transparent 50%)`);
-  });
-  card.style.setProperty('--gradient-base',`linear-gradient(${t.colors[0]} 0 100%)`);
-}
-
-function initBorderGlow(){
-  const card=document.getElementById('rankCard');
-  if(!card)return;
-  card.addEventListener('pointermove',e=>{
-    const rect=card.getBoundingClientRect();
-    const x=e.clientX-rect.left, y=e.clientY-rect.top;
-    const cx=rect.width/2, cy=rect.height/2;
-    const dx=x-cx, dy=y-cy;
-    const kx=dx!==0?cx/Math.abs(dx):Infinity;
-    const ky=dy!==0?cy/Math.abs(dy):Infinity;
-    const edge=Math.min(Math.max(1/Math.min(kx,ky),0),1);
-    let deg=Math.atan2(dy,dx)*(180/Math.PI)+90;
-    if(deg<0)deg+=360;
-    card.style.setProperty('--edge-proximity',(edge*100).toFixed(2));
-    card.style.setProperty('--cursor-angle',deg.toFixed(2)+'deg');
-  });
-  card.addEventListener('pointerleave',()=>{
-    card.style.setProperty('--edge-proximity','0');
-  });
 }
 
 // ══════════════════════════════════════════════
@@ -2946,6 +3097,29 @@ async function toggleBio(){
   }
 }
 
+// ══════════════════════════════════════════════
+//  SCROLL SHIMMER (aurora hue-shift + parallax)
+// ══════════════════════════════════════════════
+(function(){
+  const aurora=document.getElementById('bgAurora');
+  if(!aurora)return;
+  if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  let cur=0,target=0,raf=null;
+  function frame(){
+    cur+=(target-cur)*0.07;
+    const hue=(cur*0.14)%360;
+    const y=Math.max(-60,Math.min(60,cur*-0.06));
+    aurora.style.filter=`hue-rotate(${hue}deg)`;
+    aurora.style.transform=`translate3d(0,${y}px,0)`;
+    if(Math.abs(target-cur)>0.5){raf=requestAnimationFrame(frame)}
+    else{cur=target;raf=null}
+  }
+  window.addEventListener('scroll',()=>{
+    target=window.scrollY||0;
+    if(raf===null)raf=requestAnimationFrame(frame);
+  },{passive:true});
+})();
+
 // ── SHARE RANK CARD ──
 async function shareRankCard(){
   const card=document.getElementById('rankCard');
@@ -3032,10 +3206,8 @@ renderArchive();
 renderExpenses();
 renderAchievements();
 restorePage();
-initBorderGlow();
 startShiftTimer();
 setupBioButton();
-initPWA();
 </script>
 </body>
 </html>
