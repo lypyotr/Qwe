@@ -6,7 +6,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Зарплата">
-<meta name="theme-color" content="#0d0f14">
+<meta name="theme-color" content="#6366f1">
+<link rel="manifest" href="manifest.json">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230d0f14'/><text y='.9em' font-size='72' x='12'>💰</text></svg>">
 <title>Зарплата</title>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -850,9 +852,40 @@ body.light .rank-item-unit{color:#444}
 .lock-error{font-size:13px;color:var(--danger);font-weight:700;min-height:18px}
 @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
 .shake{animation:shake .35s ease}
+
+.share-card-btn{
+  display:block;width:calc(100% - 32px);margin:8px 16px 0;
+  padding:10px;border-radius:14px;border:none;cursor:pointer;
+  background:rgba(255,255,255,.08);color:var(--text);
+  font-family:'Manrope',sans-serif;font-size:13px;font-weight:700;
+  letter-spacing:.3px;transition:opacity .15s;
+}
+body.light .share-card-btn{background:rgba(0,0,0,.07)}
+.share-card-btn:active{opacity:.6}
+
+.notif-banner{
+  position:fixed;top:0;left:0;right:0;z-index:200;
+  background:var(--accent);color:#fff;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 16px;gap:12px;
+  animation:slideDown .3s ease;
+}
+@keyframes slideDown{from{transform:translateY(-100%)}to{transform:translateY(0)}}
+.notif-banner-text{font-size:13px;font-weight:700;flex:1}
+.notif-banner-ok{
+  background:rgba(255,255,255,.25);border:none;color:#fff;
+  font-family:'Manrope',sans-serif;font-size:12px;font-weight:700;
+  padding:4px 12px;border-radius:20px;cursor:pointer;
+}
 </style>
 </head>
 <body>
+
+<!-- NOTIFICATION BANNER -->
+<div class="notif-banner" id="notifBanner" style="display:none">
+  <span class="notif-banner-text">🔔 Не забудь внести данные за сегодня</span>
+  <button class="notif-banner-ok" onclick="dismissNotifBanner()">OK</button>
+</div>
 
 <!-- LOCK SCREEN -->
 <div class="lock-overlay" id="lockOverlay">
@@ -967,6 +1000,7 @@ body.light .rank-item-unit{color:#444}
     <span class="edge-light"></span>
     <div class="rank-card-inner" id="rankCardInner"></div>
   </div>
+  <button class="share-card-btn" onclick="shareRankCard()" id="shareCardBtn">📤 Поделиться</button>
 </div>
 
 <!-- ALL PERIODS ARCHIVE -->
@@ -2912,6 +2946,64 @@ async function toggleBio(){
   }
 }
 
+// ── SHARE RANK CARD ──
+async function shareRankCard(){
+  const card=document.getElementById('rankCard');
+  if(!card||typeof html2canvas==='undefined')return;
+  const btn=document.getElementById('shareCardBtn');
+  if(btn){btn.textContent='⏳ Создаю...';btn.disabled=true;}
+  try{
+    const canvas=await html2canvas(card,{scale:2,useCORS:true,backgroundColor:null,logging:false});
+    canvas.toBlob(async blob=>{
+      if(!blob)return;
+      const file=new File([blob],'achievements.png',{type:'image/png'});
+      if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
+        await navigator.share({files:[file],title:'Мои достижения'});
+      } else {
+        const a=document.createElement('a');
+        a.href=URL.createObjectURL(blob);
+        a.download='achievements.png';
+        a.click();
+      }
+    },'image/png');
+  }catch(e){console.error(e);}
+  finally{if(btn){btn.textContent='📤 Поделиться';btn.disabled=false;}}
+}
+
+// ── PWA / SERVICE WORKER ──
+function initPWA(){
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  }
+  checkDailyReminder();
+}
+
+function checkDailyReminder(){
+  const today=new Date();
+  const hour=today.getHours();
+  if(hour<18||hour>=22)return;
+  const{year,month,startDay,endDay}=getPeriod();
+  const d=today.getDate();
+  if(today.getFullYear()!==year||today.getMonth()!==month||d<startDay||d>endDay)return;
+  const todayKey='salary_notif_'+today.toDateString();
+  if(localStorage.getItem(todayKey))return;
+  try{
+    const data=JSON.parse(localStorage.getItem(saveKey())||'{}');
+    const todayWorks=(data.days||{})[String(d)];
+    const hasTodayData=todayWorks&&todayWorks.length>0&&todayWorks.some(w=>parseFloat(w.qty)>0);
+    if(!hasTodayData){
+      document.getElementById('notifBanner').style.display='flex';
+    }
+  }catch(e){}
+}
+
+function dismissNotifBanner(){
+  const banner=document.getElementById('notifBanner');
+  if(banner)banner.style.display='none';
+  const today=new Date();
+  try{localStorage.setItem('salary_notif_'+today.toDateString(),'1');}catch(e){}
+}
+
 // ══════════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════════
@@ -2943,6 +3035,7 @@ restorePage();
 initBorderGlow();
 startShiftTimer();
 setupBioButton();
+initPWA();
 </script>
 </body>
 </html>
