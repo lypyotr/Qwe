@@ -11,15 +11,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="https://www.google.com/recaptcha/api.js?onload=rcOnLoad&render=explicit" async defer></script>
-<script>
-function rcOnLoad(){
-  try{
-    window._rcLoginId=grecaptcha.render('rcLogin',{sitekey:'6LffCSQtAAAAAGvugRUmtseSn8jqx-2qOUpUINCK',theme:'dark'});
-    window._rcRegId=grecaptcha.render('rcReg',{sitekey:'6LffCSQtAAAAAGvugRUmtseSn8jqx-2qOUpUINCK',theme:'dark'});
-  }catch(e){console.warn('reCAPTCHA render',e);}
-}
-</script>
+<script src="https://www.google.com/recaptcha/api.js?render=6LffCSQtAAAAAGvugRUmtseSn8jqx-2qOUpUINCK" async defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230d0f14'/><text y='.9em' font-size='72' x='12'>💰</text></svg>">
 <title>Зарплата</title>
@@ -1014,7 +1006,6 @@ body.light .share-card-btn{background:rgba(0,0,0,.07)}
       <input class="auth-input" id="authEmail" type="email" placeholder="Email" autocomplete="email">
       <input class="auth-input" id="authPassword" type="password" placeholder="Пароль" autocomplete="current-password"
         onkeydown="if(event.key==='Enter')doFirebaseLogin()">
-      <div id="rcLogin" style="margin-bottom:8px;transform:scale(0.97);transform-origin:left"></div>
       <div class="auth-error" id="authError"></div>
       <button class="auth-btn" onclick="doFirebaseLogin()">Войти</button>
       <div class="auth-link" onclick="showAuthRegister()">Нет аккаунта? <span>Зарегистрироваться</span></div>
@@ -1027,7 +1018,6 @@ body.light .share-card-btn{background:rgba(0,0,0,.07)}
       <input class="auth-input" id="regPassword" type="password" placeholder="Пароль (минимум 6 символов)" autocomplete="new-password">
       <input class="auth-input" id="regPassword2" type="password" placeholder="Повтори пароль" autocomplete="new-password"
         onkeydown="if(event.key==='Enter')doFirebaseRegister()">
-      <div id="rcReg" style="margin-bottom:8px;transform:scale(0.97);transform-origin:left"></div>
       <div class="auth-error" id="regError"></div>
       <button class="auth-btn" onclick="doFirebaseRegister()">Создать аккаунт</button>
       <div class="auth-link" onclick="showAuthLogin()">Уже есть аккаунт? <span>Войти</span></div>
@@ -3108,23 +3098,28 @@ function showAuthOverlay(show){const el=document.getElementById('authOverlay');i
 function showAuthLogin(){document.getElementById('authLoginForm').style.display='';document.getElementById('authRegisterForm').style.display='none';document.getElementById('authForgotForm').style.display='none';document.getElementById('authError').textContent='';}
 function showAuthRegister(){document.getElementById('authLoginForm').style.display='none';document.getElementById('authRegisterForm').style.display='';document.getElementById('authForgotForm').style.display='none';document.getElementById('regError').textContent='';}
 function showAuthForgot(){document.getElementById('authLoginForm').style.display='none';document.getElementById('authRegisterForm').style.display='none';document.getElementById('authForgotForm').style.display='';document.getElementById('forgotMsg').textContent='';}
+async function getRcToken(action){
+  if(typeof grecaptcha==='undefined')return null;
+  try{return await grecaptcha.execute('6LffCSQtAAAAAGvugRUmtseSn8jqx-2qOUpUINCK',{action});}
+  catch(e){return null;}
+}
 async function doFirebaseLogin(){
   const email=document.getElementById('authEmail').value.trim(),pass=document.getElementById('authPassword').value,errEl=document.getElementById('authError');
   errEl.textContent='';if(!email||!pass){errEl.textContent='Введи email и пароль';return;}
-  if(typeof grecaptcha!=='undefined'){const rc=grecaptcha.getResponse(window._rcLoginId);if(!rc){errEl.textContent='Подтверди, что ты не робот';return;}}
   document.getElementById('authLoading').style.display='';
+  await getRcToken('login');
   try{await fbAuth.signInWithEmailAndPassword(email,pass);}
-  catch(e){document.getElementById('authLoading').style.display='none';errEl.textContent=firebaseErrMsg(e.code);if(typeof grecaptcha!=='undefined')grecaptcha.reset(window._rcLoginId);}
+  catch(e){document.getElementById('authLoading').style.display='none';errEl.textContent=firebaseErrMsg(e.code);}
 }
 async function doFirebaseRegister(){
   const email=document.getElementById('regEmail').value.trim(),pass=document.getElementById('regPassword').value,pass2=document.getElementById('regPassword2').value,errEl=document.getElementById('regError');
   errEl.textContent='';if(!email||!pass){errEl.textContent='Заполни все поля';return;}
   if(pass!==pass2){errEl.textContent='Пароли не совпадают';return;}
   if(pass.length<6){errEl.textContent='Минимум 6 символов';return;}
-  if(typeof grecaptcha!=='undefined'){const rc=grecaptcha.getResponse(window._rcRegId);if(!rc){errEl.textContent='Подтверди, что ты не робот';return;}}
   document.getElementById('authLoading').style.display='';
+  await getRcToken('register');
   try{await fbAuth.createUserWithEmailAndPassword(email,pass);}
-  catch(e){document.getElementById('authLoading').style.display='none';errEl.textContent=firebaseErrMsg(e.code);if(typeof grecaptcha!=='undefined')grecaptcha.reset(window._rcRegId);}
+  catch(e){document.getElementById('authLoading').style.display='none';errEl.textContent=firebaseErrMsg(e.code);}
 }
 async function doForgotPassword(){
   const email=document.getElementById('forgotEmail').value.trim(),msgEl=document.getElementById('forgotMsg');
