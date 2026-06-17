@@ -3048,9 +3048,8 @@ function initFirebase(){
       }else{
         currentUser=null;
         if(firestoreUnsubscribe){firestoreUnsubscribe();firestoreUnsubscribe=null;}
-        showAuthOverlay(true);showAuthLogin();
+        showAuthOverlay(true);showAuthLogin();hideLoader();
       }
-      hideLoader();
     });
   }catch(e){console.error('Firebase init',e);hideLoader();}
 }
@@ -3094,7 +3093,12 @@ async function migrateLocalStorageToFirestore(){
     }
   }catch(e){console.error('migration',e);}
 }
-function showAuthOverlay(show){const el=document.getElementById('authOverlay');if(el)el.classList.toggle('hidden',!show);}
+function showAuthOverlay(show){
+  const el=document.getElementById('authOverlay');
+  if(!el)return;
+  if(show){el.classList.remove('hidden');el.style.display='';}
+  else{el.classList.add('hidden');el.style.display='none';}
+}
 function showAuthLogin(){document.getElementById('authLoginForm').style.display='';document.getElementById('authRegisterForm').style.display='none';document.getElementById('authForgotForm').style.display='none';document.getElementById('authError').textContent='';}
 function showAuthRegister(){document.getElementById('authLoginForm').style.display='none';document.getElementById('authRegisterForm').style.display='';document.getElementById('authForgotForm').style.display='none';document.getElementById('regError').textContent='';}
 function showAuthForgot(){document.getElementById('authLoginForm').style.display='none';document.getElementById('authRegisterForm').style.display='none';document.getElementById('authForgotForm').style.display='';document.getElementById('forgotMsg').textContent='';}
@@ -3127,7 +3131,7 @@ async function doForgotPassword(){
   try{await fbAuth.sendPasswordResetEmail(email);msgEl.style.color='var(--accent)';msgEl.textContent='Письмо отправлено! Проверь почту.';}
   catch(e){msgEl.style.color='var(--danger)';msgEl.textContent=firebaseErrMsg(e.code);}
 }
-async function doFirebaseLogout(){if(confirm('Выйти из аккаунта?')){await fbAuth.signOut();location.reload();}}
+async function doFirebaseLogout(){if(confirm('Выйти из аккаунта?'))await fbAuth.signOut();}
 function firebaseErrMsg(code){return({'auth/user-not-found':'Пользователь не найден','auth/wrong-password':'Неверный пароль','auth/invalid-email':'Неверный формат email','auth/email-already-in-use':'Email уже используется','auth/weak-password':'Пароль слишком простой','auth/too-many-requests':'Слишком много попыток','auth/invalid-credential':'Неверный email или пароль','auth/network-request-failed':'Ошибка сети'})[code]||'Ошибка: '+code;}
 function userDoc(){return fbDb.collection('users').doc(currentUser.uid);}
 function periodFsKey(){return saveKey().replace('salary_','');}
