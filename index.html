@@ -3015,40 +3015,38 @@ async function migrateLocalStorageToFirestore(){
   if(!currentUser||!fbDb)return;
   try{
     const sd=await userDoc().collection('data').doc('settings').get();
-    const batch=fbDb.batch();
-    let hasMigration=false;
+    // Only migrate if Firestore has no settings yet (first login from this device)
+    if(sd.exists)return;
 
-    // Migrate settings if Firestore has none
-    if(!sd.exists){
-      const lsTemplates=JSON.parse(localStorage.getItem('salary_templates')||'[]');
-      const lsGoals=JSON.parse(localStorage.getItem('salary_goals')||'{"period":0,"week":0,"month":0}');
-      const lsExpenses=JSON.parse(localStorage.getItem('salary_expenses')||'[]');
-      const lsTheme=localStorage.getItem('salary_theme')||'dark';
-      if(lsTemplates.length||lsGoals.period||lsExpenses.length){
-        batch.set(userDoc().collection('data').doc('settings'),
-          {templates:lsTemplates,goals:lsGoals,expenses:lsExpenses,theme:lsTheme,migratedAt:firebase.firestore.FieldValue.serverTimestamp()});
-        hasMigration=true;
-      }
-    }
+    const lsTemplates=JSON.parse(localStorage.getItem('salary_templates')||'[]');
+    const lsGoals=JSON.parse(localStorage.getItem('salary_goals')||'{"period":0,"week":0,"month":0}');
+    const lsExpenses=JSON.parse(localStorage.getItem('salary_expenses')||'[]');
+    const lsTheme=localStorage.getItem('salary_theme')||'dark';
 
-    // Migrate all period keys from localStorage
-    const existingPeriods=await userDoc().collection('periods').listDocuments();
-    const existingIds=new Set(existingPeriods.map(d=>d.id));
+    // Collect all period keys from localStorage
+    const periodKeys=[];
     for(let i=0;i<localStorage.length;i++){
       const k=localStorage.key(i);
-      if(!k||!/^salary_\d+_\d+_\d+$/.test(k))continue;
-      const fsKey=k.replace('salary_','');
-      if(existingIds.has(fsKey))continue;
+      if(k&&/^salary_\d+_\d+_\d+$/.test(k))periodKeys.push(k);
+    }
+
+    if(!lsTemplates.length&&!lsGoals.period&&!periodKeys.length)return; // nothing to migrate
+
+    // Upload settings
+    await userDoc().collection('data').doc('settings').set({
+      templates:lsTemplates,goals:lsGoals,expenses:lsExpenses,theme:lsTheme,
+      migratedAt:firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    // Upload periods one by one (batch limit is 500 ops, but personal data has <<500 periods)
+    for(const k of periodKeys){
       try{
         const data=JSON.parse(localStorage.getItem(k)||'{}');
-        if(Object.keys(data.days||{}).length||( data.bonuses||[]).length){
-          batch.set(userDoc().collection('periods').doc(fsKey),
-            {...data,migratedAt:firebase.firestore.FieldValue.serverTimestamp()});
-          hasMigration=true;
-        }
+        const fsKey=k.replace('salary_','');
+        await userDoc().collection('periods').doc(fsKey).set(
+          {...data,migratedAt:firebase.firestore.FieldValue.serverTimestamp()});
       }catch(e){}
     }
-    if(hasMigration)await batch.commit();
   }catch(e){console.error('migration',e);}
 }
 function showAuthOverlay(show){const el=document.getElementById('authOverlay');if(el)el.classList.toggle('hidden',!show);}
