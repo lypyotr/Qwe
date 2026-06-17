@@ -3035,6 +3035,12 @@ function dismissNotifBanner(){
 let settingsSaveTimer=null;
 const firebaseConfig={apiKey:"AIzaSyBUxrj-FUBv2ZkJ9S4e5oT9DRDEoA3Ftcg",authDomain:"salary-7b203.firebaseapp.com",projectId:"salary-7b203",storageBucket:"salary-7b203.firebasestorage.app",messagingSenderId:"311277450560",appId:"1:311277450560:web:844b2aadf1185009d5f6a5"};
 
+function showLoader(){
+  const l=document.getElementById('appLoader');
+  if(!l)return;
+  l.style.display='flex';
+  requestAnimationFrame(()=>l.style.opacity='1');
+}
 function hideLoader(){
   const l=document.getElementById('appLoader');
   if(!l)return;
@@ -3046,7 +3052,6 @@ function resetAppState(){
   days={};bonuses=[];taxEnabled=false;selectedDay=null;
   dayOverrides={};templates=[];goals={period:0,week:0,month:0};
   expenseItems=[];selectedShiftTpls=new Set();
-  renderAll();
 }
 
 function initFirebase(){
@@ -3147,7 +3152,11 @@ async function doForgotPassword(){
   try{await fbAuth.sendPasswordResetEmail(email);msgEl.style.color='var(--accent)';msgEl.textContent='Письмо отправлено! Проверь почту.';}
   catch(e){msgEl.style.color='var(--danger)';msgEl.textContent=firebaseErrMsg(e.code);}
 }
-async function doFirebaseLogout(){if(confirm('Выйти из аккаунта?'))await fbAuth.signOut();}
+async function doFirebaseLogout(){
+  if(!confirm('Выйти из аккаунта?'))return;
+  showLoader();
+  try{await fbAuth.signOut();}catch(e){hideLoader();console.error('signOut',e);}
+}
 function firebaseErrMsg(code){return({'auth/user-not-found':'Пользователь не найден','auth/wrong-password':'Неверный пароль','auth/invalid-email':'Неверный формат email','auth/email-already-in-use':'Email уже используется','auth/weak-password':'Пароль слишком простой','auth/too-many-requests':'Слишком много попыток','auth/invalid-credential':'Неверный email или пароль','auth/network-request-failed':'Ошибка сети'})[code]||'Ошибка: '+code;}
 function userDoc(){return fbDb.collection('users').doc(currentUser.uid);}
 function periodFsKey(){return saveKey().replace('salary_','');}

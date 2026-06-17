@@ -1,4 +1,4 @@
-const CACHE='salary-v3';
+const CACHE='salary-v4';
 const URLS=['./', './index.html'];
 
 self.addEventListener('install',e=>{
