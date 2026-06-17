@@ -3035,6 +3035,13 @@ function hideLoader(){
   setTimeout(()=>l.style.display='none',260);
 }
 
+function resetAppState(){
+  days={};bonuses=[];taxEnabled=false;selectedDay=null;
+  dayOverrides={};templates=[];goals={period:0,week:0,month:0};
+  expenseItems=[];selectedShiftTpls=new Set();
+  renderAll();
+}
+
 function initFirebase(){
   try{
     firebase.initializeApp(firebaseConfig);
@@ -3045,9 +3052,11 @@ function initFirebase(){
         await loadAllUserData();
         await migrateLocalStorageToFirestore();
         renderAll();startFirestoreSync();checkDailyReminder();
+        hideLoader();
       }else{
         currentUser=null;
         if(firestoreUnsubscribe){firestoreUnsubscribe();firestoreUnsubscribe=null;}
+        resetAppState();
         showAuthOverlay(true);showAuthLogin();hideLoader();
       }
     });
