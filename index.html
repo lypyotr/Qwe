@@ -14,8 +14,10 @@
 <script src="https://www.google.com/recaptcha/api.js?onload=rcOnLoad&render=explicit" async defer></script>
 <script>
 function rcOnLoad(){
-  window._rcLoginId=grecaptcha.render('rcLogin',{sitekey:'6LffCSQtAAAAAGvugRUmtseSn8jqx-2qOUpUINCK',theme:'dark'});
-  window._rcRegId=grecaptcha.render('rcReg',{sitekey:'6LffCSQtAAAAAGvugRUmtseSn8jqx-2qOUpUINCK',theme:'dark'});
+  try{
+    window._rcLoginId=grecaptcha.render('rcLogin',{sitekey:'6LffCSQtAAAAAGvugRUmtseSn8jqx-2qOUpUINCK',theme:'dark'});
+    window._rcRegId=grecaptcha.render('rcReg',{sitekey:'6LffCSQtAAAAAGvugRUmtseSn8jqx-2qOUpUINCK',theme:'dark'});
+  }catch(e){console.warn('reCAPTCHA render',e);}
 }
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
