@@ -2491,8 +2491,6 @@ function renderArchive(){
     }catch(e){return null;}
   }).filter(Boolean);
 
-  if(!items.length){list.innerHTML='<div style="opacity:.4;font-size:13px;padding:8px 4px">Нет сохранённых периодов</div>';return;}
-
   // group by year+month
   const months=new Map();
   items.forEach(it=>{
@@ -2500,6 +2498,15 @@ function renderArchive(){
     if(!months.has(key))months.set(key,{y:it.y,m:it.m,periods:{}});
     months.get(key).periods[it.p]=it;
   });
+
+  // always include current month and up to 3 previous months so navigation is always visible
+  const now=new Date();
+  for(let d=0;d<=3;d++){
+    const dt=new Date(now.getFullYear(),now.getMonth()-d,1);
+    const ky=dt.getFullYear(),km=dt.getMonth();
+    const mkey=`${ky}_${km}`;
+    if(!months.has(mkey))months.set(mkey,{y:ky,m:km,periods:{}});
+  }
 
   // sort months descending
   const sorted=[...months.values()].sort((a,b)=>b.y-a.y||b.m-a.m);
