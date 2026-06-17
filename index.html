@@ -971,7 +971,10 @@ body.light .share-card-btn{background:rgba(0,0,0,.07)}
 </div>
 
 <!-- AUTH SCREEN -->
-<div class="auth-overlay" id="authOverlay">
+<!-- APP LOADER (hides flash while Firebase resolves auth) -->
+<div id="appLoader" style="position:fixed;inset:0;z-index:2000;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:40px;transition:opacity .25s">💰</div>
+
+<div class="auth-overlay hidden" id="authOverlay">
   <div class="auth-box">
     <div class="auth-logo">💰</div>
     <div class="auth-title">Калькулятор зарплаты</div>
@@ -2980,6 +2983,13 @@ function dismissNotifBanner(){
 let settingsSaveTimer=null;
 const firebaseConfig={apiKey:"AIzaSyBUxrj-FUBv2ZkJ9S4e5oT9DRDEoA3Ftcg",authDomain:"salary-7b203.firebaseapp.com",projectId:"salary-7b203",storageBucket:"salary-7b203.firebasestorage.app",messagingSenderId:"311277450560",appId:"1:311277450560:web:844b2aadf1185009d5f6a5"};
 
+function hideLoader(){
+  const l=document.getElementById('appLoader');
+  if(!l)return;
+  l.style.opacity='0';
+  setTimeout(()=>l.style.display='none',260);
+}
+
 function initFirebase(){
   try{
     firebase.initializeApp(firebaseConfig);
@@ -2987,14 +2997,59 @@ function initFirebase(){
     fbAuth.onAuthStateChanged(async user=>{
       if(user){
         currentUser=user;showAuthOverlay(false);
-        await loadAllUserData();renderAll();startFirestoreSync();checkDailyReminder();
+        await loadAllUserData();
+        await migrateLocalStorageToFirestore();
+        renderAll();startFirestoreSync();checkDailyReminder();
       }else{
         currentUser=null;
         if(firestoreUnsubscribe){firestoreUnsubscribe();firestoreUnsubscribe=null;}
         showAuthOverlay(true);showAuthLogin();
       }
+      hideLoader();
     });
-  }catch(e){console.error('Firebase init',e);}
+  }catch(e){console.error('Firebase init',e);hideLoader();}
+}
+
+// One-time migration: upload localStorage data to Firestore if Firestore is empty
+async function migrateLocalStorageToFirestore(){
+  if(!currentUser||!fbDb)return;
+  try{
+    const sd=await userDoc().collection('data').doc('settings').get();
+    const batch=fbDb.batch();
+    let hasMigration=false;
+
+    // Migrate settings if Firestore has none
+    if(!sd.exists){
+      const lsTemplates=JSON.parse(localStorage.getItem('salary_templates')||'[]');
+      const lsGoals=JSON.parse(localStorage.getItem('salary_goals')||'{"period":0,"week":0,"month":0}');
+      const lsExpenses=JSON.parse(localStorage.getItem('salary_expenses')||'[]');
+      const lsTheme=localStorage.getItem('salary_theme')||'dark';
+      if(lsTemplates.length||lsGoals.period||lsExpenses.length){
+        batch.set(userDoc().collection('data').doc('settings'),
+          {templates:lsTemplates,goals:lsGoals,expenses:lsExpenses,theme:lsTheme,migratedAt:firebase.firestore.FieldValue.serverTimestamp()});
+        hasMigration=true;
+      }
+    }
+
+    // Migrate all period keys from localStorage
+    const existingPeriods=await userDoc().collection('periods').listDocuments();
+    const existingIds=new Set(existingPeriods.map(d=>d.id));
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(!k||!/^salary_\d+_\d+_\d+$/.test(k))continue;
+      const fsKey=k.replace('salary_','');
+      if(existingIds.has(fsKey))continue;
+      try{
+        const data=JSON.parse(localStorage.getItem(k)||'{}');
+        if(Object.keys(data.days||{}).length||( data.bonuses||[]).length){
+          batch.set(userDoc().collection('periods').doc(fsKey),
+            {...data,migratedAt:firebase.firestore.FieldValue.serverTimestamp()});
+          hasMigration=true;
+        }
+      }catch(e){}
+    }
+    if(hasMigration)await batch.commit();
+  }catch(e){console.error('migration',e);}
 }
 function showAuthOverlay(show){const el=document.getElementById('authOverlay');if(el)el.classList.toggle('hidden',!show);}
 function showAuthLogin(){document.getElementById('authLoginForm').style.display='';document.getElementById('authRegisterForm').style.display='none';document.getElementById('authForgotForm').style.display='none';document.getElementById('authError').textContent='';}
