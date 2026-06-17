@@ -3127,7 +3127,7 @@ async function doForgotPassword(){
   try{await fbAuth.sendPasswordResetEmail(email);msgEl.style.color='var(--accent)';msgEl.textContent='Письмо отправлено! Проверь почту.';}
   catch(e){msgEl.style.color='var(--danger)';msgEl.textContent=firebaseErrMsg(e.code);}
 }
-function doFirebaseLogout(){if(confirm('Выйти из аккаунта?'))fbAuth.signOut();}
+async function doFirebaseLogout(){if(confirm('Выйти из аккаунта?')){await fbAuth.signOut();location.reload();}}
 function firebaseErrMsg(code){return({'auth/user-not-found':'Пользователь не найден','auth/wrong-password':'Неверный пароль','auth/invalid-email':'Неверный формат email','auth/email-already-in-use':'Email уже используется','auth/weak-password':'Пароль слишком простой','auth/too-many-requests':'Слишком много попыток','auth/invalid-credential':'Неверный email или пароль','auth/network-request-failed':'Ошибка сети'})[code]||'Ошибка: '+code;}
 function userDoc(){return fbDb.collection('users').doc(currentUser.uid);}
 function periodFsKey(){return saveKey().replace('salary_','');}
