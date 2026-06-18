@@ -2997,6 +2997,8 @@ async function shareRankCard(){
 function initPWA(){
   if('serviceWorker' in navigator){
     navigator.serviceWorker.register('./sw.js').catch(()=>{});
+    // Reload page when a new SW takes control so users always get fresh HTML
+    navigator.serviceWorker.addEventListener('controllerchange',()=>window.location.reload());
   }
   checkDailyReminder();
 }
