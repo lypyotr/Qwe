@@ -2442,7 +2442,7 @@ function renderHistory(){
   const currentKey=saveKey();
   // collect all salary keys
   const allKeys=[];
-  try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.startsWith('salary_')&&k!=='salary_theme'&&k!=='salary_templates')allKeys.push(k)}}catch(e){}
+  try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&/^salary_\d+_\d+_\d+$/.test(k))allKeys.push(k)}}catch(e){}
 
   // parse and sort desc
   const items=allKeys.map(k=>{
@@ -3111,7 +3111,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-18 #18';
+const BUILD_VER='2026-06-18 #19';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
