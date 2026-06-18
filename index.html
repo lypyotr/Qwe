@@ -3057,7 +3057,28 @@ function withTimeout(promise,ms){
 function initFirebase(){
   try{
     sbClient=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+
+    // On every auth change AFTER initial load (login, logout, token refresh)
     sbClient.auth.onAuthStateChange(async(event,session)=>{
+      if(event==='SIGNED_IN'&&session?.user){
+        currentUser=session.user;showAuthOverlay(false);
+        try{
+          await loadAllUserData();
+          await migrateLocalStorageToSupabase();
+          renderAll();startRealtimeSync();checkDailyReminder();
+        }catch(e){console.error('auth change',e);renderAll();}
+        finally{hideLoader();}
+      }else if(event==='SIGNED_OUT'){
+        currentUser=null;
+        if(realtimeChannel){sbClient.removeChannel(realtimeChannel);realtimeChannel=null;}
+        showAuthOverlay(true);showAuthLogin();
+      }else if(event==='TOKEN_REFRESHED'&&session?.user){
+        currentUser=session.user;
+      }
+    });
+
+    // Initial session check — restore existing session on page load
+    sbClient.auth.getSession().then(async({data:{session}})=>{
       if(session?.user){
         currentUser=session.user;showAuthOverlay(false);
         try{
@@ -3067,13 +3088,10 @@ function initFirebase(){
         }catch(e){console.error('auth init',e);renderAll();}
         finally{hideLoader();}
       }else{
-        currentUser=null;
-        if(realtimeChannel){sbClient.removeChannel(realtimeChannel);realtimeChannel=null;}
         showAuthOverlay(true);showAuthLogin();hideLoader();
       }
-    });
-    // Trigger initial session check
-    sbClient.auth.getSession();
+    }).catch(()=>{showAuthOverlay(true);showAuthLogin();hideLoader();});
+
   }catch(e){console.error('Supabase init',e);hideLoader();}
 }
 
