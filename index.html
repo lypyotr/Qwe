@@ -1295,7 +1295,8 @@ body.light .share-card-btn{background:rgba(0,0,0,.07)}
     <button class="modal-btn" style="width:100%;padding:13px;margin-bottom:10px" onclick="exportData()">📤 Экспорт в файл</button>
     <button class="modal-btn" style="width:100%;padding:13px;margin-bottom:10px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="document.getElementById('importFileIn').click()">📥 Импорт из файла</button>
     <input type="file" id="importFileIn" accept=".json,application/json" style="display:none" onchange="importData(event)">
-    <button class="modal-btn" id="forceSyncBtn" style="width:100%;padding:13px" onclick="forceSyncToCloud()">☁️ Выгрузить всё в облако</button>
+    <button class="modal-btn" id="forceSyncBtn" style="width:100%;padding:13px;margin-bottom:8px" onclick="forceSyncToCloud()">☁️ Выгрузить всё в облако</button>
+    <button class="modal-btn" id="forceLoadBtn" style="width:100%;padding:13px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="forceSyncFromCloud()">⬇️ Загрузить всё из облака</button>
     <div id="bioSection" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
       <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Биометрия</div>
       <div id="bioStatus" style="font-size:13px;color:var(--muted);margin-bottom:10px"></div>
@@ -2888,6 +2889,46 @@ async function forceSyncToCloud(){
   }
 }
 
+// Force-pull ALL cloud data (settings + every period) into localStorage,
+// overwriting local copy. Useful for restoring data from cloud backup.
+async function forceSyncFromCloud(){
+  if(!currentUser||!sbClient){showDataMsg('Сначала войди в аккаунт','err');return;}
+  if(!confirm('Загрузить данные из облака? Локальные данные будут перезаписаны.'))return;
+  const btn=document.getElementById('forceLoadBtn');
+  if(btn){btn.disabled=true;}
+  showDataMsg('Загружаю из облака…','ok');
+  try{
+    // settings
+    const sr=await withTimeout(sbClient.from('user_settings').select('*').eq('user_id',currentUser.id).single(),10000);
+    if(sr.data&&!sr.error){
+      const s=sr.data;
+      if(s.templates)localStorage.setItem('salary_templates',JSON.stringify(s.templates));
+      if(s.goals)localStorage.setItem('salary_goals',JSON.stringify(s.goals));
+      if(s.expenses)localStorage.setItem('salary_expenses',JSON.stringify(s.expenses));
+      if(s.theme)localStorage.setItem('salary_theme',s.theme);
+    }
+    // periods
+    const pr=await withTimeout(sbClient.from('periods').select('*').eq('user_id',currentUser.id),10000);
+    let ok=0;
+    if(pr.data&&!pr.error){
+      for(const row of pr.data){
+        const key='salary_'+row.period_key;
+        const val={days:row.days||{},bonuses:row.bonuses||[],taxEnabled:row.tax_enabled,dayOverrides:row.day_overrides||{}};
+        localStorage.setItem(key,JSON.stringify(val));
+        ok++;
+      }
+    }
+    load();renderAll();
+    showDataMsg(`✓ Загружено: настройки + ${ok} периодов`,'ok');
+    haptic('medium');
+  }catch(e){
+    console.error('forceSyncFromCloud',e);
+    showDataMsg('Ошибка загрузки: '+(e&&e.message||e),'err');
+  }finally{
+    if(btn){btn.disabled=false;}
+  }
+}
+
 function exportData(){
   const data={};
   collectAllKeys().forEach(k=>{
@@ -3068,7 +3109,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-18 #10';
+const BUILD_VER='2026-06-18 #11';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
