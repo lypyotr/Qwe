@@ -2020,11 +2020,16 @@ function setTotalView(v){
 }
 
 function daysToNextPayday(){
-  const{payDate}=getPeriodInfo();
+  // Always based on real today's date, not the selected period
   const today=new Date();
-  const t=new Date(today.getFullYear(),today.getMonth(),today.getDate());
-  const p=new Date(payDate.getFullYear(),payDate.getMonth(),payDate.getDate());
-  return Math.round((p-t)/86400000);
+  const y=today.getFullYear(),m=today.getMonth(),d=today.getDate();
+  const t=new Date(y,m,d);
+  // period 1 (1–15) pays on 22nd same month; period 2 (16–end) pays on 7th next month
+  let candidate=d<=15?new Date(y,m,22):new Date(y,m+1,7);
+  // if that date is already past, take the other one
+  if(candidate<t)candidate=d<=15?new Date(y,m+1,7):new Date(y,m+1,22);
+  const{date:payDate}=adjustPayDate(candidate);
+  return Math.round((payDate-t)/86400000);
 }
 
 function renderTotal(){
@@ -2870,7 +2875,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-18 #27';
+const BUILD_VER='2026-06-18 #28';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
