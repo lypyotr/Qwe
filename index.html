@@ -3056,7 +3056,15 @@ function withTimeout(promise,ms){
 
 function initFirebase(){
   try{
-    sbClient=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+    sbClient=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{
+      auth:{
+        persistSession:true,
+        autoRefreshToken:true,
+        detectSessionInUrl:true,
+        storage:window.localStorage,
+        storageKey:'salary-auth-token'
+      }
+    });
 
     // On every auth change AFTER initial load (login, logout, token refresh)
     sbClient.auth.onAuthStateChange(async(event,session)=>{
