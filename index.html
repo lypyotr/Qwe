@@ -1478,7 +1478,7 @@ function onPeriodChange(){
   renderPeriodCard();renderDayStrip();renderDayPanel();renderBonuses();
   renderTotal();renderChart();renderBreakdown();renderHistory();renderGoals();
   if (currentUser && fbDb) {
-    loadAllUserData().then(() => { renderAll(); startFirestoreSync(); });
+    loadAllUserData().then(() => { renderAll(); startFirestoreSync(); }).catch(e=>console.error('period change',e));
   }
 }
 
@@ -3042,9 +3042,12 @@ function initFirebase(){
     fbAuth.onAuthStateChanged(async user=>{
       if(user){
         currentUser=user;showAuthOverlay(false);
-        await loadAllUserData();
-        await migrateLocalStorageToFirestore();
-        renderAll();startFirestoreSync();checkDailyReminder();
+        try{
+          await loadAllUserData();
+          await migrateLocalStorageToFirestore();
+          renderAll();startFirestoreSync();checkDailyReminder();
+        }catch(e){console.error('auth init',e);renderAll();}
+        finally{hideLoader();}
       }else{
         currentUser=null;
         if(firestoreUnsubscribe){firestoreUnsubscribe();firestoreUnsubscribe=null;}
@@ -3112,7 +3115,7 @@ async function doFirebaseLogin(){
   errEl.textContent='';if(!email||!pass){errEl.textContent='Введи email и пароль';return;}
   document.getElementById('authLoading').style.display='';
   await getRcToken('login');
-  try{await fbAuth.signInWithEmailAndPassword(email,pass);}
+  try{await fbAuth.signInWithEmailAndPassword(email,pass);document.getElementById('authLoading').style.display='none';}
   catch(e){document.getElementById('authLoading').style.display='none';errEl.textContent=firebaseErrMsg(e.code);}
 }
 async function doFirebaseRegister(){
@@ -3122,7 +3125,7 @@ async function doFirebaseRegister(){
   if(pass.length<6){errEl.textContent='Минимум 6 символов';return;}
   document.getElementById('authLoading').style.display='';
   await getRcToken('register');
-  try{await fbAuth.createUserWithEmailAndPassword(email,pass);}
+  try{await fbAuth.createUserWithEmailAndPassword(email,pass);document.getElementById('authLoading').style.display='none';}
   catch(e){document.getElementById('authLoading').style.display='none';errEl.textContent=firebaseErrMsg(e.code);}
 }
 async function doForgotPassword(){
