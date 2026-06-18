@@ -1462,7 +1462,7 @@ function getPeriod(){
 function saveKey(){const{year,month,period}=getPeriod();return`salary_${year}_${month}_${period}`}
 function save(){
   try{
-    localStorage.setItem(saveKey(),JSON.stringify({days,bonuses,taxEnabled,dayOverrides}));
+    localStorage.setItem(saveKey(),JSON.stringify({days,bonuses,taxEnabled,dayOverrides,expenses:expenseItems}));
     renderHistory();renderAchievements();
   }catch(e){}
   scheduleSaveToFirestore();
@@ -1470,10 +1470,10 @@ function save(){
 function load(){
   try{
     const raw=localStorage.getItem(saveKey());
-    if(!raw){days={};bonuses=[];taxEnabled=false;dayOverrides={};return}
+    if(!raw){days={};bonuses=[];taxEnabled=false;dayOverrides={};expenseItems=[];return}
     const data=JSON.parse(raw);
     days=data.days||{};bonuses=data.bonuses||[];taxEnabled=!!data.taxEnabled;
-    dayOverrides=data.dayOverrides||{};
+    dayOverrides=data.dayOverrides||{};expenseItems=data.expenses||[];
     document.getElementById('taxToggle').classList.toggle('on',taxEnabled);
   }catch(e){days={};bonuses=[];taxEnabled=false;dayOverrides={}}
 }
@@ -1481,7 +1481,7 @@ function load(){
 function onPeriodChange(){
   selectedDay=null;load();
   renderPeriodCard();renderDayStrip();renderDayPanel();renderBonuses();
-  renderTotal();renderChart();renderBreakdown();renderHistory();renderGoals();
+  renderTotal();renderChart();renderBreakdown();renderHistory();renderGoals();renderExpenses();
   if (currentUser && sbClient) {
     loadAllUserData().then(() => { renderAll(); startRealtimeSync(); }).catch(e=>console.error('period change',e));
   }
@@ -2595,23 +2595,10 @@ function renderBreakdown(){
 let expenseItems=[];
 
 function loadExpenses(){
-  try{
-    const raw=localStorage.getItem('salary_expenses');
-    if(!raw){expenseItems=[];return}
-    const parsed=JSON.parse(raw);
-    // migrate from old {commute,credit} format
-    if(Array.isArray(parsed)){
-      expenseItems=parsed;
-    } else {
-      expenseItems=[];
-      if(parsed.commute>0) expenseItems.push({id:Date.now(),name:'Дорога на работу',amount:parsed.commute,mode:'period'});
-      if(parsed.credit>0)  expenseItems.push({id:Date.now()+1,name:'Кредиты / ипотека',amount:parsed.credit,mode:'month'});
-    }
-  }catch(e){expenseItems=[]}
+  // expenses are now stored per-period inside the period data; load() handles them
 }
 function saveExpenses(){
-  try{localStorage.setItem('salary_expenses',JSON.stringify(expenseItems))}catch(e){}
-  saveSettingsToFirestore();
+  save();
 }
 function addExpenseItem(){
   expenseItems.push({id:Date.now(),name:'',amount:'',mode:'period'});
@@ -2866,9 +2853,8 @@ async function forceSyncToCloud(){
     // settings
     const tpl=JSON.parse(localStorage.getItem('salary_templates')||'[]');
     const gl=JSON.parse(localStorage.getItem('salary_goals')||'{"period":0,"week":0,"month":0}');
-    const exp=JSON.parse(localStorage.getItem('salary_expenses')||'[]');
     const th=localStorage.getItem('salary_theme')||'dark';
-    const r1=await sbClient.from('user_settings').upsert({user_id:currentUser.id,templates:tpl,goals:gl,expenses:exp,theme:th,updated_at:new Date().toISOString()},{onConflict:'user_id'});
+    const r1=await sbClient.from('user_settings').upsert({user_id:currentUser.id,templates:tpl,goals:gl,theme:th,updated_at:new Date().toISOString()},{onConflict:'user_id'});
     if(r1.error)throw r1.error;
     // all periods
     const periodKeys=[];
@@ -2876,7 +2862,7 @@ async function forceSyncToCloud(){
     let ok=0;
     for(const k of periodKeys){
       const d=JSON.parse(localStorage.getItem(k)||'{}');
-      const r=await sbClient.from('periods').upsert({user_id:currentUser.id,period_key:k.replace('salary_',''),days:d.days||{},bonuses:d.bonuses||[],tax_enabled:!!d.taxEnabled,day_overrides:d.dayOverrides||{},updated_at:new Date().toISOString()},{onConflict:'user_id,period_key'});
+      const r=await sbClient.from('periods').upsert({user_id:currentUser.id,period_key:k.replace('salary_',''),days:d.days||{},bonuses:d.bonuses||[],tax_enabled:!!d.taxEnabled,day_overrides:d.dayOverrides||{},expenses:d.expenses||[],updated_at:new Date().toISOString()},{onConflict:'user_id,period_key'});
       if(!r.error)ok++; else console.error('sync period',k,r.error);
     }
     showDataMsg(`✓ Выгружено: настройки + ${ok}/${periodKeys.length} периодов`,'ok');
@@ -2904,7 +2890,6 @@ async function forceSyncFromCloud(){
       const s=sr.data;
       if(s.templates)localStorage.setItem('salary_templates',JSON.stringify(s.templates));
       if(s.goals)localStorage.setItem('salary_goals',JSON.stringify(s.goals));
-      if(s.expenses)localStorage.setItem('salary_expenses',JSON.stringify(s.expenses));
       if(s.theme)localStorage.setItem('salary_theme',s.theme);
     }
     // periods
@@ -2913,7 +2898,7 @@ async function forceSyncFromCloud(){
     if(pr.data&&!pr.error){
       for(const row of pr.data){
         const key='salary_'+row.period_key;
-        const val={days:row.days||{},bonuses:row.bonuses||[],taxEnabled:row.tax_enabled,dayOverrides:row.day_overrides||{}};
+        const val={days:row.days||{},bonuses:row.bonuses||[],taxEnabled:row.tax_enabled,dayOverrides:row.day_overrides||{},expenses:row.expenses||[]};
         localStorage.setItem(key,JSON.stringify(val));
         ok++;
       }
@@ -3109,7 +3094,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-18 #11';
+const BUILD_VER='2026-06-18 #12';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
@@ -3234,16 +3219,15 @@ async function migrateLocalStorageToSupabase(){
     if(existing)return;
     const lsTemplates=JSON.parse(localStorage.getItem('salary_templates')||'[]');
     const lsGoals=JSON.parse(localStorage.getItem('salary_goals')||'{"period":0,"week":0,"month":0}');
-    const lsExpenses=JSON.parse(localStorage.getItem('salary_expenses')||'[]');
     const lsTheme=localStorage.getItem('salary_theme')||'dark';
     const periodKeys=[];
     for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&/^salary_\d+_\d+_\d+$/.test(k))periodKeys.push(k);}
     if(!lsTemplates.length&&!lsGoals.period&&!periodKeys.length)return;
-    await sbClient.from('user_settings').upsert({user_id:currentUser.id,templates:lsTemplates,goals:lsGoals,expenses:lsExpenses,theme:lsTheme});
+    await sbClient.from('user_settings').upsert({user_id:currentUser.id,templates:lsTemplates,goals:lsGoals,theme:lsTheme});
     for(const k of periodKeys){
       try{
         const data=JSON.parse(localStorage.getItem(k)||'{}');
-        await sbClient.from('periods').upsert({user_id:currentUser.id,period_key:k.replace('salary_',''),days:data.days||{},bonuses:data.bonuses||[],tax_enabled:!!data.taxEnabled,day_overrides:data.dayOverrides||{}},{onConflict:'user_id,period_key'});
+        await sbClient.from('periods').upsert({user_id:currentUser.id,period_key:k.replace('salary_',''),days:data.days||{},bonuses:data.bonuses||[],tax_enabled:!!data.taxEnabled,day_overrides:data.dayOverrides||{},expenses:data.expenses||[]},{onConflict:'user_id,period_key'});
       }catch(e){}
     }
   }catch(e){console.error('migration',e);}
@@ -3305,13 +3289,12 @@ async function loadAllUserData(){
     if(s){
       if(s.templates){templates=s.templates;localStorage.setItem('salary_templates',JSON.stringify(templates));}
       if(s.goals){goals=s.goals;localStorage.setItem('salary_goals',JSON.stringify(goals));}
-      if(s.expenses){expenseItems=s.expenses;localStorage.setItem('salary_expenses',JSON.stringify(expenseItems));}
       if(s.theme){localStorage.setItem('salary_theme',s.theme);lightTheme=s.theme==='light';document.body.classList.toggle('light',lightTheme);document.getElementById('themeBtn').textContent=lightTheme?'🌙':'☀️';}
     }
     const{data:periods}=await withTimeout(sbClient.from('periods').select('period_key,days,bonuses,tax_enabled,day_overrides').eq('user_id',currentUser.id),10000);
-    if(periods)periods.forEach(p=>localStorage.setItem('salary_'+p.period_key,JSON.stringify({days:p.days||{},bonuses:p.bonuses||[],taxEnabled:!!p.tax_enabled,dayOverrides:p.day_overrides||{}})));
+    if(periods)periods.forEach(p=>localStorage.setItem('salary_'+p.period_key,JSON.stringify({days:p.days||{},bonuses:p.bonuses||[],taxEnabled:!!p.tax_enabled,dayOverrides:p.day_overrides||{},expenses:p.expenses||[]})));
     const{data:pd}=await withTimeout(sbClient.from('periods').select('*').eq('user_id',currentUser.id).eq('period_key',periodFsKey()).maybeSingle(),10000);
-    if(pd){days=pd.days||{};bonuses=pd.bonuses||[];taxEnabled=!!pd.tax_enabled;dayOverrides=pd.day_overrides||{};}
+    if(pd){days=pd.days||{};bonuses=pd.bonuses||[];taxEnabled=!!pd.tax_enabled;dayOverrides=pd.day_overrides||{};expenseItems=pd.expenses||[];}
     else load();
   }catch(e){console.error('loadAllUserData',e);load();}
 }
@@ -3323,8 +3306,8 @@ function startRealtimeSync(){
     .on('postgres_changes',{event:'*',schema:'public',table:'periods',filter:`user_id=eq.${currentUser.id}`},payload=>{
       const p=payload.new;
       if(p&&p.period_key===periodFsKey()){
-        days=p.days||{};bonuses=p.bonuses||[];taxEnabled=!!p.tax_enabled;dayOverrides=p.day_overrides||{};
-        localStorage.setItem(saveKey(),JSON.stringify({days,bonuses,taxEnabled,dayOverrides}));
+        days=p.days||{};bonuses=p.bonuses||[];taxEnabled=!!p.tax_enabled;dayOverrides=p.day_overrides||{};expenseItems=p.expenses||[];
+        localStorage.setItem(saveKey(),JSON.stringify({days,bonuses,taxEnabled,dayOverrides,expenses:expenseItems}));
         renderAll();
       }
     }).subscribe();
@@ -3334,7 +3317,7 @@ function scheduleSaveToFirestore(){
   if(!currentUser||!sbClient)return;
   clearTimeout(saveDebounceTimer);
   saveDebounceTimer=setTimeout(async()=>{
-    try{await sbClient.from('periods').upsert({user_id:currentUser.id,period_key:periodFsKey(),days,bonuses,tax_enabled:taxEnabled,day_overrides:dayOverrides,updated_at:new Date().toISOString()},{onConflict:'user_id,period_key'});}
+    try{await sbClient.from('periods').upsert({user_id:currentUser.id,period_key:periodFsKey(),days,bonuses,tax_enabled:taxEnabled,day_overrides:dayOverrides,expenses:expenseItems,updated_at:new Date().toISOString()},{onConflict:'user_id,period_key'});}
     catch(e){console.error('save period',e);}
   },2000);
 }
@@ -3342,7 +3325,7 @@ function scheduleSettingsSave(){
   if(!currentUser||!sbClient)return;
   clearTimeout(settingsSaveTimer);
   settingsSaveTimer=setTimeout(async()=>{
-    try{await sbClient.from('user_settings').upsert({user_id:currentUser.id,templates,goals,expenses:expenseItems,theme:lightTheme?'light':'dark',updated_at:new Date().toISOString()},{onConflict:'user_id'});}
+    try{await sbClient.from('user_settings').upsert({user_id:currentUser.id,templates,goals,theme:lightTheme?'light':'dark',updated_at:new Date().toISOString()},{onConflict:'user_id'});}
     catch(e){console.error('save settings',e);}
   },2000);
 }
