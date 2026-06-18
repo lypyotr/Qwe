@@ -1473,7 +1473,10 @@ function load(){
     if(!raw){days={};bonuses=[];taxEnabled=false;dayOverrides={};expenseItems=[];return}
     const data=JSON.parse(raw);
     days=data.days||{};bonuses=data.bonuses||[];taxEnabled=!!data.taxEnabled;
-    dayOverrides=data.dayOverrides||{};expenseItems=data.expenses||[];
+    dayOverrides=data.dayOverrides||{};
+    // migrate: if period was saved before per-period expenses, fall back to old global key
+    if(data.expenses!==undefined){expenseItems=data.expenses;}
+    else{try{const old=JSON.parse(localStorage.getItem('salary_expenses')||'[]');expenseItems=Array.isArray(old)?old:[];}catch(_){expenseItems=[];}}
     document.getElementById('taxToggle').classList.toggle('on',taxEnabled);
   }catch(e){days={};bonuses=[];taxEnabled=false;dayOverrides={}}
 }
@@ -3094,7 +3097,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-18 #12';
+const BUILD_VER='2026-06-18 #13';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
