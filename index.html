@@ -1039,7 +1039,7 @@ body.light .share-card-btn{background:rgba(0,0,0,.07)}
 </div>
 
 <!-- ══ PAGE: MAIN ══ -->
-<div class="page active" id="page-main">
+<div class="page active" id="page-work">
 
 <!-- HEADER -->
 <div class="header">
@@ -1126,25 +1126,10 @@ body.light .share-card-btn{background:rgba(0,0,0,.07)}
   <div class="tpl-list" id="tplList"></div>
 </div>
 
-</div><!-- /page-main -->
+</div><!-- /page-work -->
 
-<!-- ══ PAGE: DETAIL ══ -->
-<div class="page" id="page-detail">
-
-<!-- ACHIEVEMENTS RANK CARD -->
-<div class="rank-wrapper" id="rankWrapper">
-  <div class="pc-behind" id="rankBehind"></div>
-  <div class="rank-card" id="rankCard">
-    <div class="rank-card-inner" id="rankCardInner"></div>
-  </div>
-  <button class="share-card-btn" onclick="shareRankCard()" id="shareCardBtn">📤 Поделиться</button>
-</div>
-
-<!-- ALL PERIODS ARCHIVE -->
-<div class="archive-section" id="archiveSection">
-  <div class="archive-title">Все периоды</div>
-  <div class="archive-list" id="archiveList"></div>
-</div>
+<!-- ══ PAGE: PERIOD ══ -->
+<div class="page" id="page-period">
 
 <!-- PERIOD CARD -->
 <div class="period-card">
@@ -1220,7 +1205,27 @@ body.light .share-card-btn{background:rgba(0,0,0,.07)}
 
 <button class="reset-btn" onclick="resetAll()">🗑 Сбросить период</button>
 
-</div><!-- /page-detail -->
+</div><!-- /page-period -->
+
+<!-- ══ PAGE: ARCHIVE ══ -->
+<div class="page" id="page-archive">
+
+<!-- ACHIEVEMENTS RANK CARD -->
+<div class="rank-wrapper" id="rankWrapper">
+  <div class="pc-behind" id="rankBehind"></div>
+  <div class="rank-card" id="rankCard">
+    <div class="rank-card-inner" id="rankCardInner"></div>
+  </div>
+  <button class="share-card-btn" onclick="shareRankCard()" id="shareCardBtn">📤 Поделиться</button>
+</div>
+
+<!-- ALL PERIODS ARCHIVE -->
+<div class="archive-section" id="archiveSection">
+  <div class="archive-title">Все периоды</div>
+  <div class="archive-list" id="archiveList"></div>
+</div>
+
+</div><!-- /page-archive -->
 
 <!-- TEMPLATE MODAL -->
 <div class="modal-overlay" id="tplModal" onclick="closeTplModal(event)">
@@ -1312,13 +1317,17 @@ body.light .share-card-btn{background:rgba(0,0,0,.07)}
 
 <!-- BOTTOM NAV -->
 <nav class="bottom-nav">
-  <div class="nav-btn active" id="navMain" onclick="switchPage('main')">
-    <span class="nav-icon">🏠</span>
-    <span class="nav-lbl">Главная</span>
+  <div class="nav-btn active" id="navWork" onclick="switchPage('work')">
+    <span class="nav-icon">💰</span>
+    <span class="nav-lbl">Работа</span>
   </div>
-  <div class="nav-btn" id="navDetail" onclick="switchPage('detail')">
-    <span class="nav-icon">📊</span>
-    <span class="nav-lbl">Детали</span>
+  <div class="nav-btn" id="navPeriod" onclick="switchPage('period')">
+    <span class="nav-icon">📋</span>
+    <span class="nav-lbl">Период</span>
+  </div>
+  <div class="nav-btn" id="navArchive" onclick="switchPage('archive')">
+    <span class="nav-icon">📁</span>
+    <span class="nav-lbl">Архив</span>
   </div>
 </nav>
 
@@ -1341,7 +1350,8 @@ function switchPage(name){
 function restorePage(){
   try{
     const p=localStorage.getItem('salary_page');
-    if(p==='detail')switchPage('detail');
+    if(p==='period')switchPage('period');
+    else if(p==='archive')switchPage('archive');
   }catch(e){}
 }
 
@@ -2512,11 +2522,11 @@ function renderArchive(){
     const monthTotal=(av?av.total:0)+(zp?zp.total:0);
     const isCurAv=av&&av.k===currentKey, isCurZp=zp&&zp.k===currentKey;
 
-    const avRow=`<div class="arc-period-row" onclick="goToHistory('${y}-${m}',1);switchPage('main')">
+    const avRow=`<div class="arc-period-row" onclick="goToHistory('${y}-${m}',1);switchPage('work')">
       <span class="arc-period-lbl">Аванс <span class="arc-period-range">1–15</span></span>
       <span class="arc-period-val${isCurAv?' arc-cur':''}">${av&&av.total>0?fmt(av.total)+' ₽':'—'}</span>
     </div>`;
-    const zpRow=`<div class="arc-period-row" onclick="goToHistory('${y}-${m}',2);switchPage('main')">
+    const zpRow=`<div class="arc-period-row" onclick="goToHistory('${y}-${m}',2);switchPage('work')">
       <span class="arc-period-lbl">Зарплата <span class="arc-period-range">16–${endD}</span></span>
       <span class="arc-period-val${isCurZp?' arc-cur':''}">${zp&&zp.total>0?fmt(zp.total)+' ₽':'—'}</span>
     </div>`;
@@ -3111,7 +3121,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-18 #19';
+const BUILD_VER='2026-06-18 #20';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
