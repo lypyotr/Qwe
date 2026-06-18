@@ -2020,13 +2020,11 @@ function setTotalView(v){
 }
 
 function daysToNextPayday(){
-  const{year,month,period}=getPeriod();
-  let pd=period===1?new Date(year,month,25):new Date(year,month+1,10);
-  while(pd.getDay()===0||pd.getDay()===6)pd.setDate(pd.getDate()-1);
+  const{payDate}=getPeriodInfo();
   const today=new Date();
   const t=new Date(today.getFullYear(),today.getMonth(),today.getDate());
-  const p=new Date(pd.getFullYear(),pd.getMonth(),pd.getDate());
-  return Math.round((p-t)/(86400000));
+  const p=new Date(payDate.getFullYear(),payDate.getMonth(),payDate.getDate());
+  return Math.round((p-t)/86400000);
 }
 
 function renderTotal(){
@@ -2872,7 +2870,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-18 #26';
+const BUILD_VER='2026-06-18 #27';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
