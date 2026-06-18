@@ -2302,7 +2302,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-18 #23';
+const BUILD_VER='2026-06-18 #24';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
@@ -2542,6 +2542,25 @@ function renderAll(){
   renderTotal();renderChart();renderGoals();renderExpenses();
   renderDayStrip();renderDayPanel();renderBonuses();renderTemplates();
   renderHistory();renderArchive();renderTodaySummary();renderAchievements();
+}
+
+// ══════════════════════════════════════════════
+//  THEME
+// ══════════════════════════════════════════════
+let lightTheme=false;
+function loadTheme(){
+  const t=localStorage.getItem('salary_theme');
+  lightTheme=t==='light';
+  document.body.classList.toggle('light',lightTheme);
+  const btn=document.getElementById('themeBtn');
+  if(btn)btn.textContent=lightTheme?'🌙':'☀️';
+}
+function toggleTheme(){
+  lightTheme=!lightTheme;
+  document.body.classList.toggle('light',lightTheme);
+  localStorage.setItem('salary_theme',lightTheme?'light':'dark');
+  const btn=document.getElementById('themeBtn');
+  if(btn)btn.textContent=lightTheme?'🌙':'☀️';
 }
 
 // ══════════════════════════════════════════════
