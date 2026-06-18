@@ -3035,12 +3035,23 @@ function dismissNotifBanner(){
 let settingsSaveTimer=null;
 const firebaseConfig={apiKey:"AIzaSyBUxrj-FUBv2ZkJ9S4e5oT9DRDEoA3Ftcg",authDomain:"salary-7b203.firebaseapp.com",projectId:"salary-7b203",storageBucket:"salary-7b203.firebasestorage.app",messagingSenderId:"311277450560",appId:"1:311277450560:web:844b2aadf1185009d5f6a5"};
 
+let _loaderHidden=false;
 function hideLoader(){
+  if(_loaderHidden)return;
+  _loaderHidden=true;
   const l=document.getElementById('appLoader');
   if(!l)return;
   l.style.opacity='0';
   setTimeout(()=>l.style.display='none',260);
 }
+// Hard fallback: if Firebase never calls back within 8s, show the app anyway
+setTimeout(()=>{
+  if(!_loaderHidden){
+    console.warn('loader timeout — showing app without Firebase');
+    hideLoader();
+    showAuthOverlay(true);showAuthLogin();
+  }
+},8000);
 
 function initFirebase(){
   try{
@@ -3145,19 +3156,22 @@ async function doFirebaseLogout(){if(confirm('Выйти из аккаунта?'
 function firebaseErrMsg(code){return({'auth/user-not-found':'Пользователь не найден','auth/wrong-password':'Неверный пароль','auth/invalid-email':'Неверный формат email','auth/email-already-in-use':'Email уже используется','auth/weak-password':'Пароль слишком простой','auth/too-many-requests':'Слишком много попыток','auth/invalid-credential':'Неверный email или пароль','auth/network-request-failed':'Ошибка сети'})[code]||'Ошибка: '+code;}
 function userDoc(){return fbDb.collection('users').doc(currentUser.uid);}
 function periodFsKey(){return saveKey().replace('salary_','');}
+function withTimeout(promise,ms){
+  return Promise.race([promise,new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),ms))]);
+}
 async function loadAllUserData(){
   if(!currentUser||!fbDb)return;
   try{
-    const sd=await userDoc().collection('data').doc('settings').get();
+    const sd=await withTimeout(userDoc().collection('data').doc('settings').get(),6000);
     if(sd.exists){const s=sd.data();
       if(s.templates){templates=s.templates;localStorage.setItem('salary_templates',JSON.stringify(templates));}
       if(s.goals){goals=s.goals;localStorage.setItem('salary_goals',JSON.stringify(goals));}
       if(s.expenses){expenseItems=s.expenses;localStorage.setItem('salary_expenses',JSON.stringify(expenseItems));}
       if(s.theme){localStorage.setItem('salary_theme',s.theme);lightTheme=s.theme==='light';document.body.classList.toggle('light',lightTheme);document.getElementById('themeBtn').textContent=lightTheme?'🌙':'☀️';}
     }
-    const ps=await userDoc().collection('periods').get();
+    const ps=await withTimeout(userDoc().collection('periods').get(),6000);
     ps.forEach(doc=>localStorage.setItem('salary_'+doc.id,JSON.stringify(doc.data())));
-    const pd=await userDoc().collection('periods').doc(periodFsKey()).get();
+    const pd=await withTimeout(userDoc().collection('periods').doc(periodFsKey()).get(),6000);
     if(pd.exists){const p=pd.data();days=p.days||{};bonuses=p.bonuses||[];taxEnabled=!!p.taxEnabled;dayOverrides=p.dayOverrides||{};}
     else load();
   }catch(e){console.error('loadAllUserData',e);load();}
