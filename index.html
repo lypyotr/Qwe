@@ -1426,6 +1426,18 @@ function calcTotal(){let t=calcBase()+calcBonus();if(taxEnabled)t*=0.87;return M
 function fmt(n){return Math.round(n).toLocaleString('ru-RU')}
 function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')}
 
+// Returns days from today to payday. Period 1 → 25th same month, Period 2 → 10th next month.
+// If payday falls on weekend, moves to preceding Friday (Russian labor law).
+function daysToNextPayday(){
+  const{year,month,period}=getPeriod();
+  let pd=period===1?new Date(year,month,25):new Date(year,month+1,10);
+  while(pd.getDay()===0||pd.getDay()===6)pd.setDate(pd.getDate()-1);
+  const today=new Date();
+  const t=new Date(today.getFullYear(),today.getMonth(),today.getDate());
+  const p=new Date(pd.getFullYear(),pd.getMonth(),pd.getDate());
+  return Math.round((p-t)/(86400000));
+}
+
 // ══════════════════════════════════════════════
 //  TOGGLE
 // ══════════════════════════════════════════════
@@ -1471,6 +1483,11 @@ function renderTotal(){
   if(base>0)meta.push(`<div class="meta-item">База: <strong>${fmt(base)} ₽</strong></div>`);
   if(filledDays>1)meta.push(`<div class="meta-item">Ср/день: <strong>${fmt(base/filledDays)} ₽</strong></div>`);
   if(hasExp)meta.push(`<div class="meta-item" style="color:var(--danger)">Расходы: <strong>−${fmt(expTotal)} ₽</strong></div>`);
+  const days2pay=daysToNextPayday();
+  if(disp>0&&days2pay>0){
+    const perDay=Math.round(disp/days2pay);
+    meta.push(`<div class="meta-item" style="color:var(--accent2)">~${fmt(perDay)} ₽/день <span style="font-weight:400;color:var(--muted)">до зп (${days2pay} дн.)</span></div>`);
+  }
   document.getElementById('totalMeta').innerHTML=meta.join('');
   renderCompareBadge(disp);
   renderTodaySummary();
@@ -2285,7 +2302,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-18 #22';
+const BUILD_VER='2026-06-18 #23';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
