@@ -1218,12 +1218,6 @@ body.light .share-card-btn{background:rgba(0,0,0,.07)}
   <div id="expensesList"></div>
 </div>
 
-<!-- BREAKDOWN -->
-<div class="section">
-  <div class="section-header"><div class="section-title">Итоговая разбивка</div></div>
-  <div class="breakdown" id="breakdown"></div>
-</div>
-
 <button class="reset-btn" onclick="resetAll()">🗑 Сбросить период</button>
 
 </div><!-- /page-detail -->
@@ -1396,7 +1390,7 @@ function toggleDayWorkStatus(){
   }
   save();haptic('light');
   renderDayPanel();renderDayStrip();renderCountdown();
-  renderTotal();renderBreakdown();renderGoals();
+  renderTotal();renderGoals();
 }
 
 // ══════════════════════════════════════════════
@@ -1484,7 +1478,7 @@ function load(){
 function onPeriodChange(){
   selectedDay=null;load();
   renderPeriodCard();renderDayStrip();renderDayPanel();renderBonuses();
-  renderTotal();renderChart();renderBreakdown();renderHistory();renderGoals();renderExpenses();
+  renderTotal();renderChart();renderHistory();renderGoals();renderExpenses();
   if (currentUser && sbClient) {
     loadAllUserData().then(() => { renderAll(); startRealtimeSync(); }).catch(e=>console.error('period change',e));
   }
@@ -2095,14 +2089,14 @@ function addWork(){
   if(!days[selectedDay])days[selectedDay]=[];
   days[selectedDay].push({id:Date.now(),name:'',qty:'',price:''});
   save();
-  renderDayPanel();renderDayStrip();renderTotal();renderChart();renderBreakdown();renderGoals();
+  renderDayPanel();renderDayStrip();renderTotal();renderChart();renderGoals();
   setTimeout(()=>{const inputs=document.querySelectorAll('.dw-name');if(inputs.length)inputs[inputs.length-1].focus()},50);
 }
 function delWork(day,id){
   if(!days[day])return;
   days[day]=days[day].filter(w=>w.id!==id);
   save();haptic('medium');
-  renderDayPanel();renderDayStrip();renderTotal();renderChart();renderBreakdown();renderGoals();
+  renderDayPanel();renderDayStrip();renderTotal();renderChart();renderGoals();
 }
 function updateWork(day,id,field,value){
   const w=(days[day]||[]).find(w=>w.id===id);
@@ -2110,7 +2104,7 @@ function updateWork(day,id,field,value){
   w[field]=value;save();
   const sum=daySum(day);
   document.getElementById('dpSum').textContent=sum>0?fmt(sum)+' ₽':'';
-  renderDayStrip();renderTotal();renderChart();renderBreakdown();renderGoals();
+  renderDayStrip();renderTotal();renderChart();renderGoals();
   renderShiftTracker();
 }
 
@@ -2172,7 +2166,7 @@ function applyTemplate(id){
   if(!days[selectedDay])days[selectedDay]=[];
   days[selectedDay].push({id:Date.now(),name:t.name,qty:'',price:String(t.price)});
   save();haptic('light');
-  renderDayPanel();renderDayStrip();renderTotal();renderChart();renderBreakdown();
+  renderDayPanel();renderDayStrip();renderTotal();renderChart();
 }
 function applyTemplateFromModal(id){
   applyTemplate(id);
@@ -2216,7 +2210,7 @@ function copyFromDay(fromDay){
   });
   save();haptic('medium');
   document.getElementById('copyModal').classList.remove('open');
-  renderDayPanel();renderDayStrip();renderTotal();renderChart();renderBreakdown();renderGoals();
+  renderDayPanel();renderDayStrip();renderTotal();renderChart();renderGoals();
 }
 function plWorks(n){if(n%10===1&&n%100!==11)return'работа';if([2,3,4].includes(n%10)&&![12,13,14].includes(n%100))return'работы';return'работ'}
 
@@ -2226,11 +2220,11 @@ function plWorks(n){if(n%10===1&&n%100!==11)return'работа';if([2,3,4].incl
 function addBonus(){
   haptic('medium');
   bonuses.push({id:Date.now(),name:'',amount:''});
-  save();renderBonuses();renderTotal();renderBreakdown();renderGoals();
+  save();renderBonuses();renderTotal();renderGoals();
   setTimeout(()=>{const els=document.querySelectorAll('.bonus-name');if(els.length)els[els.length-1].focus()},50);
 }
-function removeBonus(id){bonuses=bonuses.filter(b=>b.id!==id);save();haptic('medium');renderBonuses();renderTotal();renderBreakdown();renderGoals()}
-function updateBonus(id,f,v){const b=bonuses.find(b=>b.id===id);if(b){b[f]=v;save();renderTotal();renderBreakdown();renderGoals()}}
+function removeBonus(id){bonuses=bonuses.filter(b=>b.id!==id);save();haptic('medium');renderBonuses();renderTotal();renderGoals()}
+function updateBonus(id,f,v){const b=bonuses.find(b=>b.id===id);if(b){b[f]=v;save();renderTotal();renderGoals()}}
 function renderBonuses(){
   const list=document.getElementById('bonusList');
   if(!bonuses.length){list.innerHTML='';return}
@@ -2265,7 +2259,7 @@ function toggleTax(){
   haptic('light');
   taxEnabled=!taxEnabled;
   document.getElementById('taxToggle').classList.toggle('on',taxEnabled);
-  save();renderTotal();renderBreakdown();renderGoals();
+  save();renderTotal();renderGoals();
 }
 
 // ══════════════════════════════════════════════
@@ -2276,7 +2270,7 @@ function setTotalView(v){
   totalView=v;
   document.getElementById('tvtGross').classList.toggle('active',v==='gross');
   document.getElementById('tvtNet').classList.toggle('active',v==='net');
-  renderTotal();renderBreakdown();
+  renderTotal();
 }
 
 function renderTotal(){
@@ -2606,12 +2600,12 @@ function saveExpenses(){
 function addExpenseItem(){
   expenseItems.push({id:Date.now(),name:'',amount:'',mode:'period'});
   saveExpenses();haptic('light');
-  renderExpenses();renderTotal();renderBreakdown();renderGoals();
+  renderExpenses();renderTotal();renderGoals();
 }
 function delExpense(id){
   expenseItems=expenseItems.filter(e=>e.id!==id);
   saveExpenses();haptic('medium');
-  renderExpenses();renderTotal();renderBreakdown();renderGoals();
+  renderExpenses();renderTotal();renderGoals();
 }
 function updateExpense(id,field,value){
   const item=expenseItems.find(e=>e.id===id);
@@ -2619,7 +2613,7 @@ function updateExpense(id,field,value){
   item[field]=value;
   saveExpenses();
   if(field==='mode') renderExpenses();
-  renderTotal();renderBreakdown();renderGoals();
+  renderTotal();renderGoals();
 }
 function calcWorkedDays(){return Object.keys(days).filter(d=>daySum(parseInt(d))>0).length}
 function renderExpenses(){
@@ -2797,7 +2791,7 @@ function resetAll(){
     days={};bonuses={};bonuses=[];taxEnabled=false;selectedDay=null;dayOverrides={};
     document.getElementById('taxToggle').classList.remove('on');
     save();haptic('medium');
-    renderDayStrip();renderDayPanel();renderBonuses();renderTotal();renderChart();renderBreakdown();
+    renderDayStrip();renderDayPanel();renderBonuses();renderTotal();renderChart();
   }
 }
 
@@ -2984,7 +2978,7 @@ function importData(e){
       load();
       renderPeriodCard();renderDayStrip();renderDayPanel();renderBonuses();
       renderTemplates();renderTotal();renderChart();renderGoals();
-      renderBreakdown();renderHistory();renderShiftTracker();
+      renderHistory();renderShiftTracker();
       setupBioButton();renderBioSection();
       renderExpenses();renderAchievements();
       haptic('medium');
@@ -3097,7 +3091,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-18 #14';
+const BUILD_VER='2026-06-18 #15';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
@@ -3334,7 +3328,7 @@ function scheduleSettingsSave(){
 }
 function saveSettingsToFirestore(){scheduleSettingsSave();}
 function renderAll(){
-  renderTotal();renderChart();renderBreakdown();renderGoals();
+  renderTotal();renderChart();renderGoals();
   renderDayStrip();renderDayPanel();renderBonuses();renderTemplates();
   renderHistory();renderArchive();renderShiftTracker();renderTodaySummary();renderAchievements();
 }
@@ -3348,7 +3342,7 @@ loadTemplates();loadGoals();loadExpenses();
 document.getElementById('periodSel').value=new Date().getDate()<=15?'1':'2';
 load();
 renderPeriodCard();renderDayStrip();renderDayPanel();renderBonuses();renderTemplates();
-renderTotal();renderChart();renderGoals();renderBreakdown();renderHistory();renderArchive();
+renderTotal();renderChart();renderGoals();renderHistory();renderArchive();
 renderExpenses();renderAchievements();renderShiftTracker();renderTodaySummary();
 restorePage();startShiftTimer();initPWA();
 initFirebase();
