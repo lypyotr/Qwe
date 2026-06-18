@@ -1,8 +1,8 @@
-const CACHE='salary-v1';
-const URLS=['./', './index.html'];
+const CACHE='salary-v2';
+const STATIC=['./manifest.json','./icon.svg'];
 
 self.addEventListener('install',e=>{
-  e.waitUntil(caches.open(CACHE).then(c=>c.addAll(URLS)));
+  e.waitUntil(caches.open(CACHE).then(c=>c.addAll(STATIC)));
   self.skipWaiting();
 });
 
@@ -13,7 +13,22 @@ self.addEventListener('activate',e=>{
 
 self.addEventListener('fetch',e=>{
   if(e.request.method!=='GET')return;
-  e.respondWith(caches.match(e.request).then(cached=>cached||fetch(e.request)));
+  const url=new URL(e.request.url);
+  const isHTML=e.request.mode==='navigate'||url.pathname.endsWith('.html')||url.pathname.endsWith('/');
+
+  if(isHTML){
+    // Network-first for HTML: always get fresh app, fall back to cache only if offline
+    e.respondWith(
+      fetch(e.request).then(resp=>{
+        const clone=resp.clone();
+        caches.open(CACHE).then(c=>c.put(e.request,clone));
+        return resp;
+      }).catch(()=>caches.match(e.request))
+    );
+  }else{
+    // Cache-first for static assets (fonts, icons, CDN scripts)
+    e.respondWith(caches.match(e.request).then(cached=>cached||fetch(e.request)));
+  }
 });
 
 self.addEventListener('notificationclick',e=>{

@@ -3,15 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Зарплата">
 <meta name="theme-color" content="#6366f1">
 <link rel="manifest" href="manifest.json">
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="https://www.google.com/recaptcha/api.js?render=6LffCSQtAAAAAGvugRUmtseSn8jqx-2qOUpUINCK" async defer></script>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230d0f14'/><text y='.9em' font-size='72' x='12'>💰</text></svg>">
+<link rel="shortcut icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230d0f14'/><text y='.9em' font-size='72' x='12'>💰</text></svg>">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230d0f14'/><text y='.9em' font-size='72' x='12'>💰</text></svg>">
 <title>Зарплата</title>
@@ -1354,9 +1354,9 @@ let templates=[]; // [{id,name,price}]
 let lightTheme=false;
 let goals={period:0,week:0,month:0}; // plan targets in ₽
 let selectedShiftTpls=new Set(); // IDs of templates active in shift tracker
-let fbApp = null, fbAuth = null, fbDb = null;
+let sbClient = null;
 let currentUser = null;
-let firestoreUnsubscribe = null;
+let realtimeChannel = null;
 let saveDebounceTimer = null;
 
 // ══════════════════════════════════════════════
@@ -1407,8 +1407,10 @@ const DOW=['вс','пн','вт','ср','чт','пт','сб'];
 // ══════════════════════════════════════════════
 //  HAPTICS
 // ══════════════════════════════════════════════
+let _userInteracted=false;
+document.addEventListener('pointerdown',()=>{_userInteracted=true;},{once:true,passive:true});
 function haptic(style){
-  if(navigator.vibrate){navigator.vibrate(style==='light'?10:style==='medium'?20:[15,10,15]);}
+  if(_userInteracted&&navigator.vibrate){navigator.vibrate(style==='light'?10:style==='medium'?20:[15,10,15]);}
 }
 
 // ══════════════════════════════════════════════
@@ -1477,8 +1479,8 @@ function onPeriodChange(){
   selectedDay=null;load();
   renderPeriodCard();renderDayStrip();renderDayPanel();renderBonuses();
   renderTotal();renderChart();renderBreakdown();renderHistory();renderGoals();
-  if (currentUser && fbDb) {
-    loadAllUserData().then(() => { renderAll(); startFirestoreSync(); });
+  if (currentUser && sbClient) {
+    loadAllUserData().then(() => { renderAll(); startRealtimeSync(); }).catch(e=>console.error('period change',e));
   }
 }
 
@@ -2992,6 +2994,8 @@ async function shareRankCard(){
 function initPWA(){
   if('serviceWorker' in navigator){
     navigator.serviceWorker.register('./sw.js').catch(()=>{});
+    // Reload page when a new SW takes control so users always get fresh HTML
+    navigator.serviceWorker.addEventListener('controllerchange',()=>window.location.reload());
   }
   checkDailyReminder();
 }
@@ -3023,76 +3027,78 @@ function dismissNotifBanner(){
 }
 
 // ══════════════════════════════════════════════
-//  FIREBASE AUTH + FIRESTORE
+//  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const firebaseConfig={apiKey:"AIzaSyBUxrj-FUBv2ZkJ9S4e5oT9DRDEoA3Ftcg",authDomain:"salary-7b203.firebaseapp.com",projectId:"salary-7b203",storageBucket:"salary-7b203.firebasestorage.app",messagingSenderId:"311277450560",appId:"1:311277450560:web:844b2aadf1185009d5f6a5"};
+const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
+const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
+let _loaderHidden=false;
 function hideLoader(){
+  if(_loaderHidden)return;
+  _loaderHidden=true;
   const l=document.getElementById('appLoader');
   if(!l)return;
   l.style.opacity='0';
   setTimeout(()=>l.style.display='none',260);
 }
+setTimeout(()=>{
+  if(!_loaderHidden){
+    console.warn('loader timeout');
+    hideLoader();showAuthOverlay(true);showAuthLogin();
+  }
+},8000);
+
+function periodFsKey(){return saveKey().replace('salary_','');}
+function withTimeout(promise,ms){
+  return Promise.race([promise,new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),ms))]);
+}
 
 function initFirebase(){
   try{
-    firebase.initializeApp(firebaseConfig);
-    fbAuth=firebase.auth();fbDb=firebase.firestore();
-    fbAuth.onAuthStateChanged(async user=>{
-      if(user){
-        currentUser=user;showAuthOverlay(false);
-        await loadAllUserData();
-        await migrateLocalStorageToFirestore();
-        renderAll();startFirestoreSync();checkDailyReminder();
+    sbClient=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+    sbClient.auth.onAuthStateChange(async(event,session)=>{
+      if(session?.user){
+        currentUser=session.user;showAuthOverlay(false);
+        try{
+          await loadAllUserData();
+          await migrateLocalStorageToSupabase();
+          renderAll();startRealtimeSync();checkDailyReminder();
+        }catch(e){console.error('auth init',e);renderAll();}
+        finally{hideLoader();}
       }else{
         currentUser=null;
-        if(firestoreUnsubscribe){firestoreUnsubscribe();firestoreUnsubscribe=null;}
+        if(realtimeChannel){sbClient.removeChannel(realtimeChannel);realtimeChannel=null;}
         showAuthOverlay(true);showAuthLogin();hideLoader();
       }
     });
-  }catch(e){console.error('Firebase init',e);hideLoader();}
+    // Trigger initial session check
+    sbClient.auth.getSession();
+  }catch(e){console.error('Supabase init',e);hideLoader();}
 }
 
-// One-time migration: upload localStorage data to Firestore if Firestore is empty
-async function migrateLocalStorageToFirestore(){
-  if(!currentUser||!fbDb)return;
+async function migrateLocalStorageToSupabase(){
+  if(!currentUser||!sbClient)return;
   try{
-    const sd=await userDoc().collection('data').doc('settings').get();
-    // Only migrate if Firestore has no settings yet (first login from this device)
-    if(sd.exists)return;
-
+    const {data:existing}=await sbClient.from('user_settings').select('user_id').eq('user_id',currentUser.id).maybeSingle();
+    if(existing)return;
     const lsTemplates=JSON.parse(localStorage.getItem('salary_templates')||'[]');
     const lsGoals=JSON.parse(localStorage.getItem('salary_goals')||'{"period":0,"week":0,"month":0}');
     const lsExpenses=JSON.parse(localStorage.getItem('salary_expenses')||'[]');
     const lsTheme=localStorage.getItem('salary_theme')||'dark';
-
-    // Collect all period keys from localStorage
     const periodKeys=[];
-    for(let i=0;i<localStorage.length;i++){
-      const k=localStorage.key(i);
-      if(k&&/^salary_\d+_\d+_\d+$/.test(k))periodKeys.push(k);
-    }
-
-    if(!lsTemplates.length&&!lsGoals.period&&!periodKeys.length)return; // nothing to migrate
-
-    // Upload settings
-    await userDoc().collection('data').doc('settings').set({
-      templates:lsTemplates,goals:lsGoals,expenses:lsExpenses,theme:lsTheme,
-      migratedAt:firebase.firestore.FieldValue.serverTimestamp()
-    });
-
-    // Upload periods one by one (batch limit is 500 ops, but personal data has <<500 periods)
+    for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&/^salary_\d+_\d+_\d+$/.test(k))periodKeys.push(k);}
+    if(!lsTemplates.length&&!lsGoals.period&&!periodKeys.length)return;
+    await sbClient.from('user_settings').upsert({user_id:currentUser.id,templates:lsTemplates,goals:lsGoals,expenses:lsExpenses,theme:lsTheme});
     for(const k of periodKeys){
       try{
         const data=JSON.parse(localStorage.getItem(k)||'{}');
-        const fsKey=k.replace('salary_','');
-        await userDoc().collection('periods').doc(fsKey).set(
-          {...data,migratedAt:firebase.firestore.FieldValue.serverTimestamp()});
+        await sbClient.from('periods').upsert({user_id:currentUser.id,period_key:k.replace('salary_',''),days:data.days||{},bonuses:data.bonuses||[],tax_enabled:!!data.taxEnabled,day_overrides:data.dayOverrides||{}},{onConflict:'user_id,period_key'});
       }catch(e){}
     }
   }catch(e){console.error('migration',e);}
 }
+
 function showAuthOverlay(show){
   const el=document.getElementById('authOverlay');
   if(!el)return;
@@ -3102,18 +3108,25 @@ function showAuthOverlay(show){
 function showAuthLogin(){document.getElementById('authLoginForm').style.display='';document.getElementById('authRegisterForm').style.display='none';document.getElementById('authForgotForm').style.display='none';document.getElementById('authError').textContent='';}
 function showAuthRegister(){document.getElementById('authLoginForm').style.display='none';document.getElementById('authRegisterForm').style.display='';document.getElementById('authForgotForm').style.display='none';document.getElementById('regError').textContent='';}
 function showAuthForgot(){document.getElementById('authLoginForm').style.display='none';document.getElementById('authRegisterForm').style.display='none';document.getElementById('authForgotForm').style.display='';document.getElementById('forgotMsg').textContent='';}
-async function getRcToken(action){
-  if(typeof grecaptcha==='undefined')return null;
-  try{return await grecaptcha.execute('6LffCSQtAAAAAGvugRUmtseSn8jqx-2qOUpUINCK',{action});}
-  catch(e){return null;}
+
+function supabaseErrMsg(err){
+  const msg=(err&&(err.message||err.msg||''))||'';
+  if(msg.includes('Invalid login'))return'Неверный email или пароль';
+  if(msg.includes('Email not confirmed'))return'Подтверди email перед входом';
+  if(msg.includes('already registered'))return'Email уже используется';
+  if(msg.includes('Password should be'))return'Пароль слишком простой (мин. 6 символов)';
+  if(msg.includes('rate limit')||msg.includes('too many'))return'Слишком много попыток, подожди';
+  if(msg.includes('fetch')||msg.includes('network')||msg.includes('Failed'))return'Ошибка сети';
+  return msg||'Неизвестная ошибка';
 }
+
 async function doFirebaseLogin(){
   const email=document.getElementById('authEmail').value.trim(),pass=document.getElementById('authPassword').value,errEl=document.getElementById('authError');
   errEl.textContent='';if(!email||!pass){errEl.textContent='Введи email и пароль';return;}
   document.getElementById('authLoading').style.display='';
-  await getRcToken('login');
-  try{await fbAuth.signInWithEmailAndPassword(email,pass);}
-  catch(e){document.getElementById('authLoading').style.display='none';errEl.textContent=firebaseErrMsg(e.code);}
+  const{error}=await sbClient.auth.signInWithPassword({email,password:pass});
+  document.getElementById('authLoading').style.display='none';
+  if(error)errEl.textContent=supabaseErrMsg(error);
 }
 async function doFirebaseRegister(){
   const email=document.getElementById('regEmail').value.trim(),pass=document.getElementById('regPassword').value,pass2=document.getElementById('regPassword2').value,errEl=document.getElementById('regError');
@@ -3121,61 +3134,65 @@ async function doFirebaseRegister(){
   if(pass!==pass2){errEl.textContent='Пароли не совпадают';return;}
   if(pass.length<6){errEl.textContent='Минимум 6 символов';return;}
   document.getElementById('authLoading').style.display='';
-  await getRcToken('register');
-  try{await fbAuth.createUserWithEmailAndPassword(email,pass);}
-  catch(e){document.getElementById('authLoading').style.display='none';errEl.textContent=firebaseErrMsg(e.code);}
+  const{error}=await sbClient.auth.signUp({email,password:pass});
+  document.getElementById('authLoading').style.display='none';
+  if(error)errEl.textContent=supabaseErrMsg(error);
+  else errEl.style.color='var(--accent)',errEl.textContent='Проверь почту — нужно подтвердить email';
 }
 async function doForgotPassword(){
   const email=document.getElementById('forgotEmail').value.trim(),msgEl=document.getElementById('forgotMsg');
   if(!email){msgEl.textContent='Введи email';return;}
-  try{await fbAuth.sendPasswordResetEmail(email);msgEl.style.color='var(--accent)';msgEl.textContent='Письмо отправлено! Проверь почту.';}
-  catch(e){msgEl.style.color='var(--danger)';msgEl.textContent=firebaseErrMsg(e.code);}
+  const{error}=await sbClient.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname});
+  if(error){msgEl.style.color='var(--danger)';msgEl.textContent=supabaseErrMsg(error);}
+  else{msgEl.style.color='var(--accent)';msgEl.textContent='Письмо отправлено! Проверь почту.';}
 }
-async function doFirebaseLogout(){if(confirm('Выйти из аккаунта?'))await fbAuth.signOut();}
-function firebaseErrMsg(code){return({'auth/user-not-found':'Пользователь не найден','auth/wrong-password':'Неверный пароль','auth/invalid-email':'Неверный формат email','auth/email-already-in-use':'Email уже используется','auth/weak-password':'Пароль слишком простой','auth/too-many-requests':'Слишком много попыток','auth/invalid-credential':'Неверный email или пароль','auth/network-request-failed':'Ошибка сети'})[code]||'Ошибка: '+code;}
-function userDoc(){return fbDb.collection('users').doc(currentUser.uid);}
-function periodFsKey(){return saveKey().replace('salary_','');}
+async function doFirebaseLogout(){if(confirm('Выйти из аккаунта?'))await sbClient.auth.signOut();}
+
 async function loadAllUserData(){
-  if(!currentUser||!fbDb)return;
+  if(!currentUser||!sbClient)return;
   try{
-    const sd=await userDoc().collection('data').doc('settings').get();
-    if(sd.exists){const s=sd.data();
+    const{data:s}=await withTimeout(sbClient.from('user_settings').select('*').eq('user_id',currentUser.id).maybeSingle(),6000);
+    if(s){
       if(s.templates){templates=s.templates;localStorage.setItem('salary_templates',JSON.stringify(templates));}
       if(s.goals){goals=s.goals;localStorage.setItem('salary_goals',JSON.stringify(goals));}
       if(s.expenses){expenseItems=s.expenses;localStorage.setItem('salary_expenses',JSON.stringify(expenseItems));}
       if(s.theme){localStorage.setItem('salary_theme',s.theme);lightTheme=s.theme==='light';document.body.classList.toggle('light',lightTheme);document.getElementById('themeBtn').textContent=lightTheme?'🌙':'☀️';}
     }
-    const ps=await userDoc().collection('periods').get();
-    ps.forEach(doc=>localStorage.setItem('salary_'+doc.id,JSON.stringify(doc.data())));
-    const pd=await userDoc().collection('periods').doc(periodFsKey()).get();
-    if(pd.exists){const p=pd.data();days=p.days||{};bonuses=p.bonuses||[];taxEnabled=!!p.taxEnabled;dayOverrides=p.dayOverrides||{};}
+    const{data:periods}=await withTimeout(sbClient.from('periods').select('period_key,days,bonuses,tax_enabled,day_overrides').eq('user_id',currentUser.id),6000);
+    if(periods)periods.forEach(p=>localStorage.setItem('salary_'+p.period_key,JSON.stringify({days:p.days||{},bonuses:p.bonuses||[],taxEnabled:!!p.tax_enabled,dayOverrides:p.day_overrides||{}})));
+    const{data:pd}=await withTimeout(sbClient.from('periods').select('*').eq('user_id',currentUser.id).eq('period_key',periodFsKey()).maybeSingle(),6000);
+    if(pd){days=pd.days||{};bonuses=pd.bonuses||[];taxEnabled=!!pd.tax_enabled;dayOverrides=pd.day_overrides||{};}
     else load();
   }catch(e){console.error('loadAllUserData',e);load();}
 }
-function startFirestoreSync(){
-  if(!currentUser||!fbDb)return;
-  if(firestoreUnsubscribe){firestoreUnsubscribe();firestoreUnsubscribe=null;}
-  firestoreUnsubscribe=userDoc().collection('periods').doc(periodFsKey()).onSnapshot(doc=>{
-    if(doc.exists&&!doc.metadata.hasPendingWrites){
-      const p=doc.data();days=p.days||{};bonuses=p.bonuses||[];taxEnabled=!!p.taxEnabled;dayOverrides=p.dayOverrides||{};
-      localStorage.setItem(saveKey(),JSON.stringify({days,bonuses,taxEnabled,dayOverrides}));
-      renderAll();
-    }
-  },err=>console.error('snapshot',err));
+
+function startRealtimeSync(){
+  if(!currentUser||!sbClient)return;
+  if(realtimeChannel){sbClient.removeChannel(realtimeChannel);realtimeChannel=null;}
+  realtimeChannel=sbClient.channel('periods-sync')
+    .on('postgres_changes',{event:'*',schema:'public',table:'periods',filter:`user_id=eq.${currentUser.id}`},payload=>{
+      const p=payload.new;
+      if(p&&p.period_key===periodFsKey()){
+        days=p.days||{};bonuses=p.bonuses||[];taxEnabled=!!p.tax_enabled;dayOverrides=p.day_overrides||{};
+        localStorage.setItem(saveKey(),JSON.stringify({days,bonuses,taxEnabled,dayOverrides}));
+        renderAll();
+      }
+    }).subscribe();
 }
+
 function scheduleSaveToFirestore(){
-  if(!currentUser||!fbDb)return;
+  if(!currentUser||!sbClient)return;
   clearTimeout(saveDebounceTimer);
   saveDebounceTimer=setTimeout(async()=>{
-    try{await userDoc().collection('periods').doc(periodFsKey()).set({days,bonuses,taxEnabled,dayOverrides,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});}
+    try{await sbClient.from('periods').upsert({user_id:currentUser.id,period_key:periodFsKey(),days,bonuses,tax_enabled:taxEnabled,day_overrides:dayOverrides,updated_at:new Date().toISOString()},{onConflict:'user_id,period_key'});}
     catch(e){console.error('save period',e);}
   },2000);
 }
 function scheduleSettingsSave(){
-  if(!currentUser||!fbDb)return;
+  if(!currentUser||!sbClient)return;
   clearTimeout(settingsSaveTimer);
   settingsSaveTimer=setTimeout(async()=>{
-    try{await userDoc().collection('data').doc('settings').set({templates,goals,expenses:expenseItems,theme:lightTheme?'light':'dark',updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});}
+    try{await sbClient.from('user_settings').upsert({user_id:currentUser.id,templates,goals,expenses:expenseItems,theme:lightTheme?'light':'dark',updated_at:new Date().toISOString()},{onConflict:'user_id'});}
     catch(e){console.error('save settings',e);}
   },2000);
 }
