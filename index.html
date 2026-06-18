@@ -3031,7 +3031,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-18 #6';
+const BUILD_VER='2026-06-18 #7';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
@@ -3061,7 +3061,11 @@ function hideLoader(){
 setTimeout(()=>{
   if(!_loaderHidden){
     console.warn('loader timeout');
-    hideLoader();showAuthOverlay(true);showAuthLogin();
+    hideLoader();
+    // Only fall back to the login screen if we are NOT logged in.
+    // A logged-in user must never be kicked to login just because a
+    // background cloud request was slow.
+    if(!currentUser){showAuthOverlay(true);showAuthLogin();}
   }
 },8000);
 
@@ -3083,15 +3087,9 @@ function initFirebase(){
     });
 
     // On every auth change AFTER initial load (login, logout, token refresh)
-    sbClient.auth.onAuthStateChange(async(event,session)=>{
+    sbClient.auth.onAuthStateChange((event,session)=>{
       if(event==='SIGNED_IN'&&session?.user){
-        currentUser=session.user;showAuthOverlay(false);
-        try{
-          await loadAllUserData();
-          await migrateLocalStorageToSupabase();
-          renderAll();startRealtimeSync();checkDailyReminder();
-        }catch(e){console.error('auth change',e);renderAll();}
-        finally{hideLoader();}
+        enterApp(session.user);
       }else if(event==='SIGNED_OUT'){
         currentUser=null;
         if(realtimeChannel){sbClient.removeChannel(realtimeChannel);realtimeChannel=null;}
@@ -3102,15 +3100,9 @@ function initFirebase(){
     });
 
     // Initial session check — restore existing session on page load
-    sbClient.auth.getSession().then(async({data:{session}},)=>{
+    sbClient.auth.getSession().then(({data:{session}})=>{
       if(session?.user){
-        currentUser=session.user;showAuthOverlay(false);
-        try{
-          await loadAllUserData();
-          await migrateLocalStorageToSupabase();
-          renderAll();startRealtimeSync();checkDailyReminder();
-        }catch(e){console.error('auth init',e);renderAll();}
-        finally{hideLoader();}
+        enterApp(session.user);
       }else{
         showAuthOverlay(true);showAuthLogin();hideLoader();
         authDiag('getSession() вернул ПУСТО — сессия не восстановлена');
@@ -3118,6 +3110,28 @@ function initFirebase(){
     }).catch(e=>{showAuthOverlay(true);showAuthLogin();hideLoader();authDiag('getSession() ОШИБКА: '+(e&&e.message||e));});
 
   }catch(e){console.error('Supabase init',e);hideLoader();}
+}
+
+// Show the app instantly from localStorage, then sync cloud data in the
+// background. A slow or failing Supabase request must never block the UI
+// or kick the user back to the login screen.
+let _cloudLoaded=false;
+function enterApp(user){
+  currentUser=user;
+  showAuthOverlay(false);
+  load();                 // local data first
+  renderAll();            // render immediately
+  hideLoader();           // never wait on the network
+  checkDailyReminder();
+  if(_cloudLoaded)return;  // avoid duplicate cloud loads (getSession + SIGNED_IN)
+  _cloudLoaded=true;
+  (async()=>{
+    try{
+      await loadAllUserData();
+      await migrateLocalStorageToSupabase();
+      renderAll();startRealtimeSync();
+    }catch(e){console.error('cloud sync',e);}
+  })();
 }
 
 async function migrateLocalStorageToSupabase(){
@@ -3194,16 +3208,16 @@ async function doFirebaseLogout(){if(confirm('Выйти из аккаунта?'
 async function loadAllUserData(){
   if(!currentUser||!sbClient)return;
   try{
-    const{data:s}=await withTimeout(sbClient.from('user_settings').select('*').eq('user_id',currentUser.id).maybeSingle(),6000);
+    const{data:s}=await withTimeout(sbClient.from('user_settings').select('*').eq('user_id',currentUser.id).maybeSingle(),10000);
     if(s){
       if(s.templates){templates=s.templates;localStorage.setItem('salary_templates',JSON.stringify(templates));}
       if(s.goals){goals=s.goals;localStorage.setItem('salary_goals',JSON.stringify(goals));}
       if(s.expenses){expenseItems=s.expenses;localStorage.setItem('salary_expenses',JSON.stringify(expenseItems));}
       if(s.theme){localStorage.setItem('salary_theme',s.theme);lightTheme=s.theme==='light';document.body.classList.toggle('light',lightTheme);document.getElementById('themeBtn').textContent=lightTheme?'🌙':'☀️';}
     }
-    const{data:periods}=await withTimeout(sbClient.from('periods').select('period_key,days,bonuses,tax_enabled,day_overrides').eq('user_id',currentUser.id),6000);
+    const{data:periods}=await withTimeout(sbClient.from('periods').select('period_key,days,bonuses,tax_enabled,day_overrides').eq('user_id',currentUser.id),10000);
     if(periods)periods.forEach(p=>localStorage.setItem('salary_'+p.period_key,JSON.stringify({days:p.days||{},bonuses:p.bonuses||[],taxEnabled:!!p.tax_enabled,dayOverrides:p.day_overrides||{}})));
-    const{data:pd}=await withTimeout(sbClient.from('periods').select('*').eq('user_id',currentUser.id).eq('period_key',periodFsKey()).maybeSingle(),6000);
+    const{data:pd}=await withTimeout(sbClient.from('periods').select('*').eq('user_id',currentUser.id).eq('period_key',periodFsKey()).maybeSingle(),10000);
     if(pd){days=pd.days||{};bonuses=pd.bonuses||[];taxEnabled=!!pd.tax_enabled;dayOverrides=pd.day_overrides||{};}
     else load();
   }catch(e){console.error('loadAllUserData',e);load();}
