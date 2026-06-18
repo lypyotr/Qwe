@@ -3021,11 +3021,32 @@ function toggleBio(){}
     if(Math.abs(target-cur)>0.5){raf=requestAnimationFrame(frame)}
     else{cur=target;raf=null}
   }
+  let scrollSaveTimer=null;
   window.addEventListener('scroll',()=>{
     target=window.scrollY||0;
     if(raf===null)raf=requestAnimationFrame(frame);
+    if(window._restoringScroll)return; // don't overwrite saved pos while restoring
+    clearTimeout(scrollSaveTimer);
+    scrollSaveTimer=setTimeout(()=>{try{localStorage.setItem('salary_scroll',String(window.scrollY||0))}catch(e){}},150);
   },{passive:true});
 })();
+
+// Restore scroll position after the page has rendered.
+function restoreScroll(){
+  try{
+    const y=parseInt(localStorage.getItem('salary_scroll')||'0',10);
+    if(!y)return;
+    window._restoringScroll=true;
+    // retry across frames while dynamic content settles the page height
+    let tries=0;
+    const tick=()=>{
+      window.scrollTo(0,y);
+      if(++tries<30&&Math.abs((window.scrollY||0)-y)>2)requestAnimationFrame(tick);
+      else setTimeout(()=>{window._restoringScroll=false;},200);
+    };
+    requestAnimationFrame(tick);
+  }catch(e){}
+}
 
 // ── SHARE RANK CARD ──
 async function shareRankCard(){
@@ -3091,7 +3112,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-18 #16';
+const BUILD_VER='2026-06-18 #17';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
@@ -3336,6 +3357,7 @@ function renderAll(){
 // ══════════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════════
+if('scrollRestoration' in history)history.scrollRestoration='manual';
 loadTheme();
 initMonths();
 loadTemplates();loadGoals();loadExpenses();
@@ -3345,6 +3367,7 @@ renderPeriodCard();renderDayStrip();renderDayPanel();renderBonuses();renderTempl
 renderTotal();renderChart();renderGoals();renderHistory();renderArchive();
 renderExpenses();renderAchievements();renderShiftTracker();renderTodaySummary();
 restorePage();startShiftTimer();initPWA();
+restoreScroll();
 initFirebase();
 </script>
 </body>
