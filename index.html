@@ -2302,7 +2302,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-18 #24';
+const BUILD_VER='2026-06-18 #25';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
@@ -2542,6 +2542,25 @@ function renderAll(){
   renderTotal();renderChart();renderGoals();renderExpenses();
   renderDayStrip();renderDayPanel();renderBonuses();renderTemplates();
   renderHistory();renderArchive();renderTodaySummary();renderAchievements();
+}
+
+// ══════════════════════════════════════════════
+//  NAVIGATION
+// ══════════════════════════════════════════════
+const PAGE_MAP={work:'page-work',period:'page-period',archive:'page-archive'};
+const NAV_MAP={work:'navWork',period:'navPeriod',archive:'navArchive'};
+function switchPage(name){
+  Object.keys(PAGE_MAP).forEach(k=>{
+    const pg=document.getElementById(PAGE_MAP[k]);
+    const nb=document.getElementById(NAV_MAP[k]);
+    if(pg)pg.classList.toggle('active',k===name);
+    if(nb)nb.classList.toggle('active',k===name);
+  });
+  localStorage.setItem('salary_page',name);
+}
+function restorePage(){
+  const p=localStorage.getItem('salary_page')||'work';
+  switchPage(p);
 }
 
 // ══════════════════════════════════════════════
