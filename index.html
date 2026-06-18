@@ -3031,9 +3031,21 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-18 #7';
+const BUILD_VER='2026-06-18 #8';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
+
+// Independent localStorage persistence self-test. Increments a counter on
+// every load. If it stays at 1 after refreshes, localStorage does NOT
+// persist in this browser (privacy setting / private mode) — not a code bug.
+let _lsReloadCount='?',_lsWorks=false;
+(function(){
+  try{
+    const n=(parseInt(localStorage.getItem('salary_reload_test')||'0',10)||0)+1;
+    localStorage.setItem('salary_reload_test',String(n));
+    _lsReloadCount=n;_lsWorks=true;
+  }catch(e){_lsReloadCount='ОШИБКА: '+(e&&e.name||e);_lsWorks=false;}
+})();
 
 // Visible diagnostics so we can see what's happening without DevTools
 function authDiag(extra){
@@ -3046,7 +3058,10 @@ function authDiag(extra){
       if(k&&(k.includes('auth-token')||k.startsWith('sb-'))){tokenKey=k;tokenLen=(localStorage.getItem(k)||'').length;break;}
     }
   }catch(e){tokenKey='localStorage НЕДОСТУПЕН';}
-  el.textContent='build '+BUILD_VER+'\nтокен в localStorage: '+tokenKey+(tokenLen?' ('+tokenLen+' симв.)':'')+(extra?'\n'+extra:'');
+  el.textContent='build '+BUILD_VER
+    +'\nсчётчик загрузок: '+_lsReloadCount+(_lsWorks?' (localStorage пишется)':' (localStorage НЕ работает!)')
+    +'\nтокен сессии: '+tokenKey+(tokenLen?' ('+tokenLen+' симв.)':'')
+    +(extra?'\n'+extra:'');
 }
 
 let _loaderHidden=false;
