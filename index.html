@@ -2645,7 +2645,7 @@ async function forceSyncFromCloud(){
   showDataMsg('Загружаю из облака…','ok');
   try{
     // settings
-    const sr=await withTimeout(sbClient.from('user_settings').select('*').eq('user_id',currentUser.id).single(),10000);
+    const sr=await withTimeout(sbClient.from('user_settings').select('*').eq('user_id',currentUser.id).single(),30000);
     if(sr.data&&!sr.error){
       const s=sr.data;
       if(s.templates)localStorage.setItem('salary_templates',JSON.stringify(s.templates));
@@ -2653,7 +2653,7 @@ async function forceSyncFromCloud(){
       if(s.theme)localStorage.setItem('salary_theme',s.theme);
     }
     // periods
-    const pr=await withTimeout(sbClient.from('periods').select('*').eq('user_id',currentUser.id),10000);
+    const pr=await withTimeout(sbClient.from('periods').select('*').eq('user_id',currentUser.id),30000);
     let ok=0;
     if(pr.data&&!pr.error){
       for(const row of pr.data){
@@ -2932,6 +2932,26 @@ function periodFsKey(){return saveKey().replace('salary_','');}
 function withTimeout(promise,ms){
   return Promise.race([promise,new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),ms))]);
 }
+// Network transport for every Supabase request. Retries on network failures
+// (notably ERR_HTTP2_PING_FAILED on idle/flaky connections) — each attempt
+// opens a fresh connection, which usually succeeds where a stale HTTP/2 socket
+// hangs. Uses AbortController so a stuck request is actually cancelled, not
+// just abandoned like Promise.race would.
+async function fetchWithRetry(input,init){
+  const tries=3,perTry=8000;
+  let lastErr;
+  for(let i=0;i<tries;i++){
+    const ctrl=new AbortController();
+    const timer=setTimeout(()=>ctrl.abort(),perTry);
+    try{
+      return await fetch(input,{...init,signal:ctrl.signal});
+    }catch(e){
+      lastErr=e;
+      if(i<tries-1)await new Promise(r=>setTimeout(r,400*(i+1)));
+    }finally{clearTimeout(timer);}
+  }
+  throw lastErr;
+}
 
 function initFirebase(){
   try{
@@ -2942,13 +2962,19 @@ function initFirebase(){
         detectSessionInUrl:true,
         storage:window.localStorage,
         storageKey:'salary-auth-token'
-      }
+      },
+      global:{fetch:fetchWithRetry}
     });
 
     // On every auth change AFTER initial load (login, logout, token refresh)
     sbClient.auth.onAuthStateChange((event,session)=>{
       if(event==='SIGNED_IN'&&session?.user){
-        enterApp(session.user);
+        // Defer DB work out of the auth callback. supabase-js holds the auth
+        // navigator-lock while running this callback; calling sbClient.from()
+        // here would wait for the access token, which waits for that same lock
+        // — a deadlock that surfaces as every query timing out. setTimeout(0)
+        // lets the lock release first.
+        setTimeout(()=>enterApp(session.user),0);
       }else if(event==='SIGNED_OUT'){
         currentUser=null;
         if(realtimeChannel){sbClient.removeChannel(realtimeChannel);realtimeChannel=null;}
@@ -3067,11 +3093,12 @@ async function loadAllUserData(){
   if(!currentUser||!sbClient)return;
   // Run settings + periods in parallel so one slow query can't time out the
   // whole chain. Each query is tolerated independently: a failure on one
-  // never discards data already pulled from the other.
-  const settledData=async(query,ms)=>{try{const{data}=await withTimeout(query,ms);return data;}catch(e){console.error('loadAllUserData query',e);return undefined;}};
+  // never discards data already pulled from the other. Timeouts and retries
+  // are handled by fetchWithRetry at the transport level.
+  const settledData=async(query)=>{try{const{data}=await query;return data;}catch(e){console.error('loadAllUserData query',e);return undefined;}};
   const[s,periods]=await Promise.all([
-    settledData(sbClient.from('user_settings').select('*').eq('user_id',currentUser.id).maybeSingle(),10000),
-    settledData(sbClient.from('periods').select('period_key,days,bonuses,tax_enabled,day_overrides,expenses').eq('user_id',currentUser.id),10000)
+    settledData(sbClient.from('user_settings').select('*').eq('user_id',currentUser.id).maybeSingle()),
+    settledData(sbClient.from('periods').select('period_key,days,bonuses,tax_enabled,day_overrides,expenses').eq('user_id',currentUser.id))
   ]);
   if(s){
     if(s.templates){templates=s.templates;localStorage.setItem('salary_templates',JSON.stringify(templates));}
