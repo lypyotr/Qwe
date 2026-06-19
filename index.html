@@ -3065,19 +3065,26 @@ async function doFirebaseLogout(){if(confirm('Выйти из аккаунта?'
 
 async function loadAllUserData(){
   if(!currentUser||!sbClient)return;
-  try{
-    const{data:s}=await withTimeout(sbClient.from('user_settings').select('*').eq('user_id',currentUser.id).maybeSingle(),10000);
-    if(s){
-      if(s.templates){templates=s.templates;localStorage.setItem('salary_templates',JSON.stringify(templates));}
-      if(s.goals){goals=s.goals;localStorage.setItem('salary_goals',JSON.stringify(goals));}
-      if(s.theme){localStorage.setItem('salary_theme',s.theme);lightTheme=s.theme==='light';document.body.classList.toggle('light',lightTheme);document.getElementById('themeBtn').textContent=lightTheme?'🌙':'☀️';}
-    }
-    const{data:periods}=await withTimeout(sbClient.from('periods').select('period_key,days,bonuses,tax_enabled,day_overrides').eq('user_id',currentUser.id),10000);
-    if(periods)periods.forEach(p=>localStorage.setItem('salary_'+p.period_key,JSON.stringify({days:p.days||{},bonuses:p.bonuses||[],taxEnabled:!!p.tax_enabled,dayOverrides:p.day_overrides||{},expenses:p.expenses||[]})));
-    const{data:pd}=await withTimeout(sbClient.from('periods').select('*').eq('user_id',currentUser.id).eq('period_key',periodFsKey()).maybeSingle(),10000);
+  // Run settings + periods in parallel so one slow query can't time out the
+  // whole chain. Each query is tolerated independently: a failure on one
+  // never discards data already pulled from the other.
+  const settledData=async(query,ms)=>{try{const{data}=await withTimeout(query,ms);return data;}catch(e){console.error('loadAllUserData query',e);return undefined;}};
+  const[s,periods]=await Promise.all([
+    settledData(sbClient.from('user_settings').select('*').eq('user_id',currentUser.id).maybeSingle(),10000),
+    settledData(sbClient.from('periods').select('period_key,days,bonuses,tax_enabled,day_overrides,expenses').eq('user_id',currentUser.id),10000)
+  ]);
+  if(s){
+    if(s.templates){templates=s.templates;localStorage.setItem('salary_templates',JSON.stringify(templates));}
+    if(s.goals){goals=s.goals;localStorage.setItem('salary_goals',JSON.stringify(goals));}
+    if(s.theme){localStorage.setItem('salary_theme',s.theme);lightTheme=s.theme==='light';document.body.classList.toggle('light',lightTheme);document.getElementById('themeBtn').textContent=lightTheme?'🌙':'☀️';}
+  }
+  if(periods){
+    periods.forEach(p=>localStorage.setItem('salary_'+p.period_key,JSON.stringify({days:p.days||{},bonuses:p.bonuses||[],taxEnabled:!!p.tax_enabled,dayOverrides:p.day_overrides||{},expenses:p.expenses||[]})));
+    // Derive the current period from the bulk result — no extra round-trip.
+    const pd=periods.find(p=>p.period_key===periodFsKey());
     if(pd){days=pd.days||{};bonuses=pd.bonuses||[];taxEnabled=!!pd.tax_enabled;dayOverrides=pd.day_overrides||{};expenseItems=pd.expenses||[];}
     else load();
-  }catch(e){console.error('loadAllUserData',e);load();}
+  }else load();
 }
 
 function startRealtimeSync(){
