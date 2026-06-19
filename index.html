@@ -1118,7 +1118,10 @@ body.light .share-card-btn{background:rgba(0,0,0,.07)}
 <div class="expenses-card">
   <div class="expenses-header">
     <div class="expenses-title">Расходы</div>
-    <div class="expenses-add-btn" onclick="addExpenseItem()">+ Добавить</div>
+    <div style="display:flex;gap:8px">
+      <div class="expenses-add-btn" onclick="openCopyExpModal()">⧉ Из периода</div>
+      <div class="expenses-add-btn" onclick="addExpenseItem()">+ Добавить</div>
+    </div>
   </div>
   <div id="expensesList"></div>
 </div>
@@ -1167,6 +1170,14 @@ body.light .share-card-btn{background:rgba(0,0,0,.07)}
     <div class="modal-handle"></div>
     <div class="modal-title">Копировать работы с дня</div>
     <div class="copy-day-list" id="copyDayList"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="copyExpModal" onclick="closeCopyExpModal(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Скопировать расходы из периода</div>
+    <div class="copy-day-list" id="copyExpList"></div>
   </div>
 </div>
 
@@ -1960,6 +1971,51 @@ function copyFromDay(fromDay){
   renderDayPanel();renderDayStrip();renderTotal();renderChart();renderGoals();
 }
 function plWorks(n){if(n%10===1&&n%100!==11)return'работа';if([2,3,4].includes(n%10)&&![12,13,14].includes(n%100))return'работы';return'работ'}
+function plExp(n){if(n%10===1&&n%100!==11)return'расход';if([2,3,4].includes(n%10)&&![12,13,14].includes(n%100))return'расхода';return'расходов'}
+
+function openCopyExpModal(){
+  const list=document.getElementById('copyExpList');
+  const currentKey=saveKey();
+  const items=[];
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(!k||!/^salary_\d+_\d+_\d+$/.test(k)||k===currentKey)continue;
+      let data;try{data=JSON.parse(localStorage.getItem(k)||'{}');}catch(_){continue;}
+      const exp=Array.isArray(data.expenses)?data.expenses:[];
+      if(!exp.length)continue;
+      const parts=k.replace('salary_','').split('_');
+      const y=parseInt(parts[0]),m=parseInt(parts[1]),p=parseInt(parts[2]);
+      const sum=exp.reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+      items.push({k,y,m,p,count:exp.length,sum});
+    }
+  }catch(e){}
+  items.sort((a,b)=>b.y-a.y||b.m-a.m||b.p-a.p);
+  if(!items.length){list.innerHTML='<div class="empty" style="opacity:.5;font-size:13px;padding:10px 4px">Нет других периодов с расходами</div>';}
+  else{
+    list.innerHTML=items.map(({k,y,m,p,count,sum})=>`
+      <div class="copy-day-row" onclick="copyExpensesFrom('${k}')">
+        <div class="copy-day-info">
+          <div class="copy-day-name">${MS[m]} ${y} · ${p===1?'аванс':'зп'}</div>
+          <div class="copy-day-works">${count} ${plExp(count)}</div>
+        </div>
+        <div class="copy-day-sum">${fmt(sum)} ₽</div>
+      </div>`).join('');
+  }
+  document.getElementById('copyExpModal').classList.add('open');
+}
+function closeCopyExpModal(e){if(e.target===document.getElementById('copyExpModal'))document.getElementById('copyExpModal').classList.remove('open')}
+function copyExpensesFrom(key){
+  let data;try{data=JSON.parse(localStorage.getItem(key)||'{}');}catch(_){return;}
+  const src=Array.isArray(data.expenses)?data.expenses:[];
+  if(!src.length)return;
+  src.forEach(e=>{
+    expenseItems.push({id:Date.now()+Math.floor(Math.random()*100000),name:e.name||'',amount:e.amount||'',mode:e.mode||'period'});
+  });
+  saveExpenses();haptic('medium');
+  document.getElementById('copyExpModal').classList.remove('open');
+  renderExpenses();renderTotal();renderGoals();
+}
 
 // ══════════════════════════════════════════════
 //  BONUSES
