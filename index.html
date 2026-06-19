@@ -1216,6 +1216,7 @@ body.light .share-card-btn{background:rgba(0,0,0,.07)}
     <input type="file" id="importFileIn" accept=".json,application/json" style="display:none" onchange="importData(event)">
     <button class="modal-btn" id="forceSyncBtn" style="width:100%;padding:13px;margin-bottom:8px" onclick="forceSyncToCloud()">☁️ Выгрузить всё в облако</button>
     <button class="modal-btn" id="forceLoadBtn" style="width:100%;padding:13px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="forceSyncFromCloud()">⬇️ Загрузить всё из облака</button>
+    <button class="modal-btn" id="restoreExpBtn" style="width:100%;padding:13px;margin-top:8px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="restoreExpensesFromLocal()">🩹 Восстановить расходы из этого устройства</button>
     <div id="bioSection" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
       <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Биометрия</div>
       <div id="bioStatus" style="font-size:13px;color:var(--muted);margin-bottom:10px"></div>
@@ -2658,7 +2659,9 @@ async function forceSyncFromCloud(){
     if(pr.data&&!pr.error){
       for(const row of pr.data){
         const key='salary_'+row.period_key;
-        const val={days:row.days||{},bonuses:row.bonuses||[],taxEnabled:row.tax_enabled,dayOverrides:row.day_overrides||{},expenses:row.expenses||[]};
+        let exp=row.expenses||[];
+        if(!exp.length){try{const prev=JSON.parse(localStorage.getItem(key)||'null');if(prev&&Array.isArray(prev.expenses)&&prev.expenses.length)exp=prev.expenses;}catch(_){}}
+        const val={days:row.days||{},bonuses:row.bonuses||[],taxEnabled:row.tax_enabled,dayOverrides:row.day_overrides||{},expenses:exp};
         localStorage.setItem(key,JSON.stringify(val));
         ok++;
       }
@@ -2671,6 +2674,38 @@ async function forceSyncFromCloud(){
     showDataMsg('Ошибка загрузки: '+(e&&e.message||e),'err');
   }finally{
     if(btn){btn.disabled=false;}
+  }
+}
+
+// Re-upload any expenses still present in this device's localStorage back to the
+// cloud. Recovery path for periods whose cloud expenses were wiped by the old
+// bug. Only non-empty local lists are pushed, so it never clears anything.
+async function restoreExpensesFromLocal(){
+  if(!currentUser||!sbClient){showDataMsg('Сначала войди в аккаунт','err');return;}
+  if(!confirm('Залить расходы из этого устройства в облако? Это не сотрёт расходы, которые уже есть в облаке.'))return;
+  const btn=document.getElementById('restoreExpBtn');
+  if(btn)btn.disabled=true;
+  showDataMsg('Восстанавливаю расходы…','ok');
+  let restored=0,scanned=0;
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(!k||!/^salary_\d+_\d+_\d+$/.test(k))continue;
+      scanned++;
+      let data;try{data=JSON.parse(localStorage.getItem(k)||'{}');}catch(_){continue;}
+      if(!Array.isArray(data.expenses)||!data.expenses.length)continue;
+      try{
+        await sbClient.from('periods').upsert({user_id:currentUser.id,period_key:k.replace('salary_',''),days:data.days||{},bonuses:data.bonuses||[],tax_enabled:!!data.taxEnabled,day_overrides:data.dayOverrides||{},expenses:data.expenses,updated_at:new Date().toISOString()},{onConflict:'user_id,period_key'});
+        restored++;
+      }catch(e){console.error('restore expenses',k,e);}
+    }
+    showDataMsg(`✓ Восстановлено расходов: ${restored} из ${scanned} периодов`,restored?'ok':'warn');
+    haptic('medium');
+  }catch(e){
+    console.error('restoreExpensesFromLocal',e);
+    showDataMsg('Ошибка восстановления: '+(e&&e.message||e),'err');
+  }finally{
+    if(btn)btn.disabled=false;
   }
 }
 
@@ -3106,12 +3141,18 @@ async function loadAllUserData(){
     if(s.theme){localStorage.setItem('salary_theme',s.theme);lightTheme=s.theme==='light';document.body.classList.toggle('light',lightTheme);document.getElementById('themeBtn').textContent=lightTheme?'🌙':'☀️';}
   }
   if(periods){
-    periods.forEach(p=>localStorage.setItem('salary_'+p.period_key,JSON.stringify({days:p.days||{},bonuses:p.bonuses||[],taxEnabled:!!p.tax_enabled,dayOverrides:p.day_overrides||{},expenses:p.expenses||[]})));
-    // Derive the current period from the bulk result — no extra round-trip.
-    const pd=periods.find(p=>p.period_key===periodFsKey());
-    if(pd){days=pd.days||{};bonuses=pd.bonuses||[];taxEnabled=!!pd.tax_enabled;dayOverrides=pd.day_overrides||{};expenseItems=pd.expenses||[];}
-    else load();
-  }else load();
+    periods.forEach(p=>{
+      // Guard against the old data-loss bug: an empty cloud expenses list must
+      // never wipe expenses still present locally on this device.
+      let exp=p.expenses||[];
+      if(!exp.length){
+        try{const prev=JSON.parse(localStorage.getItem('salary_'+p.period_key)||'null');if(prev&&Array.isArray(prev.expenses)&&prev.expenses.length)exp=prev.expenses;}catch(_){}
+      }
+      localStorage.setItem('salary_'+p.period_key,JSON.stringify({days:p.days||{},bonuses:p.bonuses||[],taxEnabled:!!p.tax_enabled,dayOverrides:p.day_overrides||{},expenses:exp}));
+    });
+  }
+  // Hydrate the current period from the (now merged) localStorage.
+  load();
 }
 
 function startRealtimeSync(){
@@ -3121,7 +3162,9 @@ function startRealtimeSync(){
     .on('postgres_changes',{event:'*',schema:'public',table:'periods',filter:`user_id=eq.${currentUser.id}`},payload=>{
       const p=payload.new;
       if(p&&p.period_key===periodFsKey()){
-        days=p.days||{};bonuses=p.bonuses||[];taxEnabled=!!p.tax_enabled;dayOverrides=p.day_overrides||{};expenseItems=p.expenses||[];
+        let exp=p.expenses||[];
+        if(!exp.length&&Array.isArray(expenseItems)&&expenseItems.length)exp=expenseItems; // don't let an empty update wipe current expenses
+        days=p.days||{};bonuses=p.bonuses||[];taxEnabled=!!p.tax_enabled;dayOverrides=p.day_overrides||{};expenseItems=exp;
         localStorage.setItem(saveKey(),JSON.stringify({days,bonuses,taxEnabled,dayOverrides,expenses:expenseItems}));
         renderAll();
       }
@@ -3132,7 +3175,12 @@ function scheduleSaveToFirestore(){
   if(!currentUser||!sbClient)return;
   clearTimeout(saveDebounceTimer);
   saveDebounceTimer=setTimeout(async()=>{
-    try{await sbClient.from('periods').upsert({user_id:currentUser.id,period_key:periodFsKey(),days,bonuses,tax_enabled:taxEnabled,day_overrides:dayOverrides,expenses:expenseItems,updated_at:new Date().toISOString()},{onConflict:'user_id,period_key'});}
+    const row={user_id:currentUser.id,period_key:periodFsKey(),days,bonuses,tax_enabled:taxEnabled,day_overrides:dayOverrides,updated_at:new Date().toISOString()};
+    // Never let an empty expenses list overwrite a non-empty one in the cloud.
+    // Omitting the column on update leaves the stored value untouched; to clear
+    // expenses entirely, delete them via "Восстановить" flow or edit in place.
+    if(expenseItems.length)row.expenses=expenseItems;
+    try{await sbClient.from('periods').upsert(row,{onConflict:'user_id,period_key'});}
     catch(e){console.error('save period',e);}
   },2000);
 }
