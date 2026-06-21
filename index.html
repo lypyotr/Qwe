@@ -3178,15 +3178,44 @@ async function loadAllUserData(){
     if(s.theme){localStorage.setItem('salary_theme',s.theme);lightTheme=s.theme==='light';document.body.classList.toggle('light',lightTheme);document.getElementById('themeBtn').textContent=lightTheme?'🌙':'☀️';}
   }
   if(periods){
+    // True non-empty check for both objects (days/overrides) and arrays
+    // (bonuses/expenses).
+    const nz=v=>!!v&&(Array.isArray(v)?v.length>0:(typeof v==='object'&&Object.keys(v).length>0));
+    const cloudKeys=new Set();
+    const toPush=[]; // period keys whose local data must be (re)uploaded to cloud
     periods.forEach(p=>{
-      // Guard against the old data-loss bug: an empty cloud expenses list must
-      // never wipe expenses still present locally on this device.
-      let exp=p.expenses||[];
-      if(!exp.length){
-        try{const prev=JSON.parse(localStorage.getItem('salary_'+p.period_key)||'null');if(prev&&Array.isArray(prev.expenses)&&prev.expenses.length)exp=prev.expenses;}catch(_){}
-      }
-      localStorage.setItem('salary_'+p.period_key,JSON.stringify({days:p.days||{},bonuses:p.bonuses||[],taxEnabled:!!p.tax_enabled,dayOverrides:p.day_overrides||{},expenses:exp}));
+      cloudKeys.add(p.period_key);
+      let local=null;
+      try{local=JSON.parse(localStorage.getItem('salary_'+p.period_key)||'null');}catch(_){}
+      // Prefer cloud, but NEVER let an empty cloud field wipe non-empty local
+      // data. This is the core data-loss guard — previously only expenses were
+      // protected, so an empty cloud days/bonuses/overrides could erase a
+      // populated period on first login from a device.
+      let days=p.days||{},bonuses=p.bonuses||[],ov=p.day_overrides||{},exp=p.expenses||[];
+      let recovered=false;
+      if(!nz(days)&&local&&nz(local.days)){days=local.days;recovered=true;}
+      if(!nz(bonuses)&&local&&nz(local.bonuses)){bonuses=local.bonuses;recovered=true;}
+      if(!nz(ov)&&local&&nz(local.dayOverrides)){ov=local.dayOverrides;recovered=true;}
+      if(!nz(exp)&&local&&nz(local.expenses)){exp=local.expenses;recovered=true;}
+      localStorage.setItem('salary_'+p.period_key,JSON.stringify({days,bonuses,taxEnabled:!!p.tax_enabled,dayOverrides:ov,expenses:exp}));
+      if(recovered)toPush.push(p.period_key);
     });
+    // Periods that only exist locally (never reached the cloud) must be pushed
+    // up, not silently kept on one device.
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(k&&/^salary_\d+_\d+_\d+$/.test(k)){
+        const pk=k.replace('salary_','');
+        if(!cloudKeys.has(pk))toPush.push(pk);
+      }
+    }
+    // Re-upload recovered / local-only periods so the cloud reflects this device.
+    for(const pk of toPush){
+      try{
+        const d=JSON.parse(localStorage.getItem('salary_'+pk)||'{}');
+        await sbClient.from('periods').upsert({user_id:currentUser.id,period_key:pk,days:d.days||{},bonuses:d.bonuses||[],tax_enabled:!!d.taxEnabled,day_overrides:d.dayOverrides||{},expenses:d.expenses||[],updated_at:new Date().toISOString()},{onConflict:'user_id,period_key'});
+      }catch(e){console.error('reupload period',pk,e);}
+    }
   }
   // Hydrate the current period from the (now merged) localStorage.
   load();
