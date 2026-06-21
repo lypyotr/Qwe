@@ -1223,7 +1223,7 @@ body.light .share-card-btn{background:rgba(0,0,0,.07)}
     <input type="file" id="importFileIn" accept=".json,application/json" style="display:none" onchange="importData(event)">
     <button class="modal-btn" id="forceSyncBtn" style="width:100%;padding:13px;margin-bottom:8px" onclick="forceSyncToCloud()">☁️ Выгрузить всё в облако</button>
     <button class="modal-btn" id="forceLoadBtn" style="width:100%;padding:13px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="forceSyncFromCloud()">⬇️ Загрузить всё из облака</button>
-    <button class="modal-btn" id="restoreExpBtn" style="width:100%;padding:13px;margin-top:8px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="restoreExpensesFromLocal()">🩹 Восстановить расходы из этого устройства</button>
+    <button class="modal-btn" id="restoreExpBtn" style="width:100%;padding:13px;margin-top:8px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="restoreAllFromLocal()">🩹 Восстановить данные из этого устройства</button>
     <div id="bioSection" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
       <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Биометрия</div>
       <div id="bioStatus" style="font-size:13px;color:var(--muted);margin-bottom:10px"></div>
@@ -2677,7 +2677,8 @@ async function forceSyncToCloud(){
 // overwriting local copy. Useful for restoring data from cloud backup.
 async function forceSyncFromCloud(){
   if(!currentUser||!sbClient){showDataMsg('Сначала войди в аккаунт','err');return;}
-  if(!confirm('Загрузить данные из облака? Локальные данные будут перезаписаны.'))return;
+  if(!confirm('Загрузить данные из облака? Облачные данные обновят локальные, но пустые значения из облака НЕ сотрут ваши локальные данные.'))return;
+  const nz=v=>!!v&&(Array.isArray(v)?v.length>0:(typeof v==='object'&&Object.keys(v).length>0));
   const btn=document.getElementById('forceLoadBtn');
   if(btn){btn.disabled=true;}
   showDataMsg('Загружаю из облака…','ok');
@@ -2696,10 +2697,14 @@ async function forceSyncFromCloud(){
     if(pr.data&&!pr.error){
       for(const row of pr.data){
         const key='salary_'+row.period_key;
-        let exp=row.expenses||[];
-        if(!exp.length){try{const prev=JSON.parse(localStorage.getItem(key)||'null');if(prev&&Array.isArray(prev.expenses)&&prev.expenses.length)exp=prev.expenses;}catch(_){}}
-        const val={days:row.days||{},bonuses:row.bonuses||[],taxEnabled:row.tax_enabled,dayOverrides:row.day_overrides||{},expenses:exp};
-        localStorage.setItem(key,JSON.stringify(val));
+        let local=null;try{local=JSON.parse(localStorage.getItem(key)||'null');}catch(_){}
+        // Prefer cloud, but never let an empty cloud field wipe non-empty local data.
+        let days=row.days||{},bonuses=row.bonuses||[],ov=row.day_overrides||{},exp=row.expenses||[];
+        if(!nz(days)&&local&&nz(local.days))days=local.days;
+        if(!nz(bonuses)&&local&&nz(local.bonuses))bonuses=local.bonuses;
+        if(!nz(ov)&&local&&nz(local.dayOverrides))ov=local.dayOverrides;
+        if(!nz(exp)&&local&&nz(local.expenses))exp=local.expenses;
+        localStorage.setItem(key,JSON.stringify({days,bonuses,taxEnabled:row.tax_enabled,dayOverrides:ov,expenses:exp}));
         ok++;
       }
     }
@@ -2714,32 +2719,49 @@ async function forceSyncFromCloud(){
   }
 }
 
-// Re-upload any expenses still present in this device's localStorage back to the
-// cloud. Recovery path for periods whose cloud expenses were wiped by the old
-// bug. Only non-empty local lists are pushed, so it never clears anything.
-async function restoreExpensesFromLocal(){
+// Re-upload all data still present in this device's localStorage back to the
+// cloud. Recovery path for periods whose cloud data was wiped by the old bug.
+// Merges field-by-field: a non-empty local field is pushed up, but an empty
+// local field never overwrites non-empty cloud data — so it can only add data,
+// never clear it.
+async function restoreAllFromLocal(){
   if(!currentUser||!sbClient){showDataMsg('Сначала войди в аккаунт','err');return;}
-  if(!confirm('Залить расходы из этого устройства в облако? Это не сотрёт расходы, которые уже есть в облаке.'))return;
+  if(!confirm('Залить данные этого устройства в облако? Это только добавит данные — непустые значения в облаке не будут стёрты.'))return;
   const btn=document.getElementById('restoreExpBtn');
   if(btn)btn.disabled=true;
-  showDataMsg('Восстанавливаю расходы…','ok');
+  showDataMsg('Восстанавливаю данные…','ok');
+  const nz=v=>!!v&&(Array.isArray(v)?v.length>0:(typeof v==='object'&&Object.keys(v).length>0));
   let restored=0,scanned=0;
   try{
-    for(let i=0;i<localStorage.length;i++){
-      const k=localStorage.key(i);
-      if(!k||!/^salary_\d+_\d+_\d+$/.test(k))continue;
-      scanned++;
+    // Snapshot current cloud rows so we can merge per field instead of clobbering.
+    const cloudByKey={};
+    try{const pr=await withTimeout(sbClient.from('periods').select('*').eq('user_id',currentUser.id),30000);
+      if(pr.data)pr.data.forEach(r=>{cloudByKey[r.period_key]=r;});}catch(_){}
+    const keys=[];
+    for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&/^salary_\d+_\d+_\d+$/.test(k))keys.push(k);}
+    for(const k of keys){
       let data;try{data=JSON.parse(localStorage.getItem(k)||'{}');}catch(_){continue;}
-      if(!Array.isArray(data.expenses)||!data.expenses.length)continue;
-      try{
-        await sbClient.from('periods').upsert({user_id:currentUser.id,period_key:k.replace('salary_',''),days:data.days||{},bonuses:data.bonuses||[],tax_enabled:!!data.taxEnabled,day_overrides:data.dayOverrides||{},expenses:data.expenses,updated_at:new Date().toISOString()},{onConflict:'user_id,period_key'});
-        restored++;
-      }catch(e){console.error('restore expenses',k,e);}
+      // Skip periods with no local data at all — never push emptiness up.
+      if(!(nz(data.days)||nz(data.bonuses)||nz(data.dayOverrides)||nz(data.expenses)))continue;
+      scanned++;
+      const pk=k.replace('salary_','');
+      const cl=cloudByKey[pk]||{};
+      const row={
+        user_id:currentUser.id,period_key:pk,
+        days: nz(data.days)?data.days:(cl.days||{}),
+        bonuses: nz(data.bonuses)?data.bonuses:(cl.bonuses||[]),
+        tax_enabled: !!data.taxEnabled,
+        day_overrides: nz(data.dayOverrides)?data.dayOverrides:(cl.day_overrides||{}),
+        expenses: nz(data.expenses)?data.expenses:(cl.expenses||[]),
+        updated_at:new Date().toISOString()
+      };
+      try{await sbClient.from('periods').upsert(row,{onConflict:'user_id,period_key'});restored++;}
+      catch(e){console.error('restore period',k,e);}
     }
-    showDataMsg(`✓ Восстановлено расходов: ${restored} из ${scanned} периодов`,restored?'ok':'warn');
+    showDataMsg(`✓ Восстановлено периодов: ${restored} из ${scanned}`,restored?'ok':'warn');
     haptic('medium');
   }catch(e){
-    console.error('restoreExpensesFromLocal',e);
+    console.error('restoreAllFromLocal',e);
     showDataMsg('Ошибка восстановления: '+(e&&e.message||e),'err');
   }finally{
     if(btn)btn.disabled=false;
