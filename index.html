@@ -462,15 +462,6 @@ body.light .tvt-opt.active{background:rgba(0,0,0,.1);color:var(--text)}
 .exp-empty{padding:10px 16px 12px;font-size:13px;color:var(--muted);border-top:1px solid var(--border)}
 .empty{text-align:center;padding:22px;color:var(--muted);font-size:13px}
 
-/* ── RESET ── */
-.reset-btn{
-  width:calc(100% - 32px);margin:10px 16px 0;padding:14px;
-  background:rgba(248,113,113,.07);border:1px solid rgba(248,113,113,.2);
-  border-radius:16px;color:var(--danger);font-family:'Manrope',sans-serif;
-  font-size:14px;font-weight:700;cursor:pointer;transition:all .15s;
-}
-.reset-btn:active{background:rgba(248,113,113,.15);transform:scale(.98)}
-
 /* ── MODAL (templates / copy) ── */
 .modal-overlay{
   position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;
@@ -1133,8 +1124,6 @@ body.light .share-card-btn{background:rgba(0,0,0,.07)}
   </div>
   <div id="expensesList"></div>
 </div>
-
-<button class="reset-btn" onclick="resetAll()">🗑 Сбросить период</button>
 
 </div><!-- /page-period -->
 
@@ -2606,21 +2595,6 @@ function renderAchievements(){
     ${progressHtml}
     <div class="rank-items">${itemsHtml}</div>
   `;
-}
-
-// ══════════════════════════════════════════════
-//  RESET
-// ══════════════════════════════════════════════
-function resetAll(){
-  const hasData=Object.values(days).some(ws=>ws.length>0)||bonuses.length>0;
-  if(!hasData)return;
-  haptic('medium');
-  if(confirm('Сбросить данные этого периода?')){
-    days={};bonuses={};bonuses=[];taxEnabled=false;selectedDay=null;dayOverrides={};
-    document.getElementById('taxToggle').classList.remove('on');
-    save();haptic('medium');
-    renderDayStrip();renderDayPanel();renderBonuses();renderTotal();renderChart();
-  }
 }
 
 // ══════════════════════════════════════════════
