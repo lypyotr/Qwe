@@ -3105,7 +3105,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-22 #34';
+const BUILD_VER='2026-06-22 #35';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
@@ -3227,6 +3227,18 @@ function renderMaintToggle(){
 }
 
 // ── Owner-only writes to the global config ──
+// Turn a Supabase/transport failure into an actionable Russian message.
+function configErrMsg(e){
+  const m=((e&&(e.message||e.msg))||String(e||'')).toLowerCase();
+  const code=e&&e.code;
+  if(e&&e.name==='AbortError'||m.includes('aborted')||m.includes('timeout')||m.includes('failed to fetch')||m.includes('networkerror')||m.includes('load failed'))
+    return 'Сервер не ответил (таймаут). Возможно, проект Supabase на паузе или плохая сеть — проверь в дашборде Supabase и попробуй ещё раз';
+  if(m.includes('could not find the table')||m.includes('does not exist')||m.includes('schema cache')||code==='42p01')
+    return 'Таблица app_config не найдена — выполни admin_setup.sql в Supabase';
+  if(m.includes('row-level security')||m.includes('permission')||m.includes('policy')||code==='42501')
+    return 'Нет прав на запись (RLS) — войди под аккаунтом владельца и проверь политики';
+  return 'Ошибка: '+((e&&e.message)||e);
+}
 async function adminWriteConfig(patch,msgId){
   const msg=t=>{const e=document.getElementById(msgId);if(e){e.textContent=t;e.style.color='var(--accent)';}};
   const err=t=>{const e=document.getElementById(msgId);if(e){e.textContent=t;e.style.color='var(--danger)';}};
@@ -3241,7 +3253,7 @@ async function adminWriteConfig(patch,msgId){
     return true;
   }catch(e){
     console.error('adminWriteConfig',e);
-    err('Ошибка: '+((e&&e.message)||e)+' — проверь таблицу app_config');
+    err(configErrMsg(e));
     return false;
   }
 }
