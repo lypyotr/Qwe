@@ -673,7 +673,7 @@ body.light .tvt-opt.active{background:rgba(0,0,0,.1);color:var(--text)}
   width:100%;max-width:var(--app-max);z-index:900;box-sizing:border-box;
   background:linear-gradient(135deg,var(--accent),#7c3aed);color:#fff;
   padding:calc(10px + env(safe-area-inset-top)) 16px 10px;
-  display:flex;align-items:flex-start;gap:10px;font-size:13px;font-weight:600;line-height:1.4;
+  display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;line-height:1.35;
   box-shadow:0 6px 20px rgba(0,0,0,.25);
 }
 .announce-bar .ann-ico{font-size:16px;line-height:1.2}
@@ -681,6 +681,7 @@ body.light .tvt-opt.active{background:rgba(0,0,0,.1);color:var(--text)}
 .announce-bar .ann-close{
   background:rgba(255,255,255,.22);border:none;color:#fff;font-size:13px;font-weight:800;
   width:24px;height:24px;border-radius:7px;cursor:pointer;flex:none;line-height:1;
+  display:flex;align-items:center;justify-content:center;padding:0;
 }
 
 /* ── MAINTENANCE OVERLAY ── */
@@ -3104,7 +3105,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-22 #33';
+const BUILD_VER='2026-06-22 #34';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
