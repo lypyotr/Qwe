@@ -692,6 +692,57 @@ body.light .rank-item-unit{color:#444}
 .page{display:none}
 .page.active{display:block}
 
+/* ── ADMIN PANEL ── */
+.admin-wrap{padding:0 20px 20px}
+.admin-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:16px;
+  padding:16px;margin-bottom:14px;
+}
+.admin-card-title{font-size:13px;font-weight:800;letter-spacing:.5px;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.admin-card-sub{font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:12px}
+.admin-textarea{
+  width:100%;box-sizing:border-box;background:var(--surface2);color:var(--text);
+  border:1px solid var(--border);border-radius:12px;padding:12px;font-family:inherit;
+  font-size:14px;resize:vertical;min-height:70px;margin-bottom:10px;
+}
+.admin-textarea:focus{outline:none;border-color:var(--accent)}
+.admin-diag{
+  font-size:11px;line-height:1.6;color:var(--muted);font-family:monospace;
+  white-space:pre-wrap;word-break:break-all;background:var(--surface2);
+  border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:12px;
+}
+.admin-status{font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.admin-status .dot{width:10px;height:10px;border-radius:50%;flex:none}
+.admin-status .dot.on{background:var(--danger);box-shadow:0 0 0 4px rgba(248,113,113,.18)}
+.admin-status .dot.off{background:#4ade80;box-shadow:0 0 0 4px rgba(74,222,128,.15)}
+.admin-msg{margin-top:10px;font-size:13px;text-align:center;font-weight:600;min-height:18px}
+
+/* ── GLOBAL ANNOUNCEMENT BANNER ── */
+.announce-bar{
+  position:fixed;top:0;left:50%;transform:translateX(-50%);
+  width:100%;max-width:var(--app-max);z-index:900;box-sizing:border-box;
+  background:linear-gradient(135deg,var(--accent),#7c3aed);color:#fff;
+  padding:calc(10px + env(safe-area-inset-top)) 16px 10px;
+  display:flex;align-items:flex-start;gap:10px;font-size:13px;font-weight:600;line-height:1.4;
+  box-shadow:0 6px 20px rgba(0,0,0,.25);
+}
+.announce-bar .ann-ico{font-size:16px;line-height:1.2}
+.announce-bar .ann-txt{flex:1;white-space:pre-wrap;word-break:break-word}
+.announce-bar .ann-close{
+  background:rgba(255,255,255,.22);border:none;color:#fff;font-size:13px;font-weight:800;
+  width:24px;height:24px;border-radius:7px;cursor:pointer;flex:none;line-height:1;
+}
+
+/* ── MAINTENANCE OVERLAY ── */
+.maint-overlay{
+  position:fixed;inset:0;z-index:1500;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:32px;
+}
+.maint-overlay .maint-ico{font-size:56px;margin-bottom:16px}
+.maint-overlay .maint-title{font-size:22px;font-weight:800;margin-bottom:12px}
+.maint-overlay .maint-msg{font-size:15px;color:var(--muted);line-height:1.6;max-width:340px;white-space:pre-wrap}
+
 /* ── FIREBASE AUTH SCREEN ── */
 .auth-overlay{
   position:fixed;inset:0;z-index:1000;
@@ -910,6 +961,20 @@ body.light .share-card-btn{background:rgba(0,0,0,.07)}
 <div class="notif-banner" id="notifBanner" style="display:none">
   <span class="notif-banner-text">🔔 Не забудь внести данные за сегодня</span>
   <button class="notif-banner-ok" onclick="dismissNotifBanner()">OK</button>
+</div>
+
+<!-- GLOBAL ANNOUNCEMENT (set from admin panel, shown to everyone) -->
+<div class="announce-bar" id="announceBar" style="display:none">
+  <span class="ann-ico">📢</span>
+  <span class="ann-txt" id="announceText"></span>
+  <button class="ann-close" onclick="dismissAnnounce()" title="Скрыть">✕</button>
+</div>
+
+<!-- MAINTENANCE OVERLAY (blocks app for everyone except admin) -->
+<div class="maint-overlay" id="maintOverlay" style="display:none">
+  <div class="maint-ico">🛠️</div>
+  <div class="maint-title">Идут технические работы</div>
+  <div class="maint-msg" id="maintMsg">Приложение временно недоступно. Загляни чуть позже.</div>
 </div>
 
 <!-- AUTH SCREEN -->
@@ -1146,6 +1211,47 @@ body.light .share-card-btn{background:rgba(0,0,0,.07)}
 
 </div><!-- /page-archive -->
 
+<!-- ══ PAGE: ADMIN (only visible to the owner account) ══ -->
+<div class="page" id="page-admin">
+  <div class="header">
+    <div class="header-left"><div class="header-label">🛡️ Админ-панель</div></div>
+  </div>
+  <div class="admin-wrap">
+
+    <!-- Global announcement -->
+    <div class="admin-card">
+      <div class="admin-card-title">📢 Глобальное объявление</div>
+      <div class="admin-card-sub">Текст увидят все пользователи приложения в виде баннера сверху. Оставь пустым и нажми «Снять», чтобы убрать.</div>
+      <textarea class="admin-textarea" id="annInput" placeholder="Например: Завтра обновление — данные сохранятся."></textarea>
+      <button class="modal-btn" style="width:100%;padding:13px;margin-bottom:8px" onclick="adminPublishAnnouncement()">Опубликовать всем</button>
+      <button class="modal-btn" style="width:100%;padding:13px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="adminClearAnnouncement()">Снять объявление</button>
+      <div class="admin-msg" id="annMsg"></div>
+    </div>
+
+    <!-- Maintenance mode -->
+    <div class="admin-card">
+      <div class="admin-card-title">🛠️ Режим обслуживания</div>
+      <div class="admin-card-sub">Когда включён, все пользователи (кроме тебя) видят заглушку и не могут пользоваться приложением.</div>
+      <div class="admin-status"><span class="dot off" id="maintDot"></span><span id="maintStateLbl">Выключен</span></div>
+      <textarea class="admin-textarea" id="maintInput" placeholder="Сообщение для пользователей (необязательно)"></textarea>
+      <button class="modal-btn" id="maintToggleBtn" style="width:100%;padding:13px" onclick="adminToggleMaintenance()">Включить режим обслуживания</button>
+      <div class="admin-msg" id="maintAdminMsg"></div>
+    </div>
+
+    <!-- Diagnostics & service -->
+    <div class="admin-card">
+      <div class="admin-card-title">🩺 Диагностика и служебное</div>
+      <div class="admin-card-sub">Состояние сборки, сессии и инструменты восстановления данных.</div>
+      <div class="admin-diag" id="adminDiag">—</div>
+      <button class="modal-btn" id="forceSyncBtn" style="width:100%;padding:13px;margin-bottom:8px" onclick="forceSyncToCloud()">☁️ Выгрузить всё в облако</button>
+      <button class="modal-btn" id="forceLoadBtn" style="width:100%;padding:13px;margin-bottom:8px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="forceSyncFromCloud()">⬇️ Загрузить всё из облака</button>
+      <button class="modal-btn" id="restoreExpBtn" style="width:100%;padding:13px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="restoreAllFromLocal()">🩹 Восстановить данные из этого устройства</button>
+      <div class="admin-msg" id="dataMsgAdmin"></div>
+    </div>
+
+  </div>
+</div><!-- /page-admin -->
+
 <!-- TEMPLATE MODAL -->
 <div class="modal-overlay" id="tplModal" onclick="closeTplModal(event)">
   <div class="modal">
@@ -1221,9 +1327,6 @@ body.light .share-card-btn{background:rgba(0,0,0,.07)}
     <button class="modal-btn" style="width:100%;padding:13px;margin-bottom:10px" onclick="exportData()">📤 Экспорт в файл</button>
     <button class="modal-btn" style="width:100%;padding:13px;margin-bottom:10px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="document.getElementById('importFileIn').click()">📥 Импорт из файла</button>
     <input type="file" id="importFileIn" accept=".json,application/json" style="display:none" onchange="importData(event)">
-    <button class="modal-btn" id="forceSyncBtn" style="width:100%;padding:13px;margin-bottom:8px" onclick="forceSyncToCloud()">☁️ Выгрузить всё в облако</button>
-    <button class="modal-btn" id="forceLoadBtn" style="width:100%;padding:13px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="forceSyncFromCloud()">⬇️ Загрузить всё из облака</button>
-    <button class="modal-btn" id="restoreExpBtn" style="width:100%;padding:13px;margin-top:8px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="restoreAllFromLocal()">🩹 Восстановить данные из этого устройства</button>
     <div id="bioSection" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
       <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Биометрия</div>
       <div id="bioStatus" style="font-size:13px;color:var(--muted);margin-bottom:10px"></div>
@@ -1257,6 +1360,10 @@ body.light .share-card-btn{background:rgba(0,0,0,.07)}
     <span class="nav-icon">📁</span>
     <span class="nav-lbl">Архив</span>
   </div>
+  <div class="nav-btn" id="navAdmin" onclick="switchPage('admin')" style="display:none">
+    <span class="nav-icon">🛡️</span>
+    <span class="nav-lbl">Админ</span>
+  </div>
 </nav>
 
 <script>
@@ -1267,7 +1374,10 @@ body.light .share-card-btn{background:rgba(0,0,0,.07)}
 //  PAGE NAVIGATION
 // ══════════════════════════════════════════════
 function switchPage(name){
+  // Admin page is owner-only — quietly bounce everyone else to Работа.
+  if(name==='admin'&&!isAdmin())name='work';
   haptic('light');
+  if(name==='admin')renderAdminDiag();
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
@@ -2635,9 +2745,13 @@ function openDataModal(){
 function closeDataModal(e){if(e.target===document.getElementById('dataModal'))document.getElementById('dataModal').classList.remove('open')}
 
 function showDataMsg(text,kind){
-  const msg=document.getElementById('dataMsg');
-  msg.textContent=text;
-  msg.style.color=kind==='err'?'var(--danger)':kind==='warn'?'var(--warn)':'var(--accent)';
+  const color=kind==='err'?'var(--danger)':kind==='warn'?'var(--warn)':'var(--accent)';
+  // Service tools now live in the admin panel, while import/export keeps its own
+  // message line in the Data modal — update whichever target exists.
+  ['dataMsg','dataMsgAdmin'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){el.textContent=text;el.style.color=color;}
+  });
 }
 
 // Force-push ALL local data (settings + every period) to Supabase,
@@ -2969,9 +3083,161 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-18 #28';
+const BUILD_VER='2026-06-22 #29';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
+
+// ══════════════════════════════════════════════
+//  ADMIN PANEL  (owner-only global controls)
+// ══════════════════════════════════════════════
+const ADMIN_EMAIL='lypyotr@yandex.ru';
+function isAdmin(){return !!(currentUser&&currentUser.email&&currentUser.email.toLowerCase()===ADMIN_EMAIL);}
+// Mirror of the single global config row in Supabase (table app_config, id=1).
+let appConfig={announcement:'',announcement_active:false,maintenance:false,maintenance_msg:''};
+let appConfigChannel=null;
+
+// Toggle the admin nav tab + fill the panel after we know who is logged in.
+function refreshAdminUI(){
+  const nav=document.getElementById('navAdmin');
+  if(nav)nav.style.display=isAdmin()?'':'none';
+  // A non-admin must never sit on the admin page (e.g. after account switch).
+  if(!isAdmin()&&document.getElementById('page-admin').classList.contains('active'))switchPage('work');
+  if(isAdmin())renderAdminDiag();
+}
+
+function renderAdminDiag(){
+  const el=document.getElementById('adminDiag');
+  if(!el)return;
+  let tokenLen=0;
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(k&&(k.includes('auth-token')||k.startsWith('sb-'))){tokenLen=(localStorage.getItem(k)||'').length;break;}
+    }
+  }catch(e){}
+  el.textContent='сборка: '+BUILD_VER
+    +'\nаккаунт: '+(currentUser?currentUser.email:'—')
+    +'\nuser id: '+(currentUser?currentUser.id:'—')
+    +'\nсчётчик загрузок: '+_lsReloadCount+(_lsWorks?' (localStorage пишется)':' (localStorage НЕ работает!)')
+    +'\nтокен сессии: '+(tokenLen?tokenLen+' симв.':'нет')
+    +'\nобъявление: '+(appConfig.announcement_active&&appConfig.announcement?'активно':'выключено')
+    +'\nрежим обслуживания: '+(appConfig.maintenance?'ВКЛЮЧЁН':'выключен');
+}
+
+// ── Read/apply the global config that every client shares ──
+async function loadAppConfig(){
+  if(!sbClient)return;
+  try{
+    const{data,error}=await sbClient.from('app_config').select('*').eq('id',1).maybeSingle();
+    if(error)throw error;
+    if(data)applyAppConfig(data);
+  }catch(e){console.error('loadAppConfig',e);}
+}
+function startAppConfigRealtime(){
+  if(!sbClient)return;
+  if(appConfigChannel){sbClient.removeChannel(appConfigChannel);appConfigChannel=null;}
+  appConfigChannel=sbClient.channel('app-config')
+    .on('postgres_changes',{event:'*',schema:'public',table:'app_config'},payload=>{
+      if(payload.new)applyAppConfig(payload.new);
+    }).subscribe();
+}
+function applyAppConfig(cfg){
+  appConfig={
+    announcement:cfg.announcement||'',
+    announcement_active:!!cfg.announcement_active,
+    maintenance:!!cfg.maintenance,
+    maintenance_msg:cfg.maintenance_msg||''
+  };
+  renderAnnouncement();
+  renderMaintenance();
+  // Keep the admin form in sync with the live config (without clobbering a field
+  // the owner is actively typing into).
+  if(isAdmin()){
+    const ann=document.getElementById('annInput'),mnt=document.getElementById('maintInput');
+    if(ann&&document.activeElement!==ann)ann.value=appConfig.announcement;
+    if(mnt&&document.activeElement!==mnt)mnt.value=appConfig.maintenance_msg;
+    renderMaintToggle();
+    renderAdminDiag();
+  }
+}
+function renderAnnouncement(){
+  const bar=document.getElementById('announceBar'),txt=document.getElementById('announceText');
+  if(!bar)return;
+  const active=appConfig.announcement_active&&appConfig.announcement.trim();
+  // Dismissed announcements stay hidden until the text changes.
+  let seen='';try{seen=localStorage.getItem('salary_ann_seen')||'';}catch(e){}
+  if(active&&seen!==appConfig.announcement){
+    txt.textContent=appConfig.announcement;
+    bar.style.display='';
+  }else{
+    bar.style.display='none';
+  }
+}
+function dismissAnnounce(){
+  try{localStorage.setItem('salary_ann_seen',appConfig.announcement);}catch(e){}
+  document.getElementById('announceBar').style.display='none';
+}
+function renderMaintenance(){
+  const ov=document.getElementById('maintOverlay');
+  if(!ov)return;
+  // The owner is never locked out of their own app.
+  const block=appConfig.maintenance&&!isAdmin();
+  if(block){
+    const msg=document.getElementById('maintMsg');
+    if(msg&&appConfig.maintenance_msg.trim())msg.textContent=appConfig.maintenance_msg;
+    ov.style.display='';
+  }else{
+    ov.style.display='none';
+  }
+}
+function renderMaintToggle(){
+  const dot=document.getElementById('maintDot'),lbl=document.getElementById('maintStateLbl'),btn=document.getElementById('maintToggleBtn');
+  if(!dot)return;
+  if(appConfig.maintenance){
+    dot.className='dot on';lbl.textContent='Включён';
+    btn.textContent='Выключить режим обслуживания';
+    btn.style.background='var(--surface2)';btn.style.color='var(--text)';btn.style.border='1px solid var(--border)';
+  }else{
+    dot.className='dot off';lbl.textContent='Выключен';
+    btn.textContent='Включить режим обслуживания';
+    btn.style.background='';btn.style.color='';btn.style.border='';
+  }
+}
+
+// ── Owner-only writes to the global config ──
+async function adminWriteConfig(patch,msgId){
+  const msg=t=>{const e=document.getElementById(msgId);if(e){e.textContent=t;e.style.color='var(--accent)';}};
+  const err=t=>{const e=document.getElementById(msgId);if(e){e.textContent=t;e.style.color='var(--danger)';}};
+  if(!isAdmin()||!sbClient){err('Доступно только владельцу');return false;}
+  msg('Сохраняю…');
+  try{
+    const row={id:1,...patch,updated_at:new Date().toISOString()};
+    const{error}=await sbClient.from('app_config').upsert(row,{onConflict:'id'});
+    if(error)throw error;
+    applyAppConfig({...appConfig,...patch}); // reflect immediately, realtime confirms
+    msg('✓ Применено для всех');
+    return true;
+  }catch(e){
+    console.error('adminWriteConfig',e);
+    err('Ошибка: '+((e&&e.message)||e)+' — проверь таблицу app_config');
+    return false;
+  }
+}
+async function adminPublishAnnouncement(){
+  const text=(document.getElementById('annInput').value||'').trim();
+  if(!text){document.getElementById('annMsg').style.color='var(--warn)';document.getElementById('annMsg').textContent='Введи текст объявления';return;}
+  // New text resets the "seen" flag so it re-appears for everyone, owner included.
+  try{localStorage.removeItem('salary_ann_seen');}catch(e){}
+  await adminWriteConfig({announcement:text,announcement_active:true},'annMsg');
+}
+async function adminClearAnnouncement(){
+  await adminWriteConfig({announcement_active:false},'annMsg');
+}
+async function adminToggleMaintenance(){
+  const next=!appConfig.maintenance;
+  const text=(document.getElementById('maintInput').value||'').trim();
+  await adminWriteConfig({maintenance:next,maintenance_msg:text},'maintAdminMsg');
+}
 
 // Independent localStorage persistence self-test. Increments a counter on
 // every load. If it stays at 1 after refreshes, localStorage does NOT
@@ -3072,6 +3338,9 @@ function initFirebase(){
       }else if(event==='SIGNED_OUT'){
         currentUser=null;
         if(realtimeChannel){sbClient.removeChannel(realtimeChannel);realtimeChannel=null;}
+        if(appConfigChannel){sbClient.removeChannel(appConfigChannel);appConfigChannel=null;}
+        refreshAdminUI();   // hide admin tab + leave maintenance lock to owner check
+        renderMaintenance();
         showAuthOverlay(true);showAuthLogin();
       }else if(event==='TOKEN_REFRESHED'&&session?.user){
         currentUser=session.user;
@@ -3101,6 +3370,7 @@ function enterApp(user){
   load();                 // local data first
   renderAll();            // render immediately
   hideLoader();           // never wait on the network
+  refreshAdminUI();       // show/hide the owner-only admin tab
   checkDailyReminder();
   if(_cloudLoaded)return;  // avoid duplicate cloud loads (getSession + SIGNED_IN)
   _cloudLoaded=true;
@@ -3109,6 +3379,8 @@ function enterApp(user){
       await loadAllUserData();
       await migrateLocalStorageToSupabase();
       renderAll();startRealtimeSync();
+      await loadAppConfig();   // pull global announcement / maintenance state
+      startAppConfigRealtime();
     }catch(e){console.error('cloud sync',e);}
   })();
 }
