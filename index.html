@@ -430,34 +430,52 @@ body.light .tvt-opt.active{background:rgba(0,0,0,.1);color:var(--text)}
   border-radius:8px;padding:4px 10px;
 }
 .expenses-add-btn:active{opacity:.7}
-.exp-item{padding:10px 16px;border-top:1px solid var(--border)}
-.exp-top{display:flex;align-items:center;gap:8px;margin-bottom:7px}
-.exp-name{
-  flex:1;font-family:'Manrope',sans-serif;font-size:13px;font-weight:600;
-  color:var(--text);background:transparent;border:none;outline:none;min-width:0;
+
+/* compact expense cards grid */
+.exp-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(146px,1fr));
+  gap:8px;padding:4px 16px 14px;
 }
-.exp-name::placeholder{color:var(--muted)}
-.exp-del{color:var(--muted);font-size:16px;cursor:pointer;padding:0 2px;flex-shrink:0}
-.exp-del:active{color:var(--danger)}
-.exp-bottom{display:flex;align-items:center;gap:8px}
-.exp-amount{
-  font-family:'Manrope',sans-serif;font-size:15px;font-weight:700;color:var(--text);
-  background:var(--surface2);border:1px solid var(--border);border-radius:10px;
-  padding:7px 10px;width:110px;outline:none;text-align:right;
-  -webkit-appearance:none;transition:border-color .15s;
+.exp-card{
+  position:relative;cursor:pointer;overflow:hidden;
+  background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--danger);
+  border-radius:14px;padding:11px 12px;
+  transition:transform .12s ease,border-color .15s;
 }
-.exp-amount:focus{border-color:var(--danger)}
-.exp-currency{font-size:13px;font-weight:700;color:var(--muted);flex-shrink:0}
+.exp-card:active{transform:scale(.97)}
+.exp-card-name{
+  font-size:12.5px;font-weight:700;color:var(--text);margin-bottom:6px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.exp-card-amount{
+  font-size:19px;font-weight:800;color:var(--danger);line-height:1;letter-spacing:-.3px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.exp-card-amount .cur{font-size:12px;font-weight:700;color:var(--muted);margin-left:1px}
+.exp-card-meta{display:flex;align-items:center;gap:6px;margin-top:8px;min-width:0}
+.exp-card-mode{
+  font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;
+  color:var(--danger);background:rgba(248,113,113,.12);border-radius:6px;padding:2px 6px;
+  white-space:nowrap;flex-shrink:0;
+}
+.exp-card-eff{font-size:10px;font-weight:600;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.exp-empty{padding:6px 16px 14px;font-size:13px;color:var(--muted)}
+
+/* expense edit modal: amount + segmented mode control (reused) */
 .exp-mode{
   display:flex;background:var(--surface2);border:1px solid var(--border);
-  border-radius:8px;overflow:hidden;margin-left:auto;flex-shrink:0;
+  border-radius:10px;overflow:hidden;
 }
 .exp-mode-opt{
-  font-size:11px;font-weight:700;padding:6px 10px;cursor:pointer;
+  flex:1;text-align:center;font-size:13px;font-weight:700;padding:11px 8px;cursor:pointer;
   color:var(--muted);transition:all .15s;white-space:nowrap;
 }
 .exp-mode-opt.active{background:var(--danger);color:#fff}
-.exp-empty{padding:10px 16px 12px;font-size:13px;color:var(--muted);border-top:1px solid var(--border)}
+.exp-mode-opt:active{opacity:.8}
+.exp-edit-eff{
+  text-align:center;font-size:12px;font-weight:600;color:var(--muted);margin:14px 0 4px;min-height:16px;
+}
+.exp-edit-eff b{color:var(--danger);font-weight:800}
 .empty{text-align:center;padding:22px;color:var(--muted);font-size:13px}
 
 /* ── MODAL (templates / copy) ── */
@@ -1237,6 +1255,30 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
     <div class="modal-handle"></div>
     <div class="modal-title">Скопировать расходы из периода</div>
     <div class="copy-day-list" id="copyExpList"></div>
+  </div>
+</div>
+
+<!-- EXPENSE EDIT MODAL -->
+<div class="modal-overlay" id="expEditModal" onclick="closeExpEdit(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Расход</div>
+    <input class="modal-input" id="expEditName" placeholder="Название расхода" type="text"
+      style="width:100%;box-sizing:border-box;margin-bottom:12px"
+      oninput="updateExpense(_editingExpId,'name',this.value)">
+    <div class="modal-input-row" style="align-items:center">
+      <input class="modal-input" id="expEditAmount" placeholder="0" type="number" inputmode="decimal"
+        style="text-align:right" oninput="updateExpense(_editingExpId,'amount',this.value)">
+      <span style="font-size:15px;font-weight:700;color:var(--muted);padding:0 4px">₽</span>
+    </div>
+    <div class="exp-mode" id="expEditMode">
+      <div class="exp-mode-opt" data-mode="day" onclick="setExpMode('day')">в день</div>
+      <div class="exp-mode-opt" data-mode="period" onclick="setExpMode('period')">за период</div>
+      <div class="exp-mode-opt" data-mode="month" onclick="setExpMode('month')">в месяц</div>
+    </div>
+    <div class="exp-edit-eff" id="expEditEff"></div>
+    <button class="modal-btn" style="width:100%;padding:14px;margin-top:6px" onclick="closeExpEdit()">Готово</button>
+    <button class="modal-btn" style="width:100%;padding:13px;margin-top:8px;background:rgba(248,113,113,.12);color:var(--danger);border:1px solid rgba(248,113,113,.3)" onclick="deleteEditingExpense()">🗑 Удалить расход</button>
   </div>
 </div>
 
@@ -2480,10 +2522,14 @@ function loadExpenses(){
 function saveExpenses(){
   save();
 }
+let _editingExpId=null;
+
 function addExpenseItem(){
-  expenseItems.push({id:Date.now(),name:'',amount:'',mode:'period'});
+  const id=Date.now();
+  expenseItems.push({id,name:'',amount:'',mode:'period'});
   saveExpenses();haptic('light');
   renderExpenses();renderTotal();renderGoals();
+  openExpEdit(id); // jump straight into editing the fresh card
 }
 function delExpense(id){
   expenseItems=expenseItems.filter(e=>e.id!==id);
@@ -2495,10 +2541,68 @@ function updateExpense(id,field,value){
   if(!item)return;
   item[field]=value;
   saveExpenses();
-  if(field==='mode') renderExpenses();
-  renderTotal();renderGoals();
+  renderExpenses();renderTotal();renderGoals(); // editing happens in the modal, so re-rendering cards never steals focus
+  if(_editingExpId===id)renderExpEditEff();
 }
 function calcWorkedDays(){return Object.keys(days).filter(d=>daySum(parseInt(d))>0).length}
+
+function expModeLabel(mode){return mode==='day'?'в день':mode==='month'?'в месяц':'за период';}
+
+// ── Edit modal ──
+function openExpEdit(id){
+  const item=expenseItems.find(e=>e.id===id);
+  if(!item)return;
+  _editingExpId=id;
+  document.getElementById('expEditName').value=item.name||'';
+  document.getElementById('expEditAmount').value=item.amount||'';
+  renderExpModeButtons();
+  renderExpEditEff();
+  document.getElementById('expEditModal').classList.add('open');
+}
+function closeExpEdit(e){
+  if(e&&e.target!==document.getElementById('expEditModal'))return; // click inside the sheet
+  document.getElementById('expEditModal').classList.remove('open');
+  // A card added via "+ Добавить" but left completely blank is discarded on close.
+  if(_editingExpId!=null){
+    const item=expenseItems.find(x=>x.id===_editingExpId);
+    if(item&&!String(item.name||'').trim()&&!(parseFloat(item.amount)||0)){
+      expenseItems=expenseItems.filter(x=>x.id!==_editingExpId);
+      saveExpenses();renderExpenses();renderTotal();renderGoals();
+    }
+  }
+  _editingExpId=null;
+}
+function setExpMode(mode){
+  if(_editingExpId==null)return;
+  haptic('light');
+  updateExpense(_editingExpId,'mode',mode);
+  renderExpModeButtons();
+}
+function renderExpModeButtons(){
+  const item=expenseItems.find(e=>e.id===_editingExpId);
+  if(!item)return;
+  document.querySelectorAll('#expEditMode .exp-mode-opt').forEach(b=>{
+    b.classList.toggle('active',b.dataset.mode===item.mode);
+  });
+}
+function renderExpEditEff(){
+  const el=document.getElementById('expEditEff');
+  const item=expenseItems.find(e=>e.id===_editingExpId);
+  if(!el||!item)return;
+  const amt=parseFloat(item.amount)||0;
+  const wd=calcWorkedDays();
+  if(item.mode==='day')el.innerHTML=`${wd} раб. дн × ${fmt(amt)} ₽ = вычет <b>−${fmt(amt*wd)} ₽</b> за период`;
+  else if(item.mode==='month')el.innerHTML=`Половина месячной суммы = вычет <b>−${fmt(amt/2)} ₽</b> за период`;
+  else el.innerHTML=`Вычет <b>−${fmt(amt)} ₽</b> за период`;
+}
+function deleteEditingExpense(){
+  if(_editingExpId==null)return;
+  const id=_editingExpId;
+  _editingExpId=null;
+  document.getElementById('expEditModal').classList.remove('open');
+  delExpense(id);
+}
+
 function renderExpenses(){
   const list=document.getElementById('expensesList');
   if(!list)return;
@@ -2507,27 +2611,22 @@ function renderExpenses(){
     return;
   }
   const wd=calcWorkedDays();
-  list.innerHTML=expenseItems.map(item=>`
-    <div class="exp-item">
-      <div class="exp-top">
-        <input class="exp-name" placeholder="Название расхода" value="${esc(String(item.name||''))}"
-          oninput="updateExpense(${item.id},'name',this.value)">
-        <div class="exp-del" onclick="delExpense(${item.id})">✕</div>
+  const cards=expenseItems.map(item=>{
+    const amt=parseFloat(item.amount)||0;
+    const name=esc(String(item.name||'').trim()||'Расход');
+    let eff='';
+    if(item.mode==='day')eff=`${wd} дн → −${fmt(amt*wd)} ₽`;
+    else if(item.mode==='month')eff=`½ мес → −${fmt(amt/2)} ₽`;
+    return `<div class="exp-card" onclick="openExpEdit(${item.id})">
+      <div class="exp-card-name">${name}</div>
+      <div class="exp-card-amount">${fmt(amt)}<span class="cur"> ₽</span></div>
+      <div class="exp-card-meta">
+        <span class="exp-card-mode">${expModeLabel(item.mode)}</span>
+        ${eff?`<span class="exp-card-eff">${eff}</span>`:''}
       </div>
-      <div class="exp-bottom">
-        <input class="exp-amount" type="number" inputmode="decimal" placeholder="0"
-          value="${item.amount||''}" oninput="updateExpense(${item.id},'amount',this.value)">
-        <span class="exp-currency">₽${item.mode==='day'?`<span style="font-size:10px;color:var(--muted)"> ×${wd}дн</span>`:''}</span>
-        <div class="exp-mode">
-          <div class="exp-mode-opt${item.mode==='day'?' active':''}"
-            onclick="updateExpense(${item.id},'mode','day')">в день</div>
-          <div class="exp-mode-opt${item.mode==='period'?' active':''}"
-            onclick="updateExpense(${item.id},'mode','period')">период</div>
-          <div class="exp-mode-opt${item.mode==='month'?' active':''}"
-            onclick="updateExpense(${item.id},'mode','month')">месяц</div>
-        </div>
-      </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
+  list.innerHTML=`<div class="exp-grid">${cards}</div>`;
 }
 function calcExpensesTotal(){
   const wd=calcWorkedDays();
@@ -2991,7 +3090,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-22 #31';
+const BUILD_VER='2026-06-22 #32';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 

@@ -1,4 +1,4 @@
-const CACHE='salary-v12';
+const CACHE='salary-v13';
 const STATIC=['./manifest.json','./icon.svg'];
 
 self.addEventListener('install',e=>{
