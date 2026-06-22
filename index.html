@@ -12,7 +12,6 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230d0f14'/><text y='.9em' font-size='72' x='12'>💰</text></svg>">
 <link rel="shortcut icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230d0f14'/><text y='.9em' font-size='72' x='12'>💰</text></svg>">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230d0f14'/><text y='.9em' font-size='72' x='12'>💰</text></svg>">
 <title>Зарплата</title>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -514,121 +513,54 @@ body.light .tvt-opt.active{background:rgba(0,0,0,.1);color:var(--text)}
 
 @keyframes slideIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
 
-/* ── ACHIEVEMENT RANK CARD ── */
-/* ── RANK CARD ── */
-.rank-wrapper{
-  position:relative;
-  perspective:700px;
-  margin:16px 16px 12px;
-}
-.pc-behind{
-  position:absolute;inset:-24px;border-radius:36px;
-  filter:blur(36px);opacity:.55;z-index:-1;pointer-events:none;
-  transition:background .5s;
-}
-.rank-card{
-  --border-radius:24px;
-  border-radius:var(--border-radius);
-  position:relative;overflow:visible;
-  isolation:isolate;display:grid;
-  border:1px solid rgb(255 255 255/15%);
-  box-shadow:rgba(0,0,0,.1) 0 1px 2px,rgba(0,0,0,.1) 0 4px 8px,rgba(0,0,0,.2) 0 16px 32px,rgba(0,0,0,.2) 0 32px 64px;
-}
-/* large semi-transparent background icon */
-.rank-bg-icon{
-  position:absolute;top:50%;left:50%;
-  transform:translate(-50%,-50%);
-  font-size:150px;line-height:1;opacity:.07;
-  pointer-events:none;z-index:0;user-select:none;
-}
-/* tier backgrounds */
-.rank-card.bronze{background:linear-gradient(135deg,#2a1a0e 0%,#3d2510 50%,#1e1208 100%)}
-.rank-card.silver{background:linear-gradient(135deg,#1a1e26 0%,#252d3a 50%,#141820 100%)}
-.rank-card.gold{background:linear-gradient(135deg,#2a2000 0%,#3d2e00 50%,#1e1800 100%)}
-.rank-card.platinum{background:linear-gradient(135deg,#0d1a2a 0%,#0a2040 50%,#061018 100%)}
-body.light .rank-card.bronze{background:linear-gradient(135deg,#fdf0e0 0%,#f5dbb5 100%)}
-body.light .rank-card.silver{background:linear-gradient(135deg,#eef0f5 0%,#d8dce8 100%)}
-body.light .rank-card.gold{background:linear-gradient(135deg,#fffbe6 0%,#fde68a 100%)}
-body.light .rank-card.platinum{background:linear-gradient(135deg,#e0f2fe 0%,#bae6fd 100%)}
+/* ── STATS / ACHIEVEMENTS (archive overview) ── */
+.stats-section{margin:16px 16px 14px;--tier:var(--accent)}
 
-.rank-card-inner{
-  display:flex;flex-direction:column;position:relative;
-  overflow:hidden;z-index:1;border-radius:var(--border-radius);
-  padding:16px 12px 14px;
+/* level / rank banner */
+.level-banner{
+  display:flex;align-items:center;gap:14px;position:relative;overflow:hidden;
+  background:var(--surface);border:1px solid var(--border);border-radius:18px;
+  padding:14px 16px;margin-bottom:10px;
 }
+.level-banner::before{
+  content:'';position:absolute;left:-26px;top:50%;transform:translateY(-50%);
+  width:120px;height:120px;border-radius:50%;pointer-events:none;opacity:.2;
+  background:radial-gradient(circle,var(--tier),transparent 70%);
+}
+.level-icon{font-size:40px;line-height:1;position:relative;z-index:1;filter:drop-shadow(0 3px 10px rgba(0,0,0,.35))}
+.level-main{flex:1;min-width:0;position:relative;z-index:1}
+.level-name-row{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:7px}
+.level-name{font-size:16px;font-weight:800;letter-spacing:.5px;color:var(--tier)}
+.level-pct{font-size:12px;font-weight:800;color:var(--muted)}
+.level-bar{height:7px;border-radius:4px;background:rgba(128,128,128,.18);overflow:hidden}
+.level-bar-fill{height:100%;border-radius:4px;background:var(--tier);transition:width .7s cubic-bezier(.4,0,.2,1)}
+.level-hint{font-size:11px;font-weight:600;color:var(--muted);margin-top:7px}
 
-.rank-top{display:flex;align-items:stretch;justify-content:center;gap:6px;margin-bottom:16px}
-.rank-badge{
-  display:flex;flex-direction:column;align-items:center;gap:4px;
+/* hero totals */
+.stat-tiles{display:flex;gap:8px;margin-bottom:16px}
+.stat-tile{
+  flex:1;min-width:0;text-align:center;
+  background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:14px 8px;
 }
-.rank-icon{font-size:44px;line-height:1;filter:drop-shadow(0 2px 8px rgba(0,0,0,.5))}
-.rank-tier-name{
-  font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;
-  padding:3px 10px;border-radius:20px;
-}
-.rank-card.bronze .rank-tier-name{background:rgba(205,127,50,.2);color:#e8a855;border:1px solid rgba(205,127,50,.4)}
-.rank-card.silver .rank-tier-name{background:rgba(192,192,192,.15);color:#c8d0dc;border:1px solid rgba(192,192,192,.3)}
-.rank-card.gold .rank-tier-name{background:rgba(255,215,0,.15);color:#fbbf24;border:1px solid rgba(255,215,0,.35)}
-.rank-card.platinum .rank-tier-name{background:rgba(56,189,248,.15);color:#7dd3fc;border:1px solid rgba(56,189,248,.3)}
+.stat-tile-num{font-size:clamp(18px,5.5vw,27px);font-weight:800;line-height:1;letter-spacing:-.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stat-tile-lbl{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin-top:6px}
 
-.rank-right{text-align:right}
-.rank-stat-box{
-  text-align:center;padding:8px 6px;border-radius:12px;
-  background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);
-  flex:1;min-width:0;overflow:hidden;
+/* top works */
+.top-works-title{font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;opacity:.4;margin:0 0 8px 4px}
+.top-works-list{display:flex;flex-direction:column;gap:6px}
+.tw-row{
+  display:flex;align-items:center;gap:12px;
+  background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:11px 14px;
 }
-body.light .rank-stat-box{background:rgba(0,0,0,.06);border-color:rgba(0,0,0,.1)}
-.rank-label{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.5;margin-bottom:4px}
-body.light .rank-label{color:#444}
-.rank-total-num{font-size:clamp(16px,5vw,42px);font-weight:800;line-height:1;letter-spacing:-0.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rank-card.bronze .rank-total-num{color:#e8a855}
-.rank-card.silver .rank-total-num{color:#c8d0dc}
-.rank-card.gold .rank-total-num{color:#fbbf24}
-.rank-card.platinum .rank-total-num{color:#7dd3fc}
-.rank-total-lbl{font-size:11px;font-weight:600;opacity:.5;margin-top:2px}
-body.light .rank-total-lbl{color:#444}
-
-/* progress to next tier */
-.rank-progress-section{margin-bottom:14px}
-.rank-progress-meta{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px}
-.rank-progress-text{font-size:11px;font-weight:600;opacity:.55}
-body.light .rank-progress-text{color:#333}
-.rank-next-label{font-size:10px;font-weight:700;letter-spacing:.5px;opacity:.45}
-body.light .rank-next-label{color:#333}
-.rank-progress-bg{height:6px;border-radius:3px;overflow:hidden;background:rgba(255,255,255,.1)}
-.rank-progress-fill{height:100%;border-radius:3px;transition:width .6s cubic-bezier(.4,0,.2,1)}
-.rank-card.bronze .rank-progress-fill{background:linear-gradient(90deg,#cd7f32,#e8a855)}
-.rank-card.silver .rank-progress-fill{background:linear-gradient(90deg,#8896b0,#c8d0dc)}
-.rank-card.gold .rank-progress-fill{background:linear-gradient(90deg,#d97706,#fbbf24)}
-.rank-card.platinum .rank-progress-fill{background:linear-gradient(90deg,#0284c7,#38bdf8)}
-
-/* items list inside rank card */
-.rank-items{display:flex;flex-direction:column;gap:6px}
-.rank-item-row{
-  display:flex;align-items:center;justify-content:space-between;
-  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);
-  border-radius:12px;padding:9px 12px;
-}
-body.light .rank-item-row{background:rgba(0,0,0,.05);border-color:rgba(0,0,0,.08)}
-.rank-item-left{display:flex;flex-direction:column;gap:2px;min-width:0}
-.rank-item-name{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.9}
-body.light .rank-item-name{color:#111}
-.rank-item-sub{font-size:10px;font-weight:600;opacity:.45}
-body.light .rank-item-sub{color:#444}
-.rank-item-right{display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0}
-.rank-item-qty{font-size:20px;font-weight:800;line-height:1}
-.rank-card.bronze .rank-item-qty{color:#e8a855}
-.rank-card.silver .rank-item-qty{color:#c8d0dc}
-.rank-card.gold .rank-item-qty{color:#fbbf24}
-.rank-card.platinum .rank-item-qty{color:#7dd3fc}
-.rank-item-unit{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.4;margin-top:1px}
-body.light .rank-item-unit{color:#444}
-.rank-item-bar{height:3px;border-radius:2px;margin-top:5px;background:rgba(255,255,255,.08)}
-.rank-item-bar-fill{height:100%;border-radius:2px}
-.rank-card.bronze .rank-item-bar-fill{background:linear-gradient(90deg,#cd7f32,#e8a855)}
-.rank-card.silver .rank-item-bar-fill{background:linear-gradient(90deg,#8896b0,#c8d0dc)}
-.rank-card.gold .rank-item-bar-fill{background:linear-gradient(90deg,#d97706,#fbbf24)}
-.rank-card.platinum .rank-item-bar-fill{background:linear-gradient(90deg,#0284c7,#38bdf8)}
+.tw-rank{font-size:15px;font-weight:800;color:var(--muted);width:24px;flex:none;text-align:center}
+.tw-body{flex:1;min-width:0}
+.tw-name{font-size:14px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tw-sub{font-size:11px;font-weight:600;color:var(--muted);margin-top:1px}
+.tw-bar{height:4px;border-radius:2px;background:rgba(128,128,128,.15);margin-top:7px;overflow:hidden}
+.tw-bar-fill{height:100%;border-radius:2px;background:var(--tier);transition:width .6s cubic-bezier(.4,0,.2,1)}
+.tw-right{text-align:right;flex:none}
+.tw-qty{font-size:19px;font-weight:800;line-height:1;color:var(--tier)}
+.tw-unit{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-top:2px}
 
 /* ── ARCHIVE ── */
 .archive-section{margin:0 16px 12px}
@@ -925,16 +857,6 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
 .photo-viewer img{max-width:100%;max-height:72vh;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.5)}
 .photo-viewer-actions{display:flex;gap:10px}
 
-.share-card-btn{
-  display:block;width:calc(100% - 32px);margin:8px 16px 0;
-  padding:10px;border-radius:14px;border:none;cursor:pointer;
-  background:rgba(255,255,255,.08);color:var(--text);
-  font-family:'Manrope',sans-serif;font-size:13px;font-weight:700;
-  letter-spacing:.3px;transition:opacity .15s;
-}
-body.light .share-card-btn{background:rgba(0,0,0,.07)}
-.share-card-btn:active{opacity:.6}
-
 .notif-banner{
   position:fixed;top:0;left:50%;transform:translateX(-50%);
   width:100%;max-width:var(--app-max);z-index:200;
@@ -1194,13 +1116,40 @@ body.light .share-card-btn{background:rgba(0,0,0,.07)}
 <!-- ══ PAGE: ARCHIVE ══ -->
 <div class="page" id="page-archive">
 
-<!-- ACHIEVEMENTS RANK CARD -->
-<div class="rank-wrapper" id="rankWrapper">
-  <div class="pc-behind" id="rankBehind"></div>
-  <div class="rank-card" id="rankCard">
-    <div class="rank-card-inner" id="rankCardInner"></div>
+<!-- ACHIEVEMENTS / STATS OVERVIEW -->
+<div class="stats-section" id="statsSection">
+  <!-- Level / rank banner -->
+  <div class="level-banner">
+    <div class="level-icon" id="levelIcon">🥉</div>
+    <div class="level-main">
+      <div class="level-name-row">
+        <span class="level-name" id="levelName">Бронза</span>
+        <span class="level-pct" id="levelPct"></span>
+      </div>
+      <div class="level-bar"><div class="level-bar-fill" id="levelBarFill" style="width:0%"></div></div>
+      <div class="level-hint" id="levelHint"></div>
+    </div>
   </div>
-  <button class="share-card-btn" onclick="shareRankCard()" id="shareCardBtn">📤 Поделиться</button>
+
+  <!-- Hero totals -->
+  <div class="stat-tiles">
+    <div class="stat-tile">
+      <div class="stat-tile-num" id="statQty">0</div>
+      <div class="stat-tile-lbl">изделий</div>
+    </div>
+    <div class="stat-tile">
+      <div class="stat-tile-num" id="statDays">0</div>
+      <div class="stat-tile-lbl">раб. дней</div>
+    </div>
+    <div class="stat-tile">
+      <div class="stat-tile-num" id="statEarned">0</div>
+      <div class="stat-tile-lbl">₽ заработано</div>
+    </div>
+  </div>
+
+  <!-- Top works -->
+  <div class="top-works-title">Топ работ</div>
+  <div class="top-works-list" id="topWorksList"></div>
 </div>
 
 <!-- ALL PERIODS ARCHIVE -->
@@ -2592,7 +2541,7 @@ function calcExpensesTotal(){
 function calcNetTotal(){return calcTotal()-calcExpensesTotal()}
 
 // ══════════════════════════════════════════════
-//  ACHIEVEMENTS (rank card)
+//  ACHIEVEMENTS / STATS OVERVIEW (archive page)
 // ══════════════════════════════════════════════
 const RANKS=[
   {name:'Бронза', cls:'bronze', icon:'🥉', min:0,    max:499},
@@ -2605,9 +2554,11 @@ function getRank(total){
   return RANKS.find(r=>total>=r.min&&total<=r.max)||RANKS[0];
 }
 
+const TIER_COLOR={bronze:'#e8a855',silver:'#c8d0dc',gold:'#fbbf24',platinum:'#7dd3fc'};
+
 function renderAchievements(){
-  const card=document.getElementById('rankCard');
-  if(!card)return;
+  const section=document.getElementById('statsSection');
+  if(!section)return;
 
   // aggregate qty by name across all period keys
   const stats={};
@@ -2632,86 +2583,58 @@ function renderAchievements(){
   }catch(e){}
 
   const entries=Object.entries(stats).sort((a,b)=>b[1].qty-a[1].qty);
-  if(!entries.length){card.style.display='none';return;}
-  card.style.display='';
+  if(!entries.length){section.style.display='none';return;}
+  section.style.display='';
 
   const totalQty=Math.round(entries.reduce((s,[,v])=>s+v.qty,0));
   const rank=getRank(totalQty);
-  card.className='rank-card '+rank.cls;
-  const behindEl=document.getElementById('rankBehind');
-  if(behindEl){
-    const glowBg={bronze:'radial-gradient(ellipse,#cd7f32,transparent 70%)',silver:'radial-gradient(ellipse,#94a3b8,transparent 70%)',gold:'radial-gradient(ellipse,#d97706,transparent 70%)',platinum:'radial-gradient(ellipse,#0284c7,transparent 70%)'};
-    behindEl.style.background=glowBg[rank.cls]||glowBg.bronze;
-  }
+  // Drive every tinted element (icon glow, progress, qty numbers, bars) from one var.
+  section.style.setProperty('--tier',TIER_COLOR[rank.cls]||TIER_COLOR.bronze);
 
-  // progress to next tier
+  // ── Level banner ──
+  document.getElementById('levelIcon').textContent=rank.icon;
+  document.getElementById('levelName').textContent=rank.name;
   const nextRank=RANKS[RANKS.indexOf(rank)+1];
-  let progressHtml='';
+  const pctEl=document.getElementById('levelPct'),hintEl=document.getElementById('levelHint'),fillEl=document.getElementById('levelBarFill');
   if(nextRank){
     const span=nextRank.min-rank.min;
     const done=totalQty-rank.min;
     const pct=Math.min(Math.round(done/span*100),100);
-    const left=nextRank.min-totalQty;
-    progressHtml=`
-    <div class="rank-progress-section">
-      <div class="rank-progress-meta">
-        <span class="rank-progress-text">До ${nextRank.name}: ещё ${fmt(left)} шт</span>
-        <span class="rank-next-label">${pct}%</span>
-      </div>
-      <div class="rank-progress-bg">
-        <div class="rank-progress-fill" style="width:${pct}%"></div>
-      </div>
-    </div>`;
-  } else {
-    progressHtml=`<div class="rank-progress-section">
-      <div class="rank-progress-meta">
-        <span class="rank-progress-text" style="opacity:.7">Максимальный ранг достигнут 🎉</span>
-      </div>
-      <div class="rank-progress-bg"><div class="rank-progress-fill" style="width:100%"></div></div>
-    </div>`;
+    pctEl.textContent=pct+'%';
+    hintEl.textContent=`До ранга «${nextRank.name}» ещё ${fmt(nextRank.min-totalQty)} шт`;
+    fillEl.style.width=pct+'%';
+  }else{
+    pctEl.textContent='MAX';
+    hintEl.textContent='Максимальный ранг достигнут 🎉';
+    fillEl.style.width='100%';
   }
 
+  // ── Hero totals ──
+  document.getElementById('statQty').textContent=fmt(totalQty);
+  document.getElementById('statDays').textContent=calcTotalWorkedDaysAllTime();
+  document.getElementById('statEarned').textContent=fmt(calcTotalEarnedAllTime());
+
+  // ── Top works ──
   const maxQty=entries[0][1].qty;
-  const itemsHtml=entries.map(([name,v])=>{
+  const medals=['🥇','🥈','🥉'];
+  document.getElementById('topWorksList').innerHTML=entries.map(([name,v],i)=>{
     const barW=Math.round(v.qty/maxQty*100);
     const pc=v.periods.size;
     const pLabel=pc===1?'1 период':pc<=4?pc+' периода':pc+' периодов';
-    return`<div class="rank-item-row">
-      <div class="rank-item-left">
-        <div class="rank-item-name">${esc(name)}</div>
-        <div class="rank-item-sub">${pLabel} · ${fmt(v.earnings)} ₽</div>
-        <div class="rank-item-bar" style="width:100%;margin-top:6px">
-          <div class="rank-item-bar-fill" style="width:${barW}%"></div>
-        </div>
+    const badge=medals[i]||('#'+(i+1));
+    return`<div class="tw-row">
+      <div class="tw-rank">${badge}</div>
+      <div class="tw-body">
+        <div class="tw-name">${esc(name)}</div>
+        <div class="tw-sub">${pLabel} · ${fmt(v.earnings)} ₽</div>
+        <div class="tw-bar"><div class="tw-bar-fill" style="width:${barW}%"></div></div>
       </div>
-      <div class="rank-item-right">
-        <div class="rank-item-qty">${Math.round(v.qty)}</div>
-        <div class="rank-item-unit">шт</div>
+      <div class="tw-right">
+        <div class="tw-qty">${Math.round(v.qty)}</div>
+        <div class="tw-unit">шт</div>
       </div>
     </div>`;
   }).join('');
-
-  const totalDays=calcTotalWorkedDaysAllTime();
-  const totalEarned=calcTotalEarnedAllTime();
-  document.getElementById('rankCardInner').innerHTML=`
-    <div class="rank-bg-icon">${rank.icon}</div>
-    <div class="rank-top">
-      <div class="rank-stat-box">
-        <div class="rank-total-num">${fmt(totalQty)}</div>
-        <div class="rank-total-lbl">изделий</div>
-      </div>
-      <div class="rank-stat-box">
-        <div class="rank-total-num">${totalDays}</div>
-        <div class="rank-total-lbl">раб. дней</div>
-      </div>
-      <div class="rank-stat-box">
-        <div class="rank-total-num">${fmt(totalEarned)}</div>
-        <div class="rank-total-lbl">₽ заработано</div>
-      </div>
-    </div>
-    ${progressHtml}
-    <div class="rank-items">${itemsHtml}</div>
-  `;
 }
 
 // ══════════════════════════════════════════════
@@ -3028,29 +2951,6 @@ function restoreScroll(){
 }
 
 // ── SHARE RANK CARD ──
-async function shareRankCard(){
-  const card=document.getElementById('rankCard');
-  if(!card||typeof html2canvas==='undefined')return;
-  const btn=document.getElementById('shareCardBtn');
-  if(btn){btn.textContent='⏳ Создаю...';btn.disabled=true;}
-  try{
-    const canvas=await html2canvas(card,{scale:2,useCORS:true,backgroundColor:null,logging:false});
-    canvas.toBlob(async blob=>{
-      if(!blob)return;
-      const file=new File([blob],'achievements.png',{type:'image/png'});
-      if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
-        await navigator.share({files:[file],title:'Мои достижения'});
-      } else {
-        const a=document.createElement('a');
-        a.href=URL.createObjectURL(blob);
-        a.download='achievements.png';
-        a.click();
-      }
-    },'image/png');
-  }catch(e){console.error(e);}
-  finally{if(btn){btn.textContent='📤 Поделиться';btn.disabled=false;}}
-}
-
 // ── PWA / SERVICE WORKER ──
 function initPWA(){
   if('serviceWorker' in navigator){
@@ -3091,7 +2991,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-22 #30';
+const BUILD_VER='2026-06-22 #31';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
