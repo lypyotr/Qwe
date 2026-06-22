@@ -1249,6 +1249,14 @@ body.light .share-card-btn{background:rgba(0,0,0,.07)}
       <div class="admin-msg" id="dataMsgAdmin"></div>
     </div>
 
+    <!-- Test section (local-only, this device) -->
+    <div class="admin-card">
+      <div class="admin-card-title">🧪 Тестовый раздел</div>
+      <div class="admin-card-sub">Очищает кэш приложения и localStorage <b>только на этом устройстве</b>. Облачные данные в аккаунте не трогаются — после повторного входа всё подтянется из облака. Тебя разлогинит, и страница перезагрузится.</div>
+      <button class="modal-btn" id="clearCacheBtn" style="width:100%;padding:13px;background:rgba(248,113,113,.15);color:var(--danger);border:1px solid var(--danger)" onclick="adminClearCache()">🧹 Очистить кэш и localStorage</button>
+      <div class="admin-msg" id="clearCacheMsg"></div>
+    </div>
+
   </div>
 </div><!-- /page-admin -->
 
@@ -3083,7 +3091,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-22 #29';
+const BUILD_VER='2026-06-22 #30';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
@@ -3237,6 +3245,39 @@ async function adminToggleMaintenance(){
   const next=!appConfig.maintenance;
   const text=(document.getElementById('maintInput').value||'').trim();
   await adminWriteConfig({maintenance:next,maintenance_msg:text},'maintAdminMsg');
+}
+
+// Owner-only, LOCAL-only: wipe this device's caches + localStorage. Never
+// touches Supabase, so cloud data and other users/devices are unaffected.
+async function adminClearCache(){
+  const msg=t=>{const e=document.getElementById('clearCacheMsg');if(e){e.textContent=t;e.style.color='var(--accent)';}};
+  const err=t=>{const e=document.getElementById('clearCacheMsg');if(e){e.textContent=t;e.style.color='var(--danger)';}};
+  if(!isAdmin()){err('Доступно только владельцу');return;}
+  if(!confirm('Очистить кэш и localStorage на этом устройстве? Тебя разлогинит, локальные данные сотрутся (облако не затрагивается). Продолжить?'))return;
+  const btn=document.getElementById('clearCacheBtn');
+  if(btn)btn.disabled=true;
+  msg('Очищаю…');
+  try{
+    // 1) Service Worker caches (Cache Storage)
+    if(window.caches){
+      const keys=await caches.keys();
+      await Promise.all(keys.map(k=>caches.delete(k)));
+    }
+    // 2) Unregister service workers so a fresh one installs on reload
+    if(navigator.serviceWorker){
+      const regs=await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r=>r.unregister()));
+    }
+    // 3) localStorage + sessionStorage
+    try{localStorage.clear();}catch(e){}
+    try{sessionStorage.clear();}catch(e){}
+    msg('✓ Кэш очищен. Перезагружаю…');
+    setTimeout(()=>location.reload(true),700);
+  }catch(e){
+    console.error('adminClearCache',e);
+    err('Ошибка очистки: '+((e&&e.message)||e));
+    if(btn)btn.disabled=false;
+  }
 }
 
 // Independent localStorage persistence self-test. Increments a counter on
