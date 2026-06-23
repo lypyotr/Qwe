@@ -191,19 +191,22 @@ body.light .tvt-opt.active{background:rgba(0,0,0,.1);color:var(--text)}
 
 /* ── CHART ── */
 .chart-wrap{margin:0 16px 12px;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:14px 16px;box-shadow:var(--card-shadow)}
-.chart-title{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
-.chart-bars{display:flex;align-items:flex-end;gap:4px;height:60px}
-.chart-bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
-.chart-bar{width:100%;border-radius:5px 5px 0 0;background:var(--border);transition:all .3s;min-height:3px}
-.chart-bar.active{background:var(--accent)}
-.chart-bar.has-data{background:rgba(74,222,128,.4)}
-.chart-bar.active.has-data{background:var(--accent)}
-.chart-bar-lbl{font-size:8px;font-weight:700;color:var(--muted)}
+.chart-title{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+.chart-hint{font-size:11px;color:var(--muted);margin-bottom:14px}
+.chart-bars{display:flex;align-items:stretch;gap:5px;height:96px;margin-bottom:2px}
+.chart-bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;cursor:pointer;min-width:0}
+.chart-bar-col{flex:1;width:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:3px}
+.chart-val{font-size:8.5px;font-weight:800;color:var(--accent);line-height:1;white-space:nowrap}
+.chart-bar{width:100%;max-width:18px;border-radius:5px 5px 0 0;background:var(--border);transition:height .3s ease,background .2s;min-height:3px}
+.chart-bar.has-data{background:linear-gradient(180deg,#4ade80,rgba(74,222,128,.4))!important}
+.chart-bar.active{background:var(--accent)!important}
+.chart-bar-lbl{font-size:9px;font-weight:700;color:var(--muted);margin-top:6px}
 .chart-bar-wrap.active .chart-bar-lbl{color:var(--accent)}
-.chart-stats{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}
-.chart-stat{flex:1;background:var(--surface2);border-radius:10px;padding:8px 10px;min-width:80px}
-.chart-stat-label{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
-.chart-stat-val{font-size:14px;font-weight:800;color:var(--text)}
+.chart-bar-wrap.active .chart-val{color:var(--accent)}
+.chart-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:14px}
+.chart-stat{background:var(--surface2);border-radius:12px;padding:10px 12px;min-width:0}
+.chart-stat-label{font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chart-stat-val{font-size:14px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* ── TODAY SUMMARY ── */
 .today-summary{
@@ -996,6 +999,7 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
 <!-- CHART -->
 <div class="chart-wrap" id="chartWrap" style="display:none">
   <div class="chart-title">По дням периода</div>
+  <div class="chart-hint">Высота столбика — заработок за день. Нажми, чтобы открыть день.</div>
   <div class="chart-bars" id="chartBars"></div>
   <div class="chart-stats" id="chartStats"></div>
 </div>
@@ -2342,37 +2346,54 @@ function calcTotalWorkedDaysAllTime(){
   return total;
 }
 
+// Compact ₽ for the tiny bar labels: 15000 → "15к", 11670 → "11,7к".
+function shortRub(n){
+  if(n<1000)return String(Math.round(n));
+  const v=n/1000;
+  const str=(v>=100?String(Math.round(v)):(Math.round(v*10)/10).toString());
+  return str.replace(/\.0$/,'').replace('.',',')+'к';
+}
+function dayWord(n){const a=n%10,b=n%100;return a===1&&b!==11?'день':a>=2&&a<=4&&(b<10||b>=20)?'дня':'дней';}
+
 function renderChart(){
-  const{startDay,endDay}=getPeriod();
-  const{month}=getPeriod();
+  const{startDay,endDay,month}=getPeriod();
   const sums=[];
   for(let d=startDay;d<=endDay;d++)sums.push({d,s:daySum(d)});
   const maxSum=Math.max(...sums.map(x=>x.s),1);
-  const totalFilled=sums.filter(x=>x.s>0).length;
+  const nonZero=sums.filter(x=>x.s>0);
   const wrap=document.getElementById('chartWrap');
-  if(totalFilled===0){wrap.style.display='none';return}
+  if(nonZero.length===0){wrap.style.display='none';return}
   wrap.style.display='';
+
+  const maxDay=nonZero.reduce((a,b)=>b.s>a.s?b:a,{s:0,d:0});
+  // Show a value over every worked bar when there are few; otherwise only over
+  // the selected and best days so the labels never crowd each other.
+  const showAllVals=nonZero.length<=8;
+
   const barsEl=document.getElementById('chartBars');
   barsEl.innerHTML=sums.map(({d,s})=>{
-    const h=Math.max(s>0?4:2,Math.round((s/maxSum)*56));
-    const isActive=selectedDay===d;
     const hasData=s>0;
+    const h=hasData?Math.max(6,Math.round(s/maxSum*54)):3;
+    const isActive=selectedDay===d;
+    const showVal=hasData&&(showAllVals||isActive||d===maxDay.d);
     return`<div class="chart-bar-wrap${isActive?' active':''}" onclick="selectDay(${d})">
-      <div class="chart-bar${isActive?' active':''}${hasData?' has-data':''}" style="height:${h}px"></div>
+      <div class="chart-bar-col">
+        ${showVal?`<div class="chart-val">${shortRub(s)}</div>`:''}
+        <div class="chart-bar${hasData?' has-data':''}${isActive?' active':''}" style="height:${h}px"></div>
+      </div>
       <div class="chart-bar-lbl">${d}</div>
     </div>`;
   }).join('');
 
-  // stats
-  const nonZero=sums.filter(x=>x.s>0);
-  const avg=nonZero.length?nonZero.reduce((s,x)=>s+x.s,0)/nonZero.length:0;
-  const maxDay=nonZero.reduce((a,b)=>b.s>a.s?b:a,{s:0,d:0});
-  let statsHtml='';
-  statsHtml+=`<div class="chart-stat"><div class="chart-stat-label">Средний день</div><div class="chart-stat-val">${fmt(avg)} ₽</div></div>`;
-  if(maxDay.d)statsHtml+=`<div class="chart-stat"><div class="chart-stat-label">Лучший день</div><div class="chart-stat-val">${maxDay.d} ${MS[month]} · ${fmt(maxDay.s)} ₽</div></div>`;
-  statsHtml+=`<div class="chart-stat"><div class="chart-stat-label">В этом периоде</div><div class="chart-stat-val">${nonZero.length} дн.</div></div>`;
-  statsHtml+=`<div class="chart-stat"><div class="chart-stat-label">Всего рабочих дней</div><div class="chart-stat-val">${calcTotalWorkedDaysAllTime()} дн.</div></div>`;
-  document.getElementById('chartStats').innerHTML=statsHtml;
+  // Period-only stats — no all-time numbers here, so nothing contradicts itself.
+  const periodSum=sums.reduce((a,b)=>a+b.s,0);
+  const avg=nonZero.length?Math.round(periodSum/nonZero.length):0;
+  let s='';
+  s+=`<div class="chart-stat"><div class="chart-stat-label">💰 Заработано</div><div class="chart-stat-val">${fmt(periodSum)} ₽</div></div>`;
+  s+=`<div class="chart-stat"><div class="chart-stat-label">📅 Отработано</div><div class="chart-stat-val">${nonZero.length} ${dayWord(nonZero.length)}</div></div>`;
+  s+=`<div class="chart-stat"><div class="chart-stat-label">📊 Средний день</div><div class="chart-stat-val">${fmt(avg)} ₽</div></div>`;
+  if(maxDay.d)s+=`<div class="chart-stat"><div class="chart-stat-label">🏆 Лучший день</div><div class="chart-stat-val">${maxDay.d} ${MS[month]} · ${fmt(maxDay.s)} ₽</div></div>`;
+  document.getElementById('chartStats').innerHTML=s;
 }
 
 // ══════════════════════════════════════════════
@@ -3105,7 +3126,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-22 #35';
+const BUILD_VER='2026-06-23 #36';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
