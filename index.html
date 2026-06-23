@@ -660,6 +660,44 @@ body.light .cur-toggle.usd{background:rgba(74,222,128,.2);color:var(--text)}
 .page{display:none}
 .page.active{display:block}
 
+/* ── CALCULATORS ── */
+.calc-wrap{padding:0 16px 20px}
+.calc-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:18px;
+  padding:18px;margin-bottom:14px;box-shadow:var(--card-shadow);
+}
+.calc-card-title{font-size:15px;font-weight:800;letter-spacing:.3px;margin-bottom:6px}
+.calc-card-sub{font-size:12.5px;color:var(--muted);line-height:1.5;margin-bottom:16px}
+.calc-input-row{
+  display:flex;align-items:center;gap:8px;
+  background:var(--surface2);border:1px solid var(--border);border-radius:14px;
+  padding:4px 14px 4px 4px;transition:border-color .15s;
+}
+.calc-input-row:focus-within{border-color:var(--accent)}
+.calc-input{
+  flex:1;min-width:0;font-family:'Manrope',sans-serif;font-size:22px;font-weight:800;
+  color:var(--text);background:transparent;border:none;outline:none;
+  padding:12px 6px 12px 14px;text-align:right;-webkit-appearance:none;
+}
+.calc-input::placeholder{font-size:15px;font-weight:600;color:var(--muted)}
+.calc-cur{font-size:18px;font-weight:800;color:var(--muted);flex:none}
+.calc-result{margin-top:16px}
+.calc-hint{font-size:13px;color:var(--muted);line-height:1.55;text-align:center;padding:8px 0}
+.calc-hint b{color:var(--text);font-weight:800}
+.calc-big{
+  text-align:center;font-size:38px;font-weight:800;color:var(--accent);
+  letter-spacing:-1px;line-height:1;margin-bottom:4px;
+}
+.calc-big span{font-size:17px;font-weight:600;opacity:.7;letter-spacing:0}
+.calc-big-sub{text-align:center;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:16px}
+.calc-rows{display:flex;flex-direction:column;gap:1px;background:var(--border);border-radius:12px;overflow:hidden}
+.calc-rrow{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  background:var(--surface2);padding:11px 14px;font-size:13px;
+}
+.calc-rrow span{color:var(--muted);font-weight:600}
+.calc-rrow b{color:var(--text);font-weight:800;font-size:14px}
+
 /* ── ADMIN PANEL ── */
 .admin-wrap{padding:0 20px 20px}
 .admin-card{
@@ -1199,6 +1237,27 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
 
 </div><!-- /page-archive -->
 
+<!-- ══ PAGE: CALCULATORS ══ -->
+<div class="page" id="page-calc">
+  <div class="header">
+    <div class="header-left"><div class="header-label">🧮 Калькуляторы</div></div>
+  </div>
+  <div class="calc-wrap">
+
+    <!-- Daily spending until next payday -->
+    <div class="calc-card">
+      <div class="calc-card-title">💸 Сколько можно тратить в день</div>
+      <div class="calc-card-sub">Введи, сколько денег у тебя есть сейчас — покажу, сколько можно тратить в день до следующей выплаты.</div>
+      <div class="calc-input-row">
+        <input class="calc-input" id="calcMoneyIn" type="number" inputmode="decimal" placeholder="Сколько у меня есть" oninput="renderSpendCalc()">
+        <span class="calc-cur">₽</span>
+      </div>
+      <div class="calc-result" id="calcSpendResult"></div>
+    </div>
+
+  </div>
+</div><!-- /page-calc -->
+
 <!-- ══ PAGE: ADMIN (only visible to the owner account) ══ -->
 <div class="page" id="page-admin">
   <div class="header">
@@ -1394,6 +1453,10 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
     <span class="nav-icon">📁</span>
     <span class="nav-lbl">Архив</span>
   </div>
+  <div class="nav-btn" id="navCalc" onclick="switchPage('calc')">
+    <span class="nav-icon">🧮</span>
+    <span class="nav-lbl">Калькуляторы</span>
+  </div>
   <div class="nav-btn" id="navAdmin" onclick="switchPage('admin')" style="display:none">
     <span class="nav-icon">🛡️</span>
     <span class="nav-lbl">Админ</span>
@@ -1412,6 +1475,7 @@ function switchPage(name){
   if(name==='admin'&&!isAdmin())name='work';
   haptic('light');
   if(name==='admin'){renderAdminDiag();renderBackupInfo();}
+  if(name==='calc')renderSpendCalc();
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
@@ -1424,6 +1488,7 @@ function restorePage(){
     const p=localStorage.getItem('salary_page');
     if(p==='period')switchPage('period');
     else if(p==='archive')switchPage('archive');
+    else if(p==='calc')switchPage('calc');
   }catch(e){}
 }
 
@@ -2290,8 +2355,9 @@ async function toggleCurrency(){
   if(currencyView==='usd')refreshUsdRateIfNeeded(); // freshen in background
 }
 
-function daysToNextPayday(){
-  // Always based on real today's date, not the selected period
+// Next payday, its date and how many days remain — all based on the real
+// today's date, not the selected period.
+function nextPaydayInfo(){
   const today=new Date();
   const y=today.getFullYear(),m=today.getMonth(),d=today.getDate();
   const t=new Date(y,m,d);
@@ -2300,7 +2366,39 @@ function daysToNextPayday(){
   // if that date is already past, take the other one
   if(candidate<t)candidate=d<=15?new Date(y,m+1,7):new Date(y,m+1,22);
   const{date:payDate}=adjustPayDate(candidate);
-  return Math.round((payDate-t)/86400000);
+  const days=Math.round((payDate-t)/86400000);
+  // ~22nd = аванс, ~7th = зарплата
+  const label=payDate.getDate()>=20?'аванса':'зарплаты';
+  return{date:payDate,days,label};
+}
+function daysToNextPayday(){return nextPaydayInfo().days;}
+
+// Calculator: how much you can spend per day until the next payday.
+function renderSpendCalc(){
+  const el=document.getElementById('calcSpendResult');
+  if(!el)return;
+  const inp=document.getElementById('calcMoneyIn');
+  const amount=parseFloat(inp&&inp.value)||0;
+  try{localStorage.setItem('salary_calc_money',amount>0?String(amount):'');}catch(e){}
+  const{date,days,label}=nextPaydayInfo();
+  const dStr=date.getDate()+' '+MS[date.getMonth()];
+  if(days<=0){
+    el.innerHTML='<div class="calc-hint">Выплата уже сегодня 🎉</div>';
+    return;
+  }
+  if(amount<=0){
+    el.innerHTML=`<div class="calc-hint">До <b>${label}</b> (${dStr}) осталось <b>${days} ${dayWord(days)}</b>.<br>Введи сумму выше — посчитаю дневной лимит.</div>`;
+    return;
+  }
+  const perDay=amount/days;
+  el.innerHTML=`
+    <div class="calc-big">${fmt(perDay)} <span>₽/день</span></div>
+    <div class="calc-big-sub">можно тратить до ${label} (${dStr})</div>
+    <div class="calc-rows">
+      <div class="calc-rrow"><span>Осталось до выплаты</span><b>${days} ${dayWord(days)}</b></div>
+      <div class="calc-rrow"><span>В неделю</span><b>${fmt(perDay*7)} ₽</b></div>
+      <div class="calc-rrow"><span>Всего есть</span><b>${fmt(amount)} ₽</b></div>
+    </div>`;
 }
 
 function renderTotal(){
@@ -3232,7 +3330,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-23 #37';
+const BUILD_VER='2026-06-23 #38';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
@@ -3955,6 +4053,8 @@ load();
 renderPeriodCard();renderDayStrip();renderDayPanel();renderBonuses();renderTemplates();
 renderTotal();renderChart();renderGoals();renderHistory();renderArchive();
 renderExpenses();renderAchievements();renderTodaySummary();
+try{const _cm=localStorage.getItem('salary_calc_money');if(_cm){const _ci=document.getElementById('calcMoneyIn');if(_ci)_ci.value=_cm;}}catch(e){}
+renderSpendCalc();
 restorePage();initPWA();
 restoreScroll();
 initFirebase();
