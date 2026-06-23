@@ -180,6 +180,21 @@ body.light .tvt-opt{color:var(--muted)}
 .tvt-opt.active{background:rgba(255,255,255,.18);color:#fff}
 body.light .tvt-opt.active{background:rgba(0,0,0,.1);color:var(--text)}
 
+/* currency (₽ / $) toggle on the total card */
+.cur-toggle{
+  position:absolute;top:14px;right:14px;z-index:3;
+  min-width:36px;height:30px;padding:0 11px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);
+  color:#fff;font-size:15px;font-weight:800;cursor:pointer;
+  transition:transform .12s,background .15s,opacity .15s;
+}
+body.light .cur-toggle{background:rgba(0,0,0,.06);border-color:rgba(0,0,0,.12);color:var(--text)}
+.cur-toggle:active{transform:scale(.9)}
+.cur-toggle.usd{background:rgba(74,222,128,.22);border-color:rgba(74,222,128,.45);color:#fff}
+body.light .cur-toggle.usd{background:rgba(74,222,128,.2);color:var(--text)}
+.cur-toggle.loading{opacity:.5;pointer-events:none}
+
 /* compare badge */
 .compare-badge{
   display:inline-flex;align-items:center;gap:4px;
@@ -982,6 +997,7 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
 
 <!-- TOTAL CARD -->
 <div class="total-card">
+  <div class="cur-toggle" id="curToggle" onclick="toggleCurrency()" title="Показать в долларах">$</div>
   <div class="total-label" id="totalLabel">Итого к получению</div>
   <div class="total-view-toggle" id="totalViewToggle">
     <span class="tvt-opt" id="tvtGross" onclick="setTotalView('gross')">Грязными</span>
@@ -2200,6 +2216,80 @@ function setTotalView(v){
   renderTotal();
 }
 
+// ── CURRENCY (₽ / USD) ──────────────────────────
+// The total can be shown in USD using a live RUB rate fetched from the web.
+// The rate is cached in localStorage and refreshed in the background.
+let currencyView='rub';            // 'rub' | 'usd'
+let usdRate=0;                     // RUB per 1 USD
+let usdRateAt=0;                   // epoch ms of the rate we hold
+let usdRateSource='';              // human label of where it came from
+const USD_RATE_TTL=6*60*60*1000;   // refresh if older than 6h
+
+function loadCurrencyPrefs(){
+  try{currencyView=localStorage.getItem('salary_currency')==='usd'?'usd':'rub';}catch(e){}
+  try{
+    const c=JSON.parse(localStorage.getItem('salary_usd_rate')||'null');
+    if(c&&c.rate>0){usdRate=c.rate;usdRateAt=c.at||0;usdRateSource=c.source||'';}
+  }catch(e){}
+}
+
+// Fetch USD→RUB from the Russian Central Bank, falling back to a generic FX
+// API. Both are free, keyless and CORS-enabled. Returns true on success.
+async function fetchUsdRate(){
+  const sources=[
+    {url:'https://www.cbr-xml-daily.ru/daily_json.js',pick:j=>j&&j.Valute&&j.Valute.USD&&j.Valute.USD.Value,label:'ЦБ РФ'},
+    {url:'https://open.er-api.com/v6/latest/USD',pick:j=>j&&j.rates&&j.rates.RUB,label:'er-api'},
+  ];
+  for(const s of sources){
+    try{
+      const ctrl=new AbortController();
+      const timer=setTimeout(()=>ctrl.abort(),8000);
+      const r=await fetch(s.url,{signal:ctrl.signal});
+      clearTimeout(timer);
+      if(!r.ok)continue;
+      const j=await r.json();
+      const rate=s.pick(j);
+      if(rate&&rate>0){
+        usdRate=rate;usdRateAt=Date.now();usdRateSource=s.label;
+        try{localStorage.setItem('salary_usd_rate',JSON.stringify({rate:usdRate,at:usdRateAt,source:usdRateSource}));}catch(e){}
+        return true;
+      }
+    }catch(e){/* try next source */}
+  }
+  return false;
+}
+
+// Refresh the rate when stale; re-render if the user is viewing USD.
+async function refreshUsdRateIfNeeded(force){
+  if(!force&&usdRate>0&&Date.now()-usdRateAt<USD_RATE_TTL)return;
+  const ok=await fetchUsdRate();
+  if(ok&&currencyView==='usd')renderTotal();
+}
+
+async function toggleCurrency(){
+  const btn=document.getElementById('curToggle');
+  if(currencyView==='rub'){
+    // Switching to USD — make sure we have a rate first.
+    if(!(usdRate>0)){
+      if(btn)btn.classList.add('loading');
+      await fetchUsdRate();
+      if(btn)btn.classList.remove('loading');
+      if(!(usdRate>0)){
+        const m=document.getElementById('totalMeta');
+        if(m)m.innerHTML='<div class="meta-item" style="color:var(--danger)">Не удалось получить курс доллара — проверь интернет</div>';
+        return;
+      }
+    }
+    currencyView='usd';
+  }else{
+    currencyView='rub';
+  }
+  try{localStorage.setItem('salary_currency',currencyView);}catch(e){}
+  haptic('light');
+  renderTotal();
+  if(currencyView==='usd')refreshUsdRateIfNeeded(); // freshen in background
+}
+
 function daysToNextPayday(){
   // Always based on real today's date, not the selected period
   const today=new Date();
@@ -2229,10 +2319,26 @@ function renderTotal(){
   document.getElementById('totalLabel').textContent=showNet?'На руки':'К получению';
   const disp=showNet?net:total;
   const dispEl=document.getElementById('totalDisplay');
-  dispEl.innerHTML=fmt(disp)+' <span>₽</span>';
+  const usd=currencyView==='usd'&&usdRate>0;
+  if(usd){
+    dispEl.innerHTML=fmt(disp/usdRate)+' <span>$</span>';
+  }else{
+    dispEl.innerHTML=fmt(disp)+' <span>₽</span>';
+  }
   dispEl.style.color=showNet&&net<0?'var(--danger)':'';
+  // Currency button reflects/affords the switch.
+  const curBtn=document.getElementById('curToggle');
+  if(curBtn){
+    curBtn.textContent=usd?'₽':'$';
+    curBtn.classList.toggle('usd',usd);
+    curBtn.title=usd?'Показать в рублях':'Показать в долларах';
+  }
   const filledDays=Object.keys(days).filter(d=>daySum(parseInt(d))>0).length;
   const meta=[];
+  if(usd){
+    const fresh=usdRateAt?new Date(usdRateAt).toLocaleDateString('ru-RU',{day:'numeric',month:'short'}):'';
+    meta.push(`<div class="meta-item">Курс: <strong>1 $ = ${usdRate.toFixed(2).replace('.',',')} ₽</strong> <span style="font-weight:400;color:var(--muted)">${usdRateSource}${fresh?' · '+fresh:''}</span></div>`);
+  }
   if(filledDays>0)meta.push(`<div class="meta-item">Дней: <strong>${filledDays}</strong></div>`);
   if(base>0)meta.push(`<div class="meta-item">База: <strong>${fmt(base)} ₽</strong></div>`);
   if(filledDays>1)meta.push(`<div class="meta-item">Ср/день: <strong>${fmt(base/filledDays)} ₽</strong></div>`);
@@ -3126,7 +3232,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-23 #36';
+const BUILD_VER='2026-06-23 #37';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
@@ -3843,7 +3949,7 @@ function renderAll(){
 if('scrollRestoration' in history)history.scrollRestoration='manual';
 loadTheme();
 initMonths();
-loadTemplates();loadGoals();loadExpenses();
+loadTemplates();loadGoals();loadExpenses();loadCurrencyPrefs();
 document.getElementById('periodSel').value=new Date().getDate()<=15?'1':'2';
 load();
 renderPeriodCard();renderDayStrip();renderDayPanel();renderBonuses();renderTemplates();
@@ -3852,6 +3958,7 @@ renderExpenses();renderAchievements();renderTodaySummary();
 restorePage();initPWA();
 restoreScroll();
 initFirebase();
+refreshUsdRateIfNeeded(); // fetch/refresh USD rate in the background
 </script>
 </body>
 </html>
