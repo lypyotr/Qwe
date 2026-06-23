@@ -152,19 +152,13 @@ body{
 .goal-input-label{font-size:13px;font-weight:700;color:var(--text);min-width:80px}
 
 /* ── TOTAL CARD ── */
-/* period-switch arrows flanking the total card */
-.total-nav-row{display:flex;align-items:stretch;gap:2px;margin:0 6px 12px}
-.total-nav-row .total-card{flex:1;min-width:0;margin:0}
-.total-nav{
-  flex:none;width:30px;align-self:stretch;
-  display:flex;align-items:center;justify-content:center;padding:0 0 3px;
-  background:transparent;border:none;cursor:pointer;
-  color:var(--accent);font-size:30px;font-weight:800;line-height:1;opacity:.65;
-  font-family:'Manrope',sans-serif;-webkit-tap-highlight-color:transparent;
-  transition:transform .12s,opacity .15s;
-}
-.total-nav:active{transform:scale(.82);opacity:1}
+/* swipe left/right on the card to switch period */
+@keyframes tcSlideL{0%{transform:translateX(0)}35%{transform:translateX(-14px)}100%{transform:translateX(0)}}
+@keyframes tcSlideR{0%{transform:translateX(0)}35%{transform:translateX(14px)}100%{transform:translateX(0)}}
+.total-card.swipe-l{animation:tcSlideL .26s ease}
+.total-card.swipe-r{animation:tcSlideR .26s ease}
 .total-card{
+  touch-action:pan-y;
   margin:0 16px 12px;
   background:linear-gradient(135deg,#1a3a2a 0%,#1a2a3a 100%);
   border:1px solid #2d4a38;border-radius:20px;padding:18px 20px;
@@ -1046,20 +1040,16 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
 </div>
 
 <!-- TOTAL CARD -->
-<div class="total-nav-row">
-  <button class="total-nav" onclick="shiftPeriod(-1)" aria-label="Предыдущий период" title="Предыдущий период">‹</button>
-  <div class="total-card">
-    <div class="cur-toggle" id="curToggle" onclick="toggleCurrency()" title="Показать в долларах">$</div>
-    <div class="total-label" id="totalLabel">Итого к получению</div>
-    <div class="total-view-toggle" id="totalViewToggle">
-      <span class="tvt-opt" id="tvtGross" onclick="setTotalView('gross')">Грязными</span>
-      <span class="tvt-opt" id="tvtNet" onclick="setTotalView('net')">На руки</span>
-    </div>
-    <div class="total-amount" id="totalDisplay">0 <span>₽</span></div>
-    <div class="total-meta" id="totalMeta"></div>
-    <div id="compareBadge"></div>
+<div class="total-card" id="totalCard">
+  <div class="cur-toggle" id="curToggle" onclick="toggleCurrency()" title="Показать в долларах">$</div>
+  <div class="total-label" id="totalLabel">Итого к получению</div>
+  <div class="total-view-toggle" id="totalViewToggle">
+    <span class="tvt-opt" id="tvtGross" onclick="setTotalView('gross')">Грязными</span>
+    <span class="tvt-opt" id="tvtNet" onclick="setTotalView('net')">На руки</span>
   </div>
-  <button class="total-nav" onclick="shiftPeriod(1)" aria-label="Следующий период" title="Следующий период">›</button>
+  <div class="total-amount" id="totalDisplay">0 <span>₽</span></div>
+  <div class="total-meta" id="totalMeta"></div>
+  <div id="compareBadge"></div>
 </div>
 
 <!-- TODAY SUMMARY -->
@@ -1675,6 +1665,29 @@ function shiftPeriod(dir){
   document.getElementById('periodSel').value=String(p);
   haptic('light');
   onPeriodChange();
+}
+
+// Swipe the total card left/right to move to the next/previous period.
+function initTotalSwipe(){
+  const card=document.getElementById('totalCard');
+  if(!card)return;
+  let x0=0,y0=0,t0=0;
+  card.addEventListener('touchstart',e=>{
+    const t=e.changedTouches[0];x0=t.clientX;y0=t.clientY;t0=Date.now();
+  },{passive:true});
+  card.addEventListener('touchend',e=>{
+    const t=e.changedTouches[0];
+    const dx=t.clientX-x0,dy=t.clientY-y0,dt=Date.now()-t0;
+    // Mostly-horizontal, long-enough, quick-enough flick.
+    if(dt<700&&Math.abs(dx)>48&&Math.abs(dx)>Math.abs(dy)*1.5){
+      const dir=dx<0?1:-1;            // swipe left → next, right → previous
+      card.classList.remove('swipe-l','swipe-r');
+      void card.offsetWidth;           // restart animation
+      card.classList.add(dir>0?'swipe-l':'swipe-r');
+      setTimeout(()=>card.classList.remove('swipe-l','swipe-r'),300);
+      shiftPeriod(dir);
+    }
+  },{passive:true});
 }
 
 // ══════════════════════════════════════════════
@@ -3383,7 +3396,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-23 #42';
+const BUILD_VER='2026-06-23 #43';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
@@ -4108,7 +4121,7 @@ renderTotal();renderChart();renderGoals();renderHistory();renderArchive();
 renderExpenses();renderAchievements();renderTodaySummary();
 try{const _cm=localStorage.getItem('salary_calc_money');if(_cm){const _ci=document.getElementById('calcMoneyIn');if(_ci)_ci.value=_cm;}}catch(e){}
 renderSpendCalc();
-restorePage();initPWA();
+restorePage();initPWA();initTotalSwipe();
 restoreScroll();
 initFirebase();
 refreshUsdRateIfNeeded(); // fetch/refresh USD rate in the background
