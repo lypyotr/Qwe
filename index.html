@@ -76,6 +76,17 @@ body{
 .period-title{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent2);opacity:.9}
 .period-badge{font-size:11px;font-weight:700;background:rgba(34,211,238,.12);color:var(--accent2);border:1px solid rgba(34,211,238,.25);border-radius:20px;padding:3px 10px}
 .period-selectors{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.period-nav-row{display:flex;align-items:stretch;gap:8px;margin-bottom:12px}
+.period-nav-row .period-selectors{flex:1;margin-bottom:0}
+.period-nav{
+  flex:none;width:38px;align-self:stretch;
+  display:flex;align-items:center;justify-content:center;padding:0 0 2px;
+  background:var(--surface2);border:1px solid var(--border);border-radius:10px;
+  color:var(--accent2);font-size:24px;font-weight:800;line-height:1;cursor:pointer;
+  font-family:'Manrope',sans-serif;-webkit-tap-highlight-color:transparent;
+  transition:transform .12s,background .15s;
+}
+.period-nav:active{transform:scale(.9);background:rgba(34,211,238,.16)}
 .sel-group{display:flex;flex-direction:column;gap:4px}
 .sel-label{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
 .sel-wrap{background:var(--surface2);border:1px solid var(--border);border-radius:10px;overflow:hidden}
@@ -1119,20 +1130,24 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
     <div class="period-title">Расчётный период</div>
     <div class="period-badge" id="periodBadge">—</div>
   </div>
-  <div class="period-selectors">
-    <div class="sel-group">
-      <div class="sel-label">Месяц</div>
-      <div class="sel-wrap"><select id="monthSel" onchange="onPeriodChange()"></select></div>
-    </div>
-    <div class="sel-group">
-      <div class="sel-label">Период</div>
-      <div class="sel-wrap">
-        <select id="periodSel" onchange="onPeriodChange()">
-          <option value="1">1–15 (аванс)</option>
-          <option value="2">16–31 (зарплата)</option>
-        </select>
+  <div class="period-nav-row">
+    <button class="period-nav" onclick="shiftPeriod(-1)" aria-label="Предыдущий период" title="Предыдущий период">‹</button>
+    <div class="period-selectors">
+      <div class="sel-group">
+        <div class="sel-label">Месяц</div>
+        <div class="sel-wrap"><select id="monthSel" onchange="onPeriodChange()"></select></div>
+      </div>
+      <div class="sel-group">
+        <div class="sel-label">Период</div>
+        <div class="sel-wrap">
+          <select id="periodSel" onchange="onPeriodChange()">
+            <option value="1">1–15 (аванс)</option>
+            <option value="2">16–31 (зарплата)</option>
+          </select>
+        </div>
       </div>
     </div>
+    <button class="period-nav" onclick="shiftPeriod(1)" aria-label="Следующий период" title="Следующий период">›</button>
   </div>
   <div class="paydate-box">
     <div class="paydate-row">
@@ -1628,6 +1643,37 @@ function onPeriodChange(){
   if (currentUser && sbClient) {
     loadAllUserData().then(() => { renderAll(); startRealtimeSync(); }).catch(e=>console.error('period change',e));
   }
+}
+
+// Make sure the month dropdown has an option for (y,m), adding it (kept in
+// chronological order) so the arrows can move beyond the initial ±3 months.
+function ensureMonthOption(y,m){
+  const sel=document.getElementById('monthSel');
+  const val=`${y}-${m}`;
+  if([...sel.options].some(o=>o.value===val))return;
+  const o=document.createElement('option');
+  o.value=val;o.textContent=`${MN[m]} ${y}`;
+  sel.appendChild(o);
+  const opts=[...sel.options].sort((a,b)=>{
+    const[ay,am]=a.value.split('-').map(Number);
+    const[by,bm]=b.value.split('-').map(Number);
+    return ay-by||am-bm;
+  });
+  const cur=sel.value;
+  sel.innerHTML='';opts.forEach(op=>sel.appendChild(op));
+  sel.value=cur;
+}
+// Jump one half-period back/forward: period 1 ⇄ 2, rolling over months.
+function shiftPeriod(dir){
+  const{year,month,period}=getPeriod();
+  let y=year,m=month,p=period;
+  if(dir>0){ if(p===1){p=2;} else {p=1;m++;if(m>11){m=0;y++;}} }
+  else     { if(p===2){p=1;} else {p=2;m--;if(m<0){m=11;y--;}} }
+  ensureMonthOption(y,m);
+  document.getElementById('monthSel').value=`${y}-${m}`;
+  document.getElementById('periodSel').value=String(p);
+  haptic('light');
+  onPeriodChange();
 }
 
 // ══════════════════════════════════════════════
@@ -3330,7 +3376,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-23 #39';
+const BUILD_VER='2026-06-23 #40';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
