@@ -1255,7 +1255,7 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
       <div class="calc-card-title">💸 Сколько можно тратить в день</div>
       <div class="calc-card-sub">Введи, сколько денег у тебя есть сейчас — покажу, сколько можно тратить в день до следующей выплаты.</div>
       <div class="calc-input-row">
-        <input class="calc-input" id="calcMoneyIn" type="number" inputmode="decimal" placeholder="Сколько у меня есть" oninput="renderSpendCalc()">
+        <input class="calc-input" id="calcMoneyIn" type="number" inputmode="decimal" placeholder="Сколько у меня есть" oninput="onCalcMoneyInput(this.value)">
         <span class="calc-cur">₽</span>
       </div>
       <div class="calc-result" id="calcSpendResult"></div>
@@ -2440,12 +2440,32 @@ function nextPaydayInfo(){
 function daysToNextPayday(){return nextPaydayInfo().days;}
 
 // Calculator: how much you can spend per day until the next payday.
+// User typed in the calculator — persist + sync to cloud, then re-render.
+// Calculator state lives inside the synced `goals` object (goals.calc), so it
+// rides the existing user_settings sync and is included in backups.
+function onCalcMoneyInput(v){
+  const amount=parseFloat(v)||0;
+  if(!goals.calc)goals.calc={};
+  goals.calc.money=amount>0?amount:0;
+  try{localStorage.setItem('salary_goals',JSON.stringify(goals));}catch(e){}
+  scheduleSettingsSave();   // debounced cloud sync
+  renderSpendCalc();
+}
+// Reflect the (possibly cloud-loaded) calculator state into the input + result,
+// without clobbering what the user is actively typing.
+function loadCalcInput(){
+  const ci=document.getElementById('calcMoneyIn');
+  if(ci&&document.activeElement!==ci){
+    const m=(goals.calc&&goals.calc.money)||0;
+    ci.value=m>0?m:'';
+  }
+  renderSpendCalc();
+}
 function renderSpendCalc(){
   const el=document.getElementById('calcSpendResult');
   if(!el)return;
   const inp=document.getElementById('calcMoneyIn');
   const amount=parseFloat(inp&&inp.value)||0;
-  try{localStorage.setItem('salary_calc_money',amount>0?String(amount):'');}catch(e){}
   const{date,days,label}=nextPaydayInfo();
   const dStr=date.getDate()+' '+MS[date.getMonth()];
   if(days<=0){
@@ -3396,7 +3416,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-23 #43';
+const BUILD_VER='2026-06-23 #44';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
@@ -4016,7 +4036,7 @@ async function loadAllUserData(){
   ]);
   if(s){
     if(s.templates){templates=s.templates;localStorage.setItem('salary_templates',JSON.stringify(templates));}
-    if(s.goals){goals=s.goals;localStorage.setItem('salary_goals',JSON.stringify(goals));}
+    if(s.goals){goals=s.goals;localStorage.setItem('salary_goals',JSON.stringify(goals));loadCalcInput();}
     if(s.theme){localStorage.setItem('salary_theme',s.theme);lightTheme=s.theme==='light';document.body.classList.toggle('light',lightTheme);document.getElementById('themeBtn').textContent=lightTheme?'🌙':'☀️';}
   }
   if(periods){
@@ -4119,8 +4139,15 @@ load();
 renderPeriodCard();renderDayStrip();renderDayPanel();renderBonuses();renderTemplates();
 renderTotal();renderChart();renderGoals();renderHistory();renderArchive();
 renderExpenses();renderAchievements();renderTodaySummary();
-try{const _cm=localStorage.getItem('salary_calc_money');if(_cm){const _ci=document.getElementById('calcMoneyIn');if(_ci)_ci.value=_cm;}}catch(e){}
-renderSpendCalc();
+// One-time migration of the old device-local calc value into synced goals.calc.
+try{
+  if(!(goals.calc&&goals.calc.money)){
+    const _cm=parseFloat(localStorage.getItem('salary_calc_money'))||0;
+    if(_cm>0){goals.calc={money:_cm};localStorage.setItem('salary_goals',JSON.stringify(goals));}
+  }
+  localStorage.removeItem('salary_calc_money');
+}catch(e){}
+loadCalcInput();
 restorePage();initPWA();initTotalSwipe();
 restoreScroll();
 initFirebase();
