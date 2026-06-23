@@ -76,17 +76,6 @@ body{
 .period-title{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent2);opacity:.9}
 .period-badge{font-size:11px;font-weight:700;background:rgba(34,211,238,.12);color:var(--accent2);border:1px solid rgba(34,211,238,.25);border-radius:20px;padding:3px 10px}
 .period-selectors{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
-.period-nav-row{display:flex;align-items:stretch;gap:8px;margin-bottom:12px}
-.period-nav-row .period-selectors{flex:1;margin-bottom:0}
-.period-nav{
-  flex:none;width:38px;align-self:stretch;
-  display:flex;align-items:center;justify-content:center;padding:0 0 2px;
-  background:var(--surface2);border:1px solid var(--border);border-radius:10px;
-  color:var(--accent2);font-size:24px;font-weight:800;line-height:1;cursor:pointer;
-  font-family:'Manrope',sans-serif;-webkit-tap-highlight-color:transparent;
-  transition:transform .12s,background .15s;
-}
-.period-nav:active{transform:scale(.9);background:rgba(34,211,238,.16)}
 .sel-group{display:flex;flex-direction:column;gap:4px}
 .sel-label{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
 .sel-wrap{background:var(--surface2);border:1px solid var(--border);border-radius:10px;overflow:hidden}
@@ -163,6 +152,18 @@ body{
 .goal-input-label{font-size:13px;font-weight:700;color:var(--text);min-width:80px}
 
 /* ── TOTAL CARD ── */
+/* period-switch arrows flanking the total card */
+.total-nav-row{display:flex;align-items:stretch;gap:2px;margin:0 6px 12px}
+.total-nav-row .total-card{flex:1;min-width:0;margin:0}
+.total-nav{
+  flex:none;width:30px;align-self:stretch;
+  display:flex;align-items:center;justify-content:center;padding:0 0 3px;
+  background:transparent;border:none;cursor:pointer;
+  color:var(--accent);font-size:30px;font-weight:800;line-height:1;opacity:.65;
+  font-family:'Manrope',sans-serif;-webkit-tap-highlight-color:transparent;
+  transition:transform .12s,opacity .15s;
+}
+.total-nav:active{transform:scale(.82);opacity:1}
 .total-card{
   margin:0 16px 12px;
   background:linear-gradient(135deg,#1a3a2a 0%,#1a2a3a 100%);
@@ -1045,16 +1046,20 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
 </div>
 
 <!-- TOTAL CARD -->
-<div class="total-card">
-  <div class="cur-toggle" id="curToggle" onclick="toggleCurrency()" title="Показать в долларах">$</div>
-  <div class="total-label" id="totalLabel">Итого к получению</div>
-  <div class="total-view-toggle" id="totalViewToggle">
-    <span class="tvt-opt" id="tvtGross" onclick="setTotalView('gross')">Грязными</span>
-    <span class="tvt-opt" id="tvtNet" onclick="setTotalView('net')">На руки</span>
+<div class="total-nav-row">
+  <button class="total-nav" onclick="shiftPeriod(-1)" aria-label="Предыдущий период" title="Предыдущий период">‹</button>
+  <div class="total-card">
+    <div class="cur-toggle" id="curToggle" onclick="toggleCurrency()" title="Показать в долларах">$</div>
+    <div class="total-label" id="totalLabel">Итого к получению</div>
+    <div class="total-view-toggle" id="totalViewToggle">
+      <span class="tvt-opt" id="tvtGross" onclick="setTotalView('gross')">Грязными</span>
+      <span class="tvt-opt" id="tvtNet" onclick="setTotalView('net')">На руки</span>
+    </div>
+    <div class="total-amount" id="totalDisplay">0 <span>₽</span></div>
+    <div class="total-meta" id="totalMeta"></div>
+    <div id="compareBadge"></div>
   </div>
-  <div class="total-amount" id="totalDisplay">0 <span>₽</span></div>
-  <div class="total-meta" id="totalMeta"></div>
-  <div id="compareBadge"></div>
+  <button class="total-nav" onclick="shiftPeriod(1)" aria-label="Следующий период" title="Следующий период">›</button>
 </div>
 
 <!-- TODAY SUMMARY -->
@@ -1130,24 +1135,20 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
     <div class="period-title">Расчётный период</div>
     <div class="period-badge" id="periodBadge">—</div>
   </div>
-  <div class="period-nav-row">
-    <button class="period-nav" onclick="shiftPeriod(-1)" aria-label="Предыдущий период" title="Предыдущий период">‹</button>
-    <div class="period-selectors">
-      <div class="sel-group">
-        <div class="sel-label">Месяц</div>
-        <div class="sel-wrap"><select id="monthSel" onchange="onPeriodChange()"></select></div>
-      </div>
-      <div class="sel-group">
-        <div class="sel-label">Период</div>
-        <div class="sel-wrap">
-          <select id="periodSel" onchange="onPeriodChange()">
-            <option value="1">1–15 (аванс)</option>
-            <option value="2">16–31 (зарплата)</option>
-          </select>
-        </div>
+  <div class="period-selectors">
+    <div class="sel-group">
+      <div class="sel-label">Месяц</div>
+      <div class="sel-wrap"><select id="monthSel" onchange="onPeriodChange()"></select></div>
+    </div>
+    <div class="sel-group">
+      <div class="sel-label">Период</div>
+      <div class="sel-wrap">
+        <select id="periodSel" onchange="onPeriodChange()">
+          <option value="1">1–15 (аванс)</option>
+          <option value="2">16–31 (зарплата)</option>
+        </select>
       </div>
     </div>
-    <button class="period-nav" onclick="shiftPeriod(1)" aria-label="Следующий период" title="Следующий период">›</button>
   </div>
   <div class="paydate-box">
     <div class="paydate-row">
@@ -3376,7 +3377,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-23 #40';
+const BUILD_VER='2026-06-23 #41';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
