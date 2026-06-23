@@ -1226,7 +1226,7 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
     </div>
     <div class="stat-tile">
       <div class="stat-tile-num" id="statEarned">0</div>
-      <div class="stat-tile-lbl">₽ заработано</div>
+      <div class="stat-tile-lbl" id="statEarnedLbl">₽ заработано</div>
     </div>
   </div>
 
@@ -1750,9 +1750,9 @@ function renderGoals(){
     if(pct>=1){note='🎉 Цель достигнута! Отличная работа!';noteCls='fire'}
     else if(isCurrentPeriod&&calDaysLeft>0){
       const needPerDay=left/calDaysLeft;
-      note=`Осталось ${fmt(left)} ₽ · нужно ${fmt(Math.ceil(needPerDay))} ₽/день`;
+      note=`Осталось ${M(left)} · нужно ${M(Math.ceil(needPerDay))}/день`;
       noteCls=avgPerWorkedDay>0&&needPerDay>avgPerWorkedDay*1.3?'danger':'warn';
-    } else if(!isCurrentPeriod){note=`Заработано ${fmt(earned)} ₽ из ${fmt(goals.period)} ₽`}
+    } else if(!isCurrentPeriod){note=`Заработано ${M(earned)} из ${M(goals.period)}`}
     html+=goalRowHtml('За период',earned,goals.period,barW,cls,note,noteCls);
   }
 
@@ -1770,8 +1770,8 @@ function renderGoals(){
     const left=Math.max(goals.week-weekEarned,0);
     let note='',noteCls='';
     if(pct>=1){note='🔥 Недельная цель выполнена!';noteCls='fire'}
-    else if(daysLeftInWeek>0){note=`Осталось ${fmt(left)} ₽ · нужно ${fmt(Math.ceil(left/daysLeftInWeek))} ₽/день`;noteCls=pct<0.3?'danger':'warn'}
-    else{note=`На этой неделе ${fmt(weekEarned)} ₽ из ${fmt(goals.week)} ₽`;noteCls=pct<0.5?'danger':'warn'}
+    else if(daysLeftInWeek>0){note=`Осталось ${M(left)} · нужно ${M(Math.ceil(left/daysLeftInWeek))}/день`;noteCls=pct<0.3?'danger':'warn'}
+    else{note=`На этой неделе ${M(weekEarned)} из ${M(goals.week)}`;noteCls=pct<0.5?'danger':'warn'}
     html+=goalRowHtml('За неделю',weekEarned,goals.week,barW,cls,note,noteCls);
   }
 
@@ -1801,8 +1801,8 @@ function renderGoals(){
     else{
       const lastDay=new Date(year,month+1,0).getDate();
       const calLeft=isCurrentPeriod?lastDay-today.getDate():0;
-      if(calLeft>0){note=`До конца месяца нужно ещё ${fmt(left)} ₽`;noteCls=pct<0.3?'danger':'warn'}
-      else{note=`${fmt(monthEarned)} ₽ из ${fmt(goals.month)} ₽ за месяц`;noteCls='warn'}
+      if(calLeft>0){note=`До конца месяца нужно ещё ${M(left)}`;noteCls=pct<0.3?'danger':'warn'}
+      else{note=`${M(monthEarned)} из ${M(goals.month)} за месяц`;noteCls='warn'}
     }
     html+=goalRowHtml('За месяц',monthEarned,goals.month,barW,cls,note,noteCls);
   }
@@ -1920,7 +1920,7 @@ function renderDayStrip(){
       isToday?'today-mark':'',
       hasData?'has-data':''
     ].filter(Boolean).join(' ');
-    const sumStr=hasData?fmtShort(sum):'';
+    const sumStr=hasData?fmtShort(convCur(sum)):'';
     html+=`<div class="${cls}" onclick="selectDay(${d})"><span class="day-num">${d}</span><span class="day-sum">${sumStr}</span></div>`;
   }
   strip.innerHTML=html;
@@ -1955,7 +1955,7 @@ function renderDayPanel(){
   const date=new Date(year,month,selectedDay);
   document.getElementById('dpTitle').textContent=`${selectedDay} ${MG[month]}, ${DOW[date.getDay()]}`;
   const sum=daySum(selectedDay);
-  document.getElementById('dpSum').textContent=sum>0?fmt(sum)+' ₽':'';
+  document.getElementById('dpSum').textContent=sum>0?M(sum):'';
   const btn=document.getElementById('dayTypeBtn');
   if(btn){
     const off=isDayOff(selectedDay,date);
@@ -2133,7 +2133,7 @@ function updateWork(day,id,field,value){
   if(!w)return;
   w[field]=value;save();
   const sum=daySum(day);
-  document.getElementById('dpSum').textContent=sum>0?fmt(sum)+' ₽':'';
+  document.getElementById('dpSum').textContent=sum>0?M(sum):'';
   renderDayStrip();renderTotal();renderChart();renderGoals();
 }
 
@@ -2149,7 +2149,7 @@ function renderTemplates(){
   list.innerHTML=templates.map(t=>`
     <div class="tpl-chip" onclick="applyTemplate(${t.id})">
       <span>${esc(t.name)}</span>
-      <span class="tpl-price">${fmt(t.price)} ₽</span>
+      <span class="tpl-price">${M(t.price)}</span>
       <span class="tpl-del" onclick="deleteTpl(event,${t.id})">✕</span>
     </div>`).join('');
 }
@@ -2167,7 +2167,7 @@ function renderTplModal(){
     <div class="modal-tpl-row" onclick="applyTemplateFromModal(${t.id})">
       <div>
         <div class="modal-tpl-name">${esc(t.name)}</div>
-        <div class="modal-tpl-price">${fmt(t.price)} ₽ за ед.</div>
+        <div class="modal-tpl-price">${M(t.price)} за ед.</div>
       </div>
       <div class="modal-tpl-del" onclick="deleteTpl(event,${t.id})">✕</div>
     </div>`).join('');
@@ -2224,7 +2224,7 @@ function openCopyModal(){
           <div class="copy-day-name">${d} ${MG[month]}</div>
           <div class="copy-day-works">${works.length} ${plWorks(works.length)}</div>
         </div>
-        <div class="copy-day-sum">${fmt(sum)} ₽</div>
+        <div class="copy-day-sum">${M(sum)}</div>
       </div>`).join('');
   }
   document.getElementById('copyModal').classList.add('open');
@@ -2270,7 +2270,7 @@ function openCopyExpModal(){
           <div class="copy-day-name">${MS[m]} ${y} · ${p===1?'аванс':'зп'}</div>
           <div class="copy-day-works">${count} ${plExp(count)}</div>
         </div>
-        <div class="copy-day-sum">${fmt(sum)} ₽</div>
+        <div class="copy-day-sum">${M(sum)}</div>
       </div>`).join('');
   }
   document.getElementById('copyExpModal').classList.add('open');
@@ -2324,6 +2324,13 @@ function calcBase(){return [].concat.apply([],Object.values(days)).reduce((s,w)=
 function calcBonus(){return bonuses.reduce((s,b)=>s+(parseFloat(b.amount)||0),0)}
 function calcTotal(){let t=calcBase()+calcBonus();if(taxEnabled)t*=0.87;return Math.max(0,t)}
 function fmt(n){return Math.round(n).toLocaleString('ru-RU')}
+// Currency-aware money helpers. Everything is stored/computed in rubles; when
+// USD display is active these convert at the live rate. convCur=number only,
+// curSym=active symbol, Mn=converted+formatted number, M=number + symbol.
+function convCur(n){return (currencyView==='usd'&&usdRate>0)?n/usdRate:n;}
+function curSym(){return (currencyView==='usd'&&usdRate>0)?'$':'₽';}
+function Mn(n){return fmt(convCur(n));}
+function M(n){return fmt(convCur(n))+' '+curSym();}
 function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')}
 
 // ══════════════════════════════════════════════
@@ -2394,7 +2401,7 @@ async function fetchUsdRate(){
 async function refreshUsdRateIfNeeded(force){
   if(!force&&usdRate>0&&Date.now()-usdRateAt<USD_RATE_TTL)return;
   const ok=await fetchUsdRate();
-  if(ok&&currencyView==='usd')renderTotal();
+  if(ok&&currencyView==='usd'){renderAll();renderSpendCalc();}
 }
 
 async function toggleCurrency(){
@@ -2417,7 +2424,7 @@ async function toggleCurrency(){
   }
   try{localStorage.setItem('salary_currency',currencyView);}catch(e){}
   haptic('light');
-  renderTotal();
+  renderAll();renderSpendCalc();   // convert every ₽ value across the app
   if(currencyView==='usd')refreshUsdRateIfNeeded(); // freshen in background
 }
 
@@ -2478,12 +2485,12 @@ function renderSpendCalc(){
   }
   const perDay=amount/days;
   el.innerHTML=`
-    <div class="calc-big">${fmt(perDay)} <span>₽/день</span></div>
+    <div class="calc-big">${Mn(perDay)} <span>${curSym()}/день</span></div>
     <div class="calc-big-sub">можно тратить до ${label} (${dStr})</div>
     <div class="calc-rows">
       <div class="calc-rrow"><span>Осталось до выплаты</span><b>${days} ${dayWord(days)}</b></div>
-      <div class="calc-rrow"><span>В неделю</span><b>${fmt(perDay*7)} ₽</b></div>
-      <div class="calc-rrow"><span>Всего есть</span><b>${fmt(amount)} ₽</b></div>
+      <div class="calc-rrow"><span>В неделю</span><b>${M(perDay*7)}</b></div>
+      <div class="calc-rrow"><span>Всего есть</span><b>${M(amount)}</b></div>
     </div>`;
 }
 
@@ -2504,11 +2511,7 @@ function renderTotal(){
   const disp=showNet?net:total;
   const dispEl=document.getElementById('totalDisplay');
   const usd=currencyView==='usd'&&usdRate>0;
-  if(usd){
-    dispEl.innerHTML=fmt(disp/usdRate)+' <span>$</span>';
-  }else{
-    dispEl.innerHTML=fmt(disp)+' <span>₽</span>';
-  }
+  dispEl.innerHTML=Mn(disp)+' <span>'+curSym()+'</span>';
   dispEl.style.color=showNet&&net<0?'var(--danger)':'';
   // Currency button reflects/affords the switch.
   const curBtn=document.getElementById('curToggle');
@@ -2524,13 +2527,13 @@ function renderTotal(){
     meta.push(`<div class="meta-item">Курс: <strong>1 $ = ${usdRate.toFixed(2).replace('.',',')} ₽</strong> <span style="font-weight:400;color:var(--muted)">${usdRateSource}${fresh?' · '+fresh:''}</span></div>`);
   }
   if(filledDays>0)meta.push(`<div class="meta-item">Дней: <strong>${filledDays}</strong></div>`);
-  if(base>0)meta.push(`<div class="meta-item">База: <strong>${fmt(base)} ₽</strong></div>`);
-  if(filledDays>1)meta.push(`<div class="meta-item">Ср/день: <strong>${fmt(base/filledDays)} ₽</strong></div>`);
-  if(hasExp)meta.push(`<div class="meta-item" style="color:var(--danger)">Расходы: <strong>−${fmt(expTotal)} ₽</strong></div>`);
+  if(base>0)meta.push(`<div class="meta-item">База: <strong>${M(base)}</strong></div>`);
+  if(filledDays>1)meta.push(`<div class="meta-item">Ср/день: <strong>${M(base/filledDays)}</strong></div>`);
+  if(hasExp)meta.push(`<div class="meta-item" style="color:var(--danger)">Расходы: <strong>−${M(expTotal)}</strong></div>`);
   const days2pay=daysToNextPayday();
   if(disp>0&&days2pay>0){
     const perDay=Math.round(disp/days2pay);
-    meta.push(`<div class="meta-item" style="color:var(--accent2)">~${fmt(perDay)} ₽/день <span style="font-weight:400;color:var(--muted)">до зп (${days2pay} дн.)</span></div>`);
+    meta.push(`<div class="meta-item" style="color:var(--accent2)">~${M(perDay)}/день <span style="font-weight:400;color:var(--muted)">до зп (${days2pay} дн.)</span></div>`);
   }
   document.getElementById('totalMeta').innerHTML=meta.join('');
   renderCompareBadge(disp);
@@ -2562,7 +2565,7 @@ function renderTodaySummary(){
       <div class="ts-works">${esc(names)}</div>
     </div>
     <div class="ts-right">
-      <div class="ts-amount">${fmt(sum)} ₽</div>
+      <div class="ts-amount">${M(sum)}</div>
       ${totalQty>0?`<div class="ts-qty">${Math.round(totalQty)} шт</div>`:''}
     </div>`;
 }
@@ -2596,9 +2599,9 @@ function renderCompareBadge(total){
     if(Math.abs(diff)<50){
       document.getElementById('compareBadge').innerHTML=`<span class="compare-badge same">= как прошлый период</span>`;
     } else if(diff>0){
-      document.getElementById('compareBadge').innerHTML=`<span class="compare-badge up">▲ +${fmt(diff)} ₽ (+${pct}%) vs прошлый период</span>`;
+      document.getElementById('compareBadge').innerHTML=`<span class="compare-badge up">▲ +${M(diff)} (+${pct}%) vs прошлый период</span>`;
     } else {
-      document.getElementById('compareBadge').innerHTML=`<span class="compare-badge down">▼ ${fmt(diff)} ₽ (−${pct}%) vs прошлый период</span>`;
+      document.getElementById('compareBadge').innerHTML=`<span class="compare-badge down">▼ ${M(diff)} (−${pct}%) vs прошлый период</span>`;
     }
   }catch(e){document.getElementById('compareBadge').innerHTML=''}
 }
@@ -2668,7 +2671,7 @@ function renderChart(){
     const showVal=hasData&&(showAllVals||isActive||d===maxDay.d);
     return`<div class="chart-bar-wrap${isActive?' active':''}" onclick="selectDayFromChart(${d})">
       <div class="chart-bar-col">
-        ${showVal?`<div class="chart-val">${shortRub(s)}</div>`:''}
+        ${showVal?`<div class="chart-val">${shortRub(convCur(s))}</div>`:''}
         <div class="chart-bar${hasData?' has-data':''}${isActive?' active':''}" style="height:${h}px"></div>
       </div>
       <div class="chart-bar-lbl">${d}</div>
@@ -2679,10 +2682,10 @@ function renderChart(){
   const periodSum=sums.reduce((a,b)=>a+b.s,0);
   const avg=nonZero.length?Math.round(periodSum/nonZero.length):0;
   let s='';
-  s+=`<div class="chart-stat"><div class="chart-stat-label">💰 Заработано</div><div class="chart-stat-val">${fmt(periodSum)} ₽</div></div>`;
+  s+=`<div class="chart-stat"><div class="chart-stat-label">💰 Заработано</div><div class="chart-stat-val">${M(periodSum)}</div></div>`;
   s+=`<div class="chart-stat"><div class="chart-stat-label">📅 Отработано</div><div class="chart-stat-val">${nonZero.length} ${dayWord(nonZero.length)}</div></div>`;
-  s+=`<div class="chart-stat"><div class="chart-stat-label">📊 Средний день</div><div class="chart-stat-val">${fmt(avg)} ₽</div></div>`;
-  if(maxDay.d)s+=`<div class="chart-stat"><div class="chart-stat-label">🏆 Лучший день</div><div class="chart-stat-val">${maxDay.d} ${MS[month]} · ${fmt(maxDay.s)} ₽</div></div>`;
+  s+=`<div class="chart-stat"><div class="chart-stat-label">📊 Средний день</div><div class="chart-stat-val">${M(avg)}</div></div>`;
+  if(maxDay.d)s+=`<div class="chart-stat"><div class="chart-stat-label">🏆 Лучший день</div><div class="chart-stat-val">${maxDay.d} ${MS[month]} · ${M(maxDay.s)}</div></div>`;
   document.getElementById('chartStats').innerHTML=s;
 }
 
@@ -2718,7 +2721,7 @@ function renderHistory(){
     return`<div class="hist-card${isCur?' current':''}" onclick="goToHistory('${y}-${m}',${p})">
       <div class="hist-month">${MS[m]} ${y}</div>
       <div class="hist-period">${pLabel}</div>
-      <div class="hist-total">${total>0?fmt(total)+' ₽':'—'}</div>
+      <div class="hist-total">${total>0?M(total):'—'}</div>
     </div>`;
   }).join('');
   renderArchive();
@@ -2766,17 +2769,17 @@ function renderArchive(){
 
     const avRow=`<div class="arc-period-row" onclick="goToHistory('${y}-${m}',1);switchPage('work')">
       <span class="arc-period-lbl">Аванс <span class="arc-period-range">1–15</span></span>
-      <span class="arc-period-val${isCurAv?' arc-cur':''}">${av&&av.total>0?fmt(av.total)+' ₽':'—'}</span>
+      <span class="arc-period-val${isCurAv?' arc-cur':''}">${av&&av.total>0?M(av.total):'—'}</span>
     </div>`;
     const zpRow=`<div class="arc-period-row" onclick="goToHistory('${y}-${m}',2);switchPage('work')">
       <span class="arc-period-lbl">Зарплата <span class="arc-period-range">16–${endD}</span></span>
-      <span class="arc-period-val${isCurZp?' arc-cur':''}">${zp&&zp.total>0?fmt(zp.total)+' ₽':'—'}</span>
+      <span class="arc-period-val${isCurZp?' arc-cur':''}">${zp&&zp.total>0?M(zp.total):'—'}</span>
     </div>`;
 
     return`<div class="arc-month-card">
       <div class="arc-month-header">
         <span class="arc-month-name">${MN[m]} ${y}</span>
-        <span class="arc-month-total">${monthTotal>0?fmt(monthTotal)+' ₽':'—'}</span>
+        <span class="arc-month-total">${monthTotal>0?M(monthTotal):'—'}</span>
       </div>
       ${avRow}${zpRow}
     </div>`;
@@ -2802,37 +2805,37 @@ function renderBreakdown(){
   const sortedDays=Object.keys(days).map(Number).sort((a,b)=>a-b);
   sortedDays.forEach(d=>{
     const s=daySum(d);
-    if(s>0)rows+=`<div class="breakdown-row"><span class="lbl">${d} ${MG[month]}</span><span class="val">${fmt(s)} ₽</span></div>`;
+    if(s>0)rows+=`<div class="breakdown-row"><span class="lbl">${d} ${MG[month]}</span><span class="val">${M(s)}</span></div>`;
   });
   const filledCount=sortedDays.filter(d=>daySum(d)>0).length;
-  if(base>0&&filledCount>1)rows+=`<div class="breakdown-row"><span class="lbl">Итого по работам</span><span class="val">${fmt(base)} ₽</span></div>`;
+  if(base>0&&filledCount>1)rows+=`<div class="breakdown-row"><span class="lbl">Итого по работам</span><span class="val">${M(base)}</span></div>`;
   bonuses.forEach(b=>{
     const amt=parseFloat(b.amount)||0;
     if(amt!==0){
       const lbl=b.name||(amt>0?'Доплата':'Вычет');
-      rows+=`<div class="breakdown-row bonus-r"><span class="lbl">${lbl}</span><span class="val" style="color:${amt>=0?'var(--accent3)':'var(--danger)'}">${amt>=0?'+':''}${fmt(amt)} ₽</span></div>`;
+      rows+=`<div class="breakdown-row bonus-r"><span class="lbl">${lbl}</span><span class="val" style="color:${amt>=0?'var(--accent3)':'var(--danger)'}">${amt>=0?'+':''}${M(amt)}</span></div>`;
     }
   });
-  if(taxEnabled)rows+=`<div class="breakdown-row tax-r"><span class="lbl">НДФЛ 13%</span><span class="val">−${fmt(tax)} ₽</span></div>`;
+  if(taxEnabled)rows+=`<div class="breakdown-row tax-r"><span class="lbl">НДФЛ 13%</span><span class="val">−${M(tax)}</span></div>`;
   const expTotal=calcExpensesTotal(),net=calcNetTotal();
   const hasExp=expTotal>0;
   if(hasExp){
-    rows+=`<div class="breakdown-row"><span class="lbl">К получению</span><span class="val">${fmt(total)} ₽</span></div>`;
+    rows+=`<div class="breakdown-row"><span class="lbl">К получению</span><span class="val">${M(total)}</span></div>`;
     const wd=calcWorkedDays();
     expenseItems.forEach(item=>{
       const amt=parseFloat(item.amount)||0;
       if(!amt)return;
       let calc,hint;
-      if(item.mode==='day'){calc=amt*wd;hint=`${wd} дн. × ${fmt(amt)} ₽`}
+      if(item.mode==='day'){calc=amt*wd;hint=`${wd} дн. × ${M(amt)}`}
       else if(item.mode==='month'){calc=amt/2;hint='½ мес.'}
       else{calc=amt;hint='за период'}
       const lbl=item.name||'Расход';
-      rows+=`<div class="breakdown-row exp-r"><span class="lbl">${esc(lbl)} <span style="font-weight:400;color:var(--muted)">(${hint})</span></span><span class="val">−${fmt(calc)} ₽</span></div>`;
+      rows+=`<div class="breakdown-row exp-r"><span class="lbl">${esc(lbl)} <span style="font-weight:400;color:var(--muted)">(${hint})</span></span><span class="val">−${M(calc)}</span></div>`;
     });
     const netColor=net<0?'var(--danger)':'var(--accent)';
-    rows+=`<div class="breakdown-row net-r"><span class="lbl">На руки</span><span class="val" style="color:${netColor}">${fmt(net)} ₽</span></div>`;
+    rows+=`<div class="breakdown-row net-r"><span class="lbl">На руки</span><span class="val" style="color:${netColor}">${M(net)}</span></div>`;
   } else {
-    rows+=`<div class="breakdown-row total-row"><span class="lbl">К получению</span><span class="val">${fmt(total)} ₽</span></div>`;
+    rows+=`<div class="breakdown-row total-row"><span class="lbl">К получению</span><span class="val">${M(total)}</span></div>`;
   }
   bd.innerHTML=rows;
 }
@@ -2917,9 +2920,9 @@ function renderExpEditEff(){
   if(!el||!item)return;
   const amt=parseFloat(item.amount)||0;
   const wd=calcWorkedDays();
-  if(item.mode==='day')el.innerHTML=`${wd} раб. дн × ${fmt(amt)} ₽ = вычет <b>−${fmt(amt*wd)} ₽</b> за период`;
-  else if(item.mode==='month')el.innerHTML=`Половина месячной суммы = вычет <b>−${fmt(amt/2)} ₽</b> за период`;
-  else el.innerHTML=`Вычет <b>−${fmt(amt)} ₽</b> за период`;
+  if(item.mode==='day')el.innerHTML=`${wd} раб. дн × ${M(amt)} = вычет <b>−${M(amt*wd)}</b> за период`;
+  else if(item.mode==='month')el.innerHTML=`Половина месячной суммы = вычет <b>−${M(amt/2)}</b> за период`;
+  else el.innerHTML=`Вычет <b>−${M(amt)}</b> за период`;
 }
 function deleteEditingExpense(){
   if(_editingExpId==null)return;
@@ -2941,11 +2944,11 @@ function renderExpenses(){
     const amt=parseFloat(item.amount)||0;
     const name=esc(String(item.name||'').trim()||'Расход');
     let eff='';
-    if(item.mode==='day')eff=`${wd} дн → −${fmt(amt*wd)} ₽`;
-    else if(item.mode==='month')eff=`½ мес → −${fmt(amt/2)} ₽`;
+    if(item.mode==='day')eff=`${wd} дн → −${M(amt*wd)}`;
+    else if(item.mode==='month')eff=`½ мес → −${M(amt/2)}`;
     return `<div class="exp-card" onclick="openExpEdit(${item.id})">
       <div class="exp-card-name">${name}</div>
-      <div class="exp-card-amount">${fmt(amt)}<span class="cur"> ₽</span></div>
+      <div class="exp-card-amount">${Mn(amt)}<span class="cur"> ${curSym()}</span></div>
       <div class="exp-card-meta">
         <span class="exp-card-mode">${expModeLabel(item.mode)}</span>
         ${eff?`<span class="exp-card-eff">${eff}</span>`:''}
@@ -3035,9 +3038,10 @@ function renderAchievements(){
   }
 
   // ── Hero totals ──
-  document.getElementById('statQty').textContent=fmt(totalQty);
+  document.getElementById('statQty').textContent=fmt(totalQty); // quantity, not money
   document.getElementById('statDays').textContent=calcTotalWorkedDaysAllTime();
-  document.getElementById('statEarned').textContent=fmt(calcTotalEarnedAllTime());
+  document.getElementById('statEarned').textContent=Mn(calcTotalEarnedAllTime());
+  document.getElementById('statEarnedLbl').textContent=curSym()+' заработано';
 
   // ── Top works ──
   const maxQty=entries[0][1].qty;
@@ -3051,7 +3055,7 @@ function renderAchievements(){
       <div class="tw-rank">${badge}</div>
       <div class="tw-body">
         <div class="tw-name">${esc(name)}</div>
-        <div class="tw-sub">${pLabel} · ${fmt(v.earnings)} ₽</div>
+        <div class="tw-sub">${pLabel} · ${M(v.earnings)}</div>
         <div class="tw-bar"><div class="tw-bar-fill" style="width:${barW}%"></div></div>
       </div>
       <div class="tw-right">
@@ -3416,7 +3420,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-23 #44';
+const BUILD_VER='2026-06-23 #45';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
