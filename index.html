@@ -3433,7 +3433,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-23 #46';
+const BUILD_VER='2026-06-23 #47';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
@@ -3906,7 +3906,13 @@ function initFirebase(){
         autoRefreshToken:true,
         detectSessionInUrl:true,
         storage:window.localStorage,
-        storageKey:'salary-auth-token'
+        storageKey:'salary-auth-token',
+        // Bypass the Web Locks API. supabase-js serialises auth with
+        // navigator.locks by default; in some browsers / multi-tab / private
+        // modes that lock can never resolve, leaving sign-in stuck on
+        // "Входим…" forever (it never even reaches the network call, so it
+        // never errors out). Running the callback directly avoids the deadlock.
+        lock:(name,acquireTimeout,fn)=>fn()
       },
       global:{fetch:fetchWithRetry}
     });
