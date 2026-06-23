@@ -2325,12 +2325,24 @@ function calcBonus(){return bonuses.reduce((s,b)=>s+(parseFloat(b.amount)||0),0)
 function calcTotal(){let t=calcBase()+calcBonus();if(taxEnabled)t*=0.87;return Math.max(0,t)}
 function fmt(n){return Math.round(n).toLocaleString('ru-RU')}
 // Currency-aware money helpers. Everything is stored/computed in rubles; when
-// USD display is active these convert at the live rate. convCur=number only,
-// curSym=active symbol, Mn=converted+formatted number, M=number + symbol.
+// USD display is active these convert at the live rate. A dollar amount that
+// would round to $0 is shown in cents (¢) instead so it never reads as zero.
 function convCur(n){return (currencyView==='usd'&&usdRate>0)?n/usdRate:n;}
-function curSym(){return (currencyView==='usd'&&usdRate>0)?'$':'₽';}
-function Mn(n){return fmt(convCur(n));}
-function M(n){return fmt(convCur(n))+' '+curSym();}
+function moneyParts(n){
+  if(currencyView==='usd'&&usdRate>0){
+    const v=n/usdRate;
+    if(v!==0&&Math.abs(v)<0.5){
+      const c=Math.round(v*100);
+      if(c!==0)return{num:c.toLocaleString('ru-RU'),sym:'¢'};
+    }
+    return{num:fmt(v),sym:'$'};
+  }
+  return{num:fmt(n),sym:'₽'};
+}
+function curSym(){return (currencyView==='usd'&&usdRate>0)?'$':'₽';} // generic, value-agnostic
+function curSymFor(n){return moneyParts(n).sym;}                     // ¢ when n rounds to $0
+function Mn(n){return moneyParts(n).num;}
+function M(n){const p=moneyParts(n);return p.num+' '+p.sym;}
 function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')}
 
 // ══════════════════════════════════════════════
@@ -2485,7 +2497,7 @@ function renderSpendCalc(){
   }
   const perDay=amount/days;
   el.innerHTML=`
-    <div class="calc-big">${Mn(perDay)} <span>${curSym()}/день</span></div>
+    <div class="calc-big">${Mn(perDay)} <span>${curSymFor(perDay)}/день</span></div>
     <div class="calc-big-sub">можно тратить до ${label} (${dStr})</div>
     <div class="calc-rows">
       <div class="calc-rrow"><span>Осталось до выплаты</span><b>${days} ${dayWord(days)}</b></div>
@@ -2511,7 +2523,7 @@ function renderTotal(){
   const disp=showNet?net:total;
   const dispEl=document.getElementById('totalDisplay');
   const usd=currencyView==='usd'&&usdRate>0;
-  dispEl.innerHTML=Mn(disp)+' <span>'+curSym()+'</span>';
+  dispEl.innerHTML=Mn(disp)+' <span>'+curSymFor(disp)+'</span>';
   dispEl.style.color=showNet&&net<0?'var(--danger)':'';
   // Currency button reflects/affords the switch.
   const curBtn=document.getElementById('curToggle');
@@ -2948,7 +2960,7 @@ function renderExpenses(){
     else if(item.mode==='month')eff=`½ мес → −${M(amt/2)}`;
     return `<div class="exp-card" onclick="openExpEdit(${item.id})">
       <div class="exp-card-name">${name}</div>
-      <div class="exp-card-amount">${Mn(amt)}<span class="cur"> ${curSym()}</span></div>
+      <div class="exp-card-amount">${Mn(amt)}<span class="cur"> ${curSymFor(amt)}</span></div>
       <div class="exp-card-meta">
         <span class="exp-card-mode">${expModeLabel(item.mode)}</span>
         ${eff?`<span class="exp-card-eff">${eff}</span>`:''}
@@ -3040,8 +3052,9 @@ function renderAchievements(){
   // ── Hero totals ──
   document.getElementById('statQty').textContent=fmt(totalQty); // quantity, not money
   document.getElementById('statDays').textContent=calcTotalWorkedDaysAllTime();
-  document.getElementById('statEarned').textContent=Mn(calcTotalEarnedAllTime());
-  document.getElementById('statEarnedLbl').textContent=curSym()+' заработано';
+  const _earned=calcTotalEarnedAllTime();
+  document.getElementById('statEarned').textContent=Mn(_earned);
+  document.getElementById('statEarnedLbl').textContent=curSymFor(_earned)+' заработано';
 
   // ── Top works ──
   const maxQty=entries[0][1].qty;
@@ -3420,7 +3433,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-23 #45';
+const BUILD_VER='2026-06-23 #47';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
@@ -3893,7 +3906,13 @@ function initFirebase(){
         autoRefreshToken:true,
         detectSessionInUrl:true,
         storage:window.localStorage,
-        storageKey:'salary-auth-token'
+        storageKey:'salary-auth-token',
+        // Bypass the Web Locks API. supabase-js serialises auth with
+        // navigator.locks by default; in some browsers / multi-tab / private
+        // modes that lock can never resolve, leaving sign-in stuck on
+        // "Входим…" forever (it never even reaches the network call, so it
+        // never errors out). Running the callback directly avoids the deadlock.
+        lock:(name,acquireTimeout,fn)=>fn()
       },
       global:{fetch:fetchWithRetry}
     });
