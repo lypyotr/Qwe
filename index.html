@@ -1066,14 +1066,6 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
 <div class="today-summary" id="todaySummaryCard" style="display:none"></div>
 
 
-<!-- CHART -->
-<div class="chart-wrap" id="chartWrap" style="display:none">
-  <div class="chart-title">По дням периода</div>
-  <div class="chart-hint">Высота столбика — заработок за день. Нажми, чтобы открыть день.</div>
-  <div class="chart-bars" id="chartBars"></div>
-  <div class="chart-stats" id="chartStats"></div>
-</div>
-
 <!-- TAX -->
 <div class="tax-row">
   <div class="tax-info">
@@ -1166,6 +1158,14 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
     <!-- COUNTDOWN -->
     <div class="period-countdown" id="periodCountdown"></div>
   </div>
+</div>
+
+<!-- CHART -->
+<div class="chart-wrap" id="chartWrap" style="display:none">
+  <div class="chart-title">По дням периода</div>
+  <div class="chart-hint">Высота столбика — заработок за день. Нажми, чтобы открыть день.</div>
+  <div class="chart-bars" id="chartBars"></div>
+  <div class="chart-stats" id="chartStats"></div>
 </div>
 
 <!-- GOALS CARD -->
@@ -1924,6 +1924,12 @@ function selectDay(d){
   if(!days[d])days[d]=[];
   renderDayStrip();renderDayPanel();renderChart();
 }
+// The chart now lives on the Период tab; tapping a bar opens that day on the
+// main page where the day panel/editor is.
+function selectDayFromChart(d){
+  selectDay(d);
+  switchPage('work');
+}
 
 // ══════════════════════════════════════════════
 //  DAY PANEL
@@ -2627,7 +2633,7 @@ function renderChart(){
     const h=hasData?Math.max(6,Math.round(s/maxSum*54)):3;
     const isActive=selectedDay===d;
     const showVal=hasData&&(showAllVals||isActive||d===maxDay.d);
-    return`<div class="chart-bar-wrap${isActive?' active':''}" onclick="selectDay(${d})">
+    return`<div class="chart-bar-wrap${isActive?' active':''}" onclick="selectDayFromChart(${d})">
       <div class="chart-bar-col">
         ${showVal?`<div class="chart-val">${shortRub(s)}</div>`:''}
         <div class="chart-bar${hasData?' has-data':''}${isActive?' active':''}" style="height:${h}px"></div>
@@ -3377,7 +3383,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-23 #41';
+const BUILD_VER='2026-06-23 #42';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
