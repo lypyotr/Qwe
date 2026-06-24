@@ -3560,7 +3560,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-24 #51';
+const BUILD_VER='2026-06-24 #52';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
@@ -4105,6 +4105,19 @@ function withTimeout(promise,ms){
 // opens a fresh connection, which usually succeeds where a stale HTTP/2 socket
 // hangs. Uses AbortController so a stuck request is actually cancelled, not
 // just abandoned like Promise.race would.
+// Keep the console clean of expected transient network failures. supabase-js
+// background tasks (token refresh, realtime reconnection) reject with
+// "Failed to fetch" / AbortError when the network or Supabase is briefly
+// unreachable; the app already retries and falls back to local data, so these
+// are not actionable. Real (non-network) errors are left untouched.
+window.addEventListener('unhandledrejection',ev=>{
+  const r=ev&&ev.reason;
+  const msg=((r&&(r.message||r))||'').toString().toLowerCase();
+  if((r&&r.name==='AbortError')||msg.includes('failed to fetch')||msg.includes('fetch is aborted')||msg.includes('networkerror')||msg.includes('load failed')){
+    ev.preventDefault();
+  }
+});
+
 async function fetchWithRetry(input,init){
   const tries=3,perTry=8000;
   let lastErr;
