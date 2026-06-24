@@ -657,13 +657,13 @@ body.light .cur-toggle.usd{background:rgba(74,222,128,.2);color:var(--text)}
   display:flex;z-index:50;
 }
 .nav-btn{
-  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:3px;cursor:pointer;transition:all .15s;color:var(--muted);
+  flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:3px;cursor:pointer;transition:all .15s;color:var(--muted);padding:0 2px;
   font-family:'Manrope',sans-serif;-webkit-tap-highlight-color:transparent;
 }
 .nav-btn:active{transform:scale(.93)}
-.nav-btn .nav-icon{font-size:20px;line-height:1}
-.nav-btn .nav-lbl{font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase}
+.nav-btn .nav-icon{font-size:19px;line-height:1}
+.nav-btn .nav-lbl{font-size:8.5px;font-weight:700;letter-spacing:.2px;text-transform:uppercase;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .nav-btn.active{color:var(--accent)}
 .nav-btn.active .nav-lbl{color:var(--accent)}
 
@@ -673,6 +673,8 @@ body.light .cur-toggle.usd{background:rgba(74,222,128,.2);color:var(--text)}
 
 /* ── CALCULATORS ── */
 .calc-wrap{padding:0 16px 20px}
+.prof-label{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.prof-email{font-size:14px;font-weight:700;color:var(--text);margin-bottom:12px;word-break:break-all}
 .calc-card{
   background:var(--surface);border:1px solid var(--border);border-radius:18px;
   padding:18px;margin-bottom:14px;box-shadow:var(--card-shadow);
@@ -1050,13 +1052,11 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
 
 <!-- HEADER -->
 <div class="header">
-  <div class="header-left" onclick="openProfileModal()">
+  <div class="header-left" onclick="switchPage('profile')">
     <div class="user-name empty" id="userName">Добавь имя</div>
     <div class="user-info" id="userInfo" style="display:none"></div>
   </div>
   <div class="header-actions">
-    <div class="icon-btn" onclick="openProfileModal()" title="Профиль" id="profileBtn">👤</div>
-    <div class="icon-btn" onclick="openDataModal()" title="Импорт / Экспорт" id="dataBtn">💾</div>
     <div class="icon-btn" onclick="toggleTheme()" title="Тема" id="themeBtn">🌙</div>
   </div>
 </div>
@@ -1291,6 +1291,55 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
   </div>
 </div><!-- /page-calc -->
 
+<!-- ══ PAGE: PROFILE ══ -->
+<div class="page" id="page-profile">
+  <div class="header">
+    <div class="header-left"><div class="header-label">👤 Профиль</div></div>
+  </div>
+  <div class="calc-wrap">
+
+    <!-- Name + extra info -->
+    <div class="calc-card">
+      <div class="calc-card-title">Профиль</div>
+      <div class="calc-card-sub">Имя показывается в шапке на главной, доп. информация — строкой ниже.</div>
+      <div class="prof-label">Имя</div>
+      <input class="modal-input" id="profileNameIn" type="text" maxlength="40" placeholder="Как тебя зовут" style="width:100%;box-sizing:border-box;margin-bottom:14px">
+      <div class="prof-label">Доп. информация</div>
+      <textarea class="modal-input" id="profileInfoIn" maxlength="120" placeholder="Статус, должность или короткая заметка" style="width:100%;box-sizing:border-box;min-height:60px;resize:vertical;font-weight:500"></textarea>
+      <button class="modal-btn" style="width:100%;padding:14px;margin-top:14px" onclick="saveProfile()">Сохранить</button>
+      <div class="admin-msg" id="profileMsg"></div>
+    </div>
+
+    <!-- Appearance -->
+    <div class="calc-card">
+      <div class="calc-card-title">Оформление</div>
+      <button class="modal-btn" style="width:100%;padding:13px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="toggleTheme()">🌗 Сменить тему</button>
+    </div>
+
+    <!-- Data -->
+    <div class="calc-card">
+      <div class="calc-card-title">Данные</div>
+      <div class="calc-card-sub">Резервная копия, импорт/экспорт и биометрия.</div>
+      <button class="modal-btn" style="width:100%;padding:13px" onclick="openDataModal()">💾 Импорт / экспорт данных</button>
+    </div>
+
+    <!-- Account -->
+    <div class="calc-card">
+      <div class="calc-card-title">Аккаунт</div>
+      <div class="prof-email" id="profileEmail">—</div>
+      <button class="modal-btn" style="width:100%;padding:13px;background:rgba(248,113,113,.12);color:var(--danger);border:1px solid rgba(248,113,113,.3)" onclick="doFirebaseLogout()">Выйти из аккаунта</button>
+    </div>
+
+    <!-- Admin (owner only) -->
+    <div class="calc-card" id="profileAdminCard" style="display:none">
+      <div class="calc-card-title">Администрирование</div>
+      <div class="calc-card-sub">Глобальные настройки, объявления, бэкап и служебные инструменты.</div>
+      <button class="modal-btn" style="width:100%;padding:13px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="switchPage('admin')">🛡️ Открыть админ-панель</button>
+    </div>
+
+  </div>
+</div><!-- /page-profile -->
+
 <!-- ══ PAGE: ADMIN (only visible to the owner account) ══ -->
 <div class="page" id="page-admin">
   <div class="header">
@@ -1422,20 +1471,6 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
   </div>
 </div>
 
-<!-- PROFILE MODAL -->
-<div class="modal-overlay" id="profileModal" onclick="closeProfileModal(event)">
-  <div class="modal">
-    <div class="modal-handle"></div>
-    <div class="modal-title">👤 Профиль</div>
-    <div style="font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Имя</div>
-    <input class="modal-input" id="profileNameIn" type="text" maxlength="40" placeholder="Как тебя зовут" style="width:100%;box-sizing:border-box;margin-bottom:14px">
-    <div style="font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Доп. информация</div>
-    <textarea class="modal-input" id="profileInfoIn" maxlength="120" placeholder="Статус, должность или короткая заметка" style="width:100%;box-sizing:border-box;min-height:60px;resize:vertical;font-weight:500"></textarea>
-    <button class="modal-btn" style="width:100%;padding:14px;margin-top:14px" onclick="saveProfile()">Сохранить</button>
-    <button class="modal-btn" style="width:100%;padding:12px;margin-top:8px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="doFirebaseLogout()">Выйти из аккаунта</button>
-  </div>
-</div>
-
 <!-- GOALS MODAL -->
 <div class="modal-overlay" id="goalsModal" onclick="closeGoalsModal(event)">
   <div class="modal">
@@ -1517,9 +1552,9 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
     <span class="nav-icon">🧮</span>
     <span class="nav-lbl">Калькуляторы</span>
   </div>
-  <div class="nav-btn" id="navAdmin" onclick="switchPage('admin')" style="display:none">
-    <span class="nav-icon">🛡️</span>
-    <span class="nav-lbl">Админ</span>
+  <div class="nav-btn" id="navProfile" onclick="switchPage('profile')">
+    <span class="nav-icon">👤</span>
+    <span class="nav-lbl">Профиль</span>
   </div>
 </nav>
 
@@ -1536,10 +1571,13 @@ function switchPage(name){
   haptic('light');
   if(name==='admin'){renderAdminDiag();renderBackupInfo();initPlanCard();}
   if(name==='calc')renderSpendCalc();
+  if(name==='profile')initProfilePage();
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
-  document.getElementById('nav'+name.charAt(0).toUpperCase()+name.slice(1)).classList.add('active');
+  // Admin is reachable from Profile and has no nav button — guard the lookup.
+  const navBtn=document.getElementById('nav'+name.charAt(0).toUpperCase()+name.slice(1));
+  if(navBtn)navBtn.classList.add('active');
   window.scrollTo({top:0,behavior:'smooth'});
   try{localStorage.setItem('salary_page',name)}catch(e){}
 }
@@ -1549,6 +1587,7 @@ function restorePage(){
     if(p==='period')switchPage('period');
     else if(p==='archive')switchPage('archive');
     else if(p==='calc')switchPage('calc');
+    else if(p==='profile')switchPage('profile');
   }catch(e){}
 }
 
@@ -1766,13 +1805,21 @@ function renderProfile(){
     infoEl.style.display=inf?'':'none';
   }
 }
-function openProfileModal(){
+// Fill the Profile page when it opens (inputs, account email, admin access).
+function initProfilePage(){
+  const ni=document.getElementById('profileNameIn');
+  if(!ni)return;
   const p=(goals&&goals.profile)||{};
-  document.getElementById('profileNameIn').value=p.name||'';
-  document.getElementById('profileInfoIn').value=p.info||'';
-  document.getElementById('profileModal').classList.add('open');
+  if(document.activeElement!==ni)ni.value=p.name||'';
+  const ii=document.getElementById('profileInfoIn');
+  if(ii&&document.activeElement!==ii)ii.value=p.info||'';
+  const em=document.getElementById('profileEmail');
+  if(em)em.textContent=currentUser&&currentUser.email?currentUser.email:'—';
+  const ac=document.getElementById('profileAdminCard');
+  if(ac)ac.style.display=isAdmin()?'':'none';
+  const msg=document.getElementById('profileMsg');
+  if(msg)msg.textContent='';
 }
-function closeProfileModal(e){if(e&&e.target!==document.getElementById('profileModal'))return;document.getElementById('profileModal').classList.remove('open');}
 function saveProfile(){
   const name=(document.getElementById('profileNameIn').value||'').trim();
   const info=(document.getElementById('profileInfoIn').value||'').trim();
@@ -1782,7 +1829,8 @@ function saveProfile(){
   scheduleSettingsSave();   // sync to cloud
   haptic('light');
   renderProfile();
-  document.getElementById('profileModal').classList.remove('open');
+  const msg=document.getElementById('profileMsg');
+  if(msg){msg.textContent='✓ Сохранено';msg.style.color='var(--accent)';}
 }
 function saveGoals(){
   goals.period=parseFloat(document.getElementById('goalPeriodIn').value)||0;
@@ -3560,7 +3608,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-24 #52';
+const BUILD_VER='2026-06-24 #53';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
@@ -3575,8 +3623,9 @@ let appConfigChannel=null;
 
 // Toggle the admin nav tab + fill the panel after we know who is logged in.
 function refreshAdminUI(){
-  const nav=document.getElementById('navAdmin');
-  if(nav)nav.style.display=isAdmin()?'':'none';
+  // Admin is no longer a nav tab — it's opened from the Profile page.
+  const card=document.getElementById('profileAdminCard');
+  if(card)card.style.display=isAdmin()?'':'none';
   // A non-admin must never sit on the admin page (e.g. after account switch).
   if(!isAdmin()&&document.getElementById('page-admin').classList.contains('active'))switchPage('work');
   if(isAdmin()){renderAdminDiag();renderBackupInfo();initPlanCard();}
