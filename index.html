@@ -688,6 +688,20 @@ body.light .cur-toggle.usd{background:rgba(74,222,128,.2);color:var(--text)}
 .calc-input::placeholder{font-size:15px;font-weight:600;color:var(--muted)}
 .calc-cur{font-size:18px;font-weight:800;color:var(--muted);flex:none}
 .calc-result{margin-top:16px}
+/* calculator spends (траты) list */
+.calc-spends-head{display:flex;align-items:center;justify-content:space-between;margin:16px 0 8px}
+.calc-spends-head span{font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.calc-add-spend{font-size:12px;font-weight:700;color:var(--accent);background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.2);border-radius:8px;padding:4px 10px;cursor:pointer}
+.calc-add-spend:active{opacity:.7}
+.calc-spends-list{display:flex;flex-direction:column;gap:6px}
+.calc-spend-row{display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:4px 8px 4px 12px}
+.calc-spend-name{flex:1;min-width:0;font-family:'Manrope',sans-serif;font-size:13px;font-weight:600;color:var(--text);background:transparent;border:none;outline:none}
+.calc-spend-name::placeholder{color:var(--muted)}
+.calc-spend-amt{width:84px;font-family:'Manrope',sans-serif;font-size:14px;font-weight:700;color:var(--text);background:transparent;border:none;outline:none;text-align:right;-webkit-appearance:none}
+.calc-spend-amt::placeholder{color:var(--muted)}
+.calc-cur2{font-size:12px;font-weight:700;color:var(--muted);flex:none}
+.calc-spend-del{color:var(--muted);font-size:14px;cursor:pointer;padding:4px 4px;flex:none}
+.calc-spend-del:active{color:var(--danger)}
 .calc-hint{font-size:13px;color:var(--muted);line-height:1.55;text-align:center;padding:8px 0}
 .calc-hint b{color:var(--text);font-weight:800}
 .calc-big{
@@ -1253,11 +1267,16 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
     <!-- Daily spending until next payday -->
     <div class="calc-card">
       <div class="calc-card-title">💸 Сколько можно тратить в день</div>
-      <div class="calc-card-sub">Введи, сколько денег у тебя есть сейчас — покажу, сколько можно тратить в день до следующей выплаты.</div>
+      <div class="calc-card-sub">Введи, сколько у тебя сейчас денег, и добавь предстоящие траты — покажу, сколько можно тратить в день до следующей выплаты.</div>
       <div class="calc-input-row">
         <input class="calc-input" id="calcMoneyIn" type="number" inputmode="decimal" placeholder="Сколько у меня есть" oninput="onCalcMoneyInput(this.value)">
         <span class="calc-cur">₽</span>
       </div>
+      <div class="calc-spends-head">
+        <span>Траты</span>
+        <button class="calc-add-spend" onclick="addCalcSpend()">+ Добавить</button>
+      </div>
+      <div class="calc-spends-list" id="calcSpendsList"></div>
       <div class="calc-result" id="calcSpendResult"></div>
     </div>
 
@@ -2462,15 +2481,46 @@ function daysToNextPayday(){return nextPaydayInfo().days;}
 // User typed in the calculator — persist + sync to cloud, then re-render.
 // Calculator state lives inside the synced `goals` object (goals.calc), so it
 // rides the existing user_settings sync and is included in backups.
+function saveCalcState(){try{localStorage.setItem('salary_goals',JSON.stringify(goals));}catch(e){}scheduleSettingsSave();}
+function calcSpends(){if(!goals.calc)goals.calc={};if(!Array.isArray(goals.calc.spends))goals.calc.spends=[];return goals.calc.spends;}
+function calcSpendTotal(){return calcSpends().reduce((s,x)=>s+(parseFloat(x.amount)||0),0);}
+
 function onCalcMoneyInput(v){
   const amount=parseFloat(v)||0;
   if(!goals.calc)goals.calc={};
   goals.calc.money=amount>0?amount:0;
-  try{localStorage.setItem('salary_goals',JSON.stringify(goals));}catch(e){}
-  scheduleSettingsSave();   // debounced cloud sync
+  saveCalcState();          // persist + debounced cloud sync
   renderSpendCalc();
 }
-// Reflect the (possibly cloud-loaded) calculator state into the input + result,
+function addCalcSpend(){
+  calcSpends().push({id:Date.now()+Math.floor(Math.random()*1000),name:'',amount:''});
+  saveCalcState();haptic('light');
+  renderCalcSpends();renderSpendCalc();
+}
+function updateCalcSpend(id,field,value){
+  const s=calcSpends().find(x=>x.id===id);
+  if(!s)return;
+  s[field]=value;
+  saveCalcState();
+  renderSpendCalc(); // don't re-render the list — keeps input focus
+}
+function delCalcSpend(id){
+  goals.calc.spends=calcSpends().filter(s=>s.id!==id);
+  saveCalcState();haptic('medium');
+  renderCalcSpends();renderSpendCalc();
+}
+function renderCalcSpends(){
+  const list=document.getElementById('calcSpendsList');
+  if(!list)return;
+  list.innerHTML=calcSpends().map(s=>`
+    <div class="calc-spend-row">
+      <input class="calc-spend-name" type="text" placeholder="Трата" value="${esc(String(s.name||''))}" oninput="updateCalcSpend(${s.id},'name',this.value)">
+      <input class="calc-spend-amt" type="number" inputmode="decimal" placeholder="0" value="${s.amount||''}" oninput="updateCalcSpend(${s.id},'amount',this.value)">
+      <span class="calc-cur2">₽</span>
+      <div class="calc-spend-del" onclick="delCalcSpend(${s.id})">✕</div>
+    </div>`).join('');
+}
+// Reflect the (possibly cloud-loaded) calculator state into the inputs + result,
 // without clobbering what the user is actively typing.
 function loadCalcInput(){
   const ci=document.getElementById('calcMoneyIn');
@@ -2478,6 +2528,9 @@ function loadCalcInput(){
     const m=(goals.calc&&goals.calc.money)||0;
     ci.value=m>0?m:'';
   }
+  const ae=document.activeElement;
+  const editingSpend=ae&&(ae.classList.contains('calc-spend-name')||ae.classList.contains('calc-spend-amt'));
+  if(!editingSpend)renderCalcSpends();
   renderSpendCalc();
 }
 function renderSpendCalc(){
@@ -2495,14 +2548,17 @@ function renderSpendCalc(){
     el.innerHTML=`<div class="calc-hint">До <b>${label}</b> (${dStr}) осталось <b>${days} ${dayWord(days)}</b>.<br>Введи сумму выше — посчитаю дневной лимит.</div>`;
     return;
   }
-  const perDay=amount/days;
+  const spends=calcSpendTotal();
+  const available=amount-spends;
+  const perDay=available/days;
+  const neg=perDay<0;
   el.innerHTML=`
-    <div class="calc-big">${Mn(perDay)} <span>${curSymFor(perDay)}/день</span></div>
+    <div class="calc-big"${neg?' style="color:var(--danger)"':''}>${Mn(perDay)} <span>${curSymFor(perDay)}/день</span></div>
     <div class="calc-big-sub">можно тратить до ${label} (${dStr})</div>
     <div class="calc-rows">
       <div class="calc-rrow"><span>Осталось до выплаты</span><b>${days} ${dayWord(days)}</b></div>
-      <div class="calc-rrow"><span>В неделю</span><b>${M(perDay*7)}</b></div>
-      <div class="calc-rrow"><span>Всего есть</span><b>${M(amount)}</b></div>
+      ${spends>0?`<div class="calc-rrow"><span>Учтено трат</span><b style="color:var(--danger)">−${M(spends)}</b></div>
+      <div class="calc-rrow"><span>Доступно</span><b>${M(available)}</b></div>`:''}
     </div>`;
 }
 
@@ -3433,7 +3489,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-23 #47';
+const BUILD_VER='2026-06-23 #48';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
