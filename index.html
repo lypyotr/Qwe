@@ -25,7 +25,7 @@
   --text:#f0f2ff;--muted:#9aa3b8;--danger:#f87171;--warn:#fbbf24;
   --card-shadow:0 12px 36px rgba(0,0,0,.22);
   --accent-ink:var(--accent);--accent2-ink:var(--accent2);
-  --app-max:500px;
+  --app-max:560px;
 }
 body.light{
   --bg:#eef0f6;--surface:rgba(255,255,255,.55);--surface2:rgba(255,255,255,.6);--border:rgba(17,24,39,.07);
@@ -41,7 +41,7 @@ body{
   overscroll-behavior-x:none;width:100%;max-width:var(--app-max);margin-inline:auto;position:relative;box-sizing:border-box;
 }
 /* On wide screens, frame the app like a phone instead of stretching full width */
-@media (min-width:520px){
+@media (min-width:580px){
   body{box-shadow:0 0 0 1px var(--border),0 24px 80px rgba(0,0,0,.35)}
 }
 
@@ -515,7 +515,7 @@ body.light .cur-toggle.usd{background:rgba(74,222,128,.2);color:var(--text)}
 }
 .modal-overlay.open{opacity:1;pointer-events:all}
 .modal{
-  width:100%;max-width:500px;background:var(--surface);border-radius:24px 24px 0 0;
+  width:100%;max-width:var(--app-max);background:var(--surface);border-radius:24px 24px 0 0;
   padding:16px 20px calc(32px + env(safe-area-inset-bottom));
   transform:translateY(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);
   max-height:80vh;overflow-y:auto;
@@ -3608,7 +3608,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-24 #53';
+const BUILD_VER='2026-06-24 #54';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 

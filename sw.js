@@ -1,4 +1,4 @@
-const CACHE='salary-v34';
+const CACHE='salary-v35';
 const STATIC=['./manifest.json','./icon.svg'];
 
 // Dynamic APIs that must NEVER be touched by the service worker: Supabase
