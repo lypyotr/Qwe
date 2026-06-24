@@ -11,8 +11,12 @@ create table if not exists public.app_config (
   announcement_active boolean default false,
   maintenance         boolean default false,
   maintenance_msg     text    default '',
+  first_work_day      text    default '',
   updated_at          timestamptz default now()
 );
+
+-- For projects created before the planner: add the column if missing.
+alter table public.app_config add column if not exists first_work_day text default '';
 
 -- Single canonical row.
 insert into public.app_config (id) values (1)
