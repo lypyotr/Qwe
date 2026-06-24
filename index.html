@@ -51,8 +51,13 @@ body{
   padding-top:calc(52px + env(safe-area-inset-top));
   display:flex;justify-content:space-between;align-items:flex-end;
 }
-.header-left{}
+.header-left{min-width:0;flex:1;padding-right:10px;display:flex;flex-direction:column;gap:2px;cursor:pointer}
 .header-label{font-size:18px;font-weight:800;letter-spacing:1px;color:var(--text)}
+/* section 1: user name */
+.user-name{font-size:18px;font-weight:800;letter-spacing:.3px;color:var(--text);line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.user-name.empty{font-size:14px;font-weight:700;color:var(--muted);opacity:.7}
+/* section 2: extra profile info — smaller and quieter */
+.user-info{font-size:11px;font-weight:500;color:var(--muted);line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;opacity:.85}
 .header-actions{display:flex;gap:8px;align-items:center;padding-bottom:4px}
 .icon-btn{
   width:36px;height:36px;border-radius:10px;border:1px solid var(--border);
@@ -1045,9 +1050,12 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
 
 <!-- HEADER -->
 <div class="header">
-  <div class="header-left"></div>
+  <div class="header-left" onclick="openProfileModal()">
+    <div class="user-name empty" id="userName">Добавь имя</div>
+    <div class="user-info" id="userInfo" style="display:none"></div>
+  </div>
   <div class="header-actions">
-    <div class="icon-btn" onclick="doFirebaseLogout()" title="Выйти" id="logoutBtn">👤</div>
+    <div class="icon-btn" onclick="openProfileModal()" title="Профиль" id="profileBtn">👤</div>
     <div class="icon-btn" onclick="openDataModal()" title="Импорт / Экспорт" id="dataBtn">💾</div>
     <div class="icon-btn" onclick="toggleTheme()" title="Тема" id="themeBtn">🌙</div>
   </div>
@@ -1414,6 +1422,20 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
   </div>
 </div>
 
+<!-- PROFILE MODAL -->
+<div class="modal-overlay" id="profileModal" onclick="closeProfileModal(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">👤 Профиль</div>
+    <div style="font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Имя</div>
+    <input class="modal-input" id="profileNameIn" type="text" maxlength="40" placeholder="Как тебя зовут" style="width:100%;box-sizing:border-box;margin-bottom:14px">
+    <div style="font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Доп. информация</div>
+    <textarea class="modal-input" id="profileInfoIn" maxlength="120" placeholder="Статус, должность или короткая заметка" style="width:100%;box-sizing:border-box;min-height:60px;resize:vertical;font-weight:500"></textarea>
+    <button class="modal-btn" style="width:100%;padding:14px;margin-top:14px" onclick="saveProfile()">Сохранить</button>
+    <button class="modal-btn" style="width:100%;padding:12px;margin-top:8px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="doFirebaseLogout()">Выйти из аккаунта</button>
+  </div>
+</div>
+
 <!-- GOALS MODAL -->
 <div class="modal-overlay" id="goalsModal" onclick="closeGoalsModal(event)">
   <div class="modal">
@@ -1726,6 +1748,42 @@ function initTotalSwipe(){
 //  GOALS
 // ══════════════════════════════════════════════
 function loadGoals(){try{goals=JSON.parse(localStorage.getItem('salary_goals')||'{"period":0,"week":0,"month":0}')}catch(e){goals={period:0,week:0,month:0}}}
+
+// ── PROFILE (name + extra info, header sections 1 & 2) ──
+// Stored in the synced goals object (goals.profile) so it rides user_settings
+// cloud sync and the backup — no DB migration needed.
+function renderProfile(){
+  const p=(goals&&goals.profile)||{};
+  const nameEl=document.getElementById('userName'),infoEl=document.getElementById('userInfo');
+  if(nameEl){
+    const nm=String(p.name||'').trim();
+    nameEl.textContent=nm||'Добавь имя';
+    nameEl.classList.toggle('empty',!nm);
+  }
+  if(infoEl){
+    const inf=String(p.info||'').trim();
+    infoEl.textContent=inf;
+    infoEl.style.display=inf?'':'none';
+  }
+}
+function openProfileModal(){
+  const p=(goals&&goals.profile)||{};
+  document.getElementById('profileNameIn').value=p.name||'';
+  document.getElementById('profileInfoIn').value=p.info||'';
+  document.getElementById('profileModal').classList.add('open');
+}
+function closeProfileModal(e){if(e&&e.target!==document.getElementById('profileModal'))return;document.getElementById('profileModal').classList.remove('open');}
+function saveProfile(){
+  const name=(document.getElementById('profileNameIn').value||'').trim();
+  const info=(document.getElementById('profileInfoIn').value||'').trim();
+  if(!goals.profile)goals.profile={};
+  goals.profile.name=name;goals.profile.info=info;
+  try{localStorage.setItem('salary_goals',JSON.stringify(goals));}catch(e){}
+  scheduleSettingsSave();   // sync to cloud
+  haptic('light');
+  renderProfile();
+  document.getElementById('profileModal').classList.remove('open');
+}
 function saveGoals(){
   goals.period=parseFloat(document.getElementById('goalPeriodIn').value)||0;
   goals.week=parseFloat(document.getElementById('goalWeekIn').value)||0;
@@ -3502,7 +3560,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-23 #50';
+const BUILD_VER='2026-06-24 #51';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
@@ -4224,7 +4282,7 @@ async function loadAllUserData(){
   ]);
   if(s){
     if(s.templates){templates=s.templates;localStorage.setItem('salary_templates',JSON.stringify(templates));}
-    if(s.goals){goals=s.goals;localStorage.setItem('salary_goals',JSON.stringify(goals));loadCalcInput();}
+    if(s.goals){goals=s.goals;localStorage.setItem('salary_goals',JSON.stringify(goals));loadCalcInput();renderProfile();}
     if(s.theme){localStorage.setItem('salary_theme',s.theme);lightTheme=s.theme==='light';document.body.classList.toggle('light',lightTheme);document.getElementById('themeBtn').textContent=lightTheme?'🌙':'☀️';}
   }
   if(periods){
@@ -4313,6 +4371,7 @@ function renderAll(){
   renderTotal();renderChart();renderGoals();renderExpenses();
   renderDayStrip();renderDayPanel();renderBonuses();renderTemplates();
   renderHistory();renderArchive();renderTodaySummary();renderAchievements();
+  renderProfile();
 }
 
 // ══════════════════════════════════════════════
@@ -4326,7 +4385,7 @@ document.getElementById('periodSel').value=new Date().getDate()<=15?'1':'2';
 load();
 renderPeriodCard();renderDayStrip();renderDayPanel();renderBonuses();renderTemplates();
 renderTotal();renderChart();renderGoals();renderHistory();renderArchive();
-renderExpenses();renderAchievements();renderTodaySummary();
+renderExpenses();renderAchievements();renderTodaySummary();renderProfile();
 // One-time migration of the old device-local calc value into synced goals.calc.
 try{
   if(!(goals.calc&&goals.calc.money)){
