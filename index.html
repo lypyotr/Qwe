@@ -1343,6 +1343,19 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
       <div class="admin-msg" id="clearCacheMsg"></div>
     </div>
 
+    <!-- Earnings planner (test) -->
+    <div class="admin-card">
+      <div class="admin-card-title">🎯 Планировщик заработка</div>
+      <div class="admin-card-sub">Укажи цель на месяц и работу из шаблонов — посчитаю, сколько нужно делать в день при графике 2 через 2. Выбери первый рабочий день, чтобы разметить смены.</div>
+      <input class="modal-input" id="planTargetIn" type="number" inputmode="decimal" placeholder="Цель за месяц, ₽" style="width:100%;box-sizing:border-box;margin-bottom:10px" oninput="renderPlan()">
+      <select class="modal-input" id="planTplSel" style="width:100%;box-sizing:border-box;margin-bottom:10px" onchange="renderPlan()"></select>
+      <div style="font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin:2px 0 6px">Первый рабочий день</div>
+      <input class="modal-input" id="planFirstDay" type="date" style="width:100%;box-sizing:border-box;margin-bottom:12px" onchange="onPlanFirstDayChange()">
+      <div class="admin-diag" id="planResult">—</div>
+      <button class="modal-btn" id="planGlobalBtn" style="width:100%;padding:12px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="planMakeGlobal()">🌍 Сделать первый день глобальным</button>
+      <div class="admin-msg" id="planMsg"></div>
+    </div>
+
   </div>
 </div><!-- /page-admin -->
 
@@ -1499,7 +1512,7 @@ function switchPage(name){
   // Admin page is owner-only — quietly bounce everyone else to Работа.
   if(name==='admin'&&!isAdmin())name='work';
   haptic('light');
-  if(name==='admin'){renderAdminDiag();renderBackupInfo();}
+  if(name==='admin'){renderAdminDiag();renderBackupInfo();initPlanCard();}
   if(name==='calc')renderSpendCalc();
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
@@ -3489,7 +3502,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-23 #48';
+const BUILD_VER='2026-06-23 #49';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
@@ -3499,7 +3512,7 @@ const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 const ADMIN_EMAIL='lypyotr@yandex.ru';
 function isAdmin(){return !!(currentUser&&currentUser.email&&currentUser.email.toLowerCase()===ADMIN_EMAIL);}
 // Mirror of the single global config row in Supabase (table app_config, id=1).
-let appConfig={announcement:'',announcement_active:false,maintenance:false,maintenance_msg:''};
+let appConfig={announcement:'',announcement_active:false,maintenance:false,maintenance_msg:'',first_work_day:''};
 let appConfigChannel=null;
 
 // Toggle the admin nav tab + fill the panel after we know who is logged in.
@@ -3508,7 +3521,7 @@ function refreshAdminUI(){
   if(nav)nav.style.display=isAdmin()?'':'none';
   // A non-admin must never sit on the admin page (e.g. after account switch).
   if(!isAdmin()&&document.getElementById('page-admin').classList.contains('active'))switchPage('work');
-  if(isAdmin()){renderAdminDiag();renderBackupInfo();}
+  if(isAdmin()){renderAdminDiag();renderBackupInfo();initPlanCard();}
 }
 
 function renderAdminDiag(){
@@ -3552,7 +3565,8 @@ function applyAppConfig(cfg){
     announcement:cfg.announcement||'',
     announcement_active:!!cfg.announcement_active,
     maintenance:!!cfg.maintenance,
-    maintenance_msg:cfg.maintenance_msg||''
+    maintenance_msg:cfg.maintenance_msg||'',
+    first_work_day:cfg.first_work_day||''  // optional column; absent on older DBs
   };
   renderAnnouncement();
   renderMaintenance();
@@ -3563,6 +3577,7 @@ function applyAppConfig(cfg){
     if(ann&&document.activeElement!==ann)ann.value=appConfig.announcement;
     if(mnt&&document.activeElement!==mnt)mnt.value=appConfig.maintenance_msg;
     renderMaintToggle();
+    initPlanCard();
     renderAdminDiag();
   }
 }
@@ -3687,6 +3702,100 @@ async function adminClearCache(){
     console.error('adminClearCache',e);
     err('Ошибка очистки: '+((e&&e.message)||e));
     if(btn)btn.disabled=false;
+  }
+}
+
+// ══════════════════════════════════════════════
+//  EARNINGS PLANNER  (admin test card, 2-on-2-off schedule)
+// ══════════════════════════════════════════════
+const PLAN_MONTHS_G=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+// Working days in month (y,m) for a 2-on/2-off schedule anchored at `anchor` Date.
+function planWorkDays(y,m,anchor){
+  const daysIn=new Date(y,m+1,0).getDate();
+  let n=0;
+  for(let d=1;d<=daysIn;d++){
+    const diff=Math.floor((new Date(y,m,d)-anchor)/86400000);
+    const ph=((diff%4)+4)%4;            // 0,1 = work; 2,3 = off
+    if(ph===0||ph===1)n++;
+  }
+  return{workDays:n,daysIn};
+}
+function fillPlanTemplates(){
+  const sel=document.getElementById('planTplSel');
+  if(!sel)return;
+  const saved=(()=>{try{return localStorage.getItem('salary_plan_tpl')||'';}catch(e){return'';}})();
+  if(!templates.length){sel.innerHTML='<option value="">Нет шаблонов — создай на главной</option>';return;}
+  sel.innerHTML=templates.map(t=>`<option value="${t.id}">${esc(t.name)} · ${fmt(t.price)} ₽</option>`).join('');
+  if(saved&&templates.some(t=>String(t.id)===saved))sel.value=saved;
+}
+// Populate inputs from saved-local / global config when the admin panel opens.
+function initPlanCard(){
+  const tin=document.getElementById('planTargetIn');
+  if(!tin)return;
+  fillPlanTemplates();
+  try{
+    if(document.activeElement!==tin)tin.value=localStorage.getItem('salary_plan_target')||'';
+    const fd=document.getElementById('planFirstDay');
+    if(fd&&document.activeElement!==fd)fd.value=localStorage.getItem('salary_plan_first')||appConfig.first_work_day||'';
+  }catch(e){}
+  renderPlan();
+}
+function onPlanFirstDayChange(){
+  try{localStorage.setItem('salary_plan_first',document.getElementById('planFirstDay').value);}catch(e){}
+  renderPlan();
+}
+function renderPlan(){
+  const res=document.getElementById('planResult');
+  if(!res)return;
+  const target=parseFloat(document.getElementById('planTargetIn').value)||0;
+  const sel=document.getElementById('planTplSel');
+  const firstStr=document.getElementById('planFirstDay').value;
+  // persist inputs
+  try{
+    localStorage.setItem('salary_plan_target',target>0?String(target):'');
+    if(sel&&sel.value)localStorage.setItem('salary_plan_tpl',sel.value);
+  }catch(e){}
+  if(!templates.length){res.textContent='Сначала создай шаблоны работ на главной.';return;}
+  if(target<=0){res.textContent='Введи цель за месяц.';return;}
+  const tpl=templates.find(t=>String(t.id)===(sel&&sel.value));
+  const rate=tpl?parseFloat(tpl.price)||0:0;
+  if(!tpl||rate<=0){res.textContent='Выбери работу с ненулевой ставкой.';return;}
+  const now=new Date();
+  const y=now.getFullYear(),m=now.getMonth();
+  let anchor;
+  if(firstStr){const p=firstStr.split('-').map(Number);anchor=new Date(p[0],p[1]-1,p[2]);}
+  else anchor=new Date(y,m,1);
+  const{workDays}=planWorkDays(y,m,anchor);
+  if(workDays<=0){res.textContent='В этом месяце нет рабочих смен по графику 2/2 — проверь первый рабочий день.';return;}
+  const totalUnits=target/rate;
+  const perDayUnits=totalUnits/workDays;
+  const perDayMoney=target/workDays;
+  res.textContent=
+    'месяц: '+PLAN_MONTHS_G[m]+' '+y
+    +'\nграфик: 2 через 2'+(firstStr?' (старт '+anchor.getDate()+' '+PLAN_MONTHS_G[anchor.getMonth()]+')':'')
+    +'\nрабочих смен: '+workDays
+    +'\nработа: '+(tpl.name||'—')+' · '+fmt(rate)+' ₽/ед.'
+    +'\n— нужно всего: '+fmt(Math.ceil(totalUnits))+' ед.'
+    +'\n— в смену: ~'+(Math.round(perDayUnits*10)/10).toLocaleString('ru-RU')+' ед. (~'+fmt(perDayMoney)+' ₽)';
+}
+// Owner-only: store the chosen first working day in the global config.
+async function planMakeGlobal(){
+  const ok=t=>{const e=document.getElementById('planMsg');if(e){e.textContent=t;e.style.color='var(--accent)';}};
+  const err=t=>{const e=document.getElementById('planMsg');if(e){e.textContent=t;e.style.color='var(--danger)';}};
+  const firstStr=document.getElementById('planFirstDay').value;
+  if(!firstStr){err('Сначала выбери первый рабочий день');return;}
+  if(!isAdmin()||!sbClient){err('Доступно только владельцу');return;}
+  ok('Сохраняю…');
+  try{
+    const{error}=await sbClient.from('app_config').upsert({id:1,first_work_day:firstStr,updated_at:new Date().toISOString()},{onConflict:'id'});
+    if(error)throw error;
+    appConfig.first_work_day=firstStr;
+    ok('✓ Первый рабочий день сохранён глобально');
+  }catch(e){
+    const mm=((e&&e.message)||'').toLowerCase();
+    if(mm.includes('first_work_day')||mm.includes('column')||mm.includes('schema cache'))
+      err('Нужна колонка first_work_day в app_config — выполни admin_setup.sql');
+    else err(configErrMsg(e));
   }
 }
 
