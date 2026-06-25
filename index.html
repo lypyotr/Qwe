@@ -1658,14 +1658,20 @@ let sbClient = null;
 let currentUser = null;
 let realtimeChannel = null;
 let saveDebounceTimer = null;
-// Cross-device sync state. Replication (Postgres Changes) is off — it's a paid
-// feature — so live sync runs over Realtime Broadcast (free) plus refetch on
-// focus/visibility/online/poll. Each client tags its broadcasts so it ignores
-// its own echoes.
+// ── Cross-device sync engine ──────────────────────────────────────────────
+// Replication (Postgres Changes) is off — it's a paid feature — so live sync
+// runs over Realtime Broadcast (free) plus refetch on focus/visibility/online/
+// poll. Correctness is timestamp-based last-writer-wins: every local record
+// carries a "_ts" (last-edit time, mirrored to the row's updated_at), edited
+// records are queued in a persisted "dirty" set, and merges never let an older
+// cloud row overwrite a newer or still-unsynced local one. Each client tags its
+// broadcasts so it ignores its own echoes.
 const CLIENT_ID = Math.random().toString(36).slice(2) + Date.now().toString(36);
-let _periodDirty = false, _settingsDirty = false;
+const PENDING_KEY = 'salary_pending';     // JSON array of keys awaiting upload
+const SETTINGS_TS_KEY = 'salary_settings_ts';
 let _refreshing = false, _lastRefresh = 0, _resyncTimer = null;
 let _syncWired = false, _pollTimer = null;
+let _flushTimer = null, _flushing = false, _flushBackoff = 1000;
 
 // ══════════════════════════════════════════════
 //  HOLIDAYS
@@ -1767,10 +1773,10 @@ function getPeriod(){
 function saveKey(){const{year,month,period}=getPeriod();return`salary_${year}_${month}_${period}`}
 function save(){
   try{
-    localStorage.setItem(saveKey(),JSON.stringify({days,bonuses,taxEnabled,dayOverrides,expenses:expenseItems}));
+    localStorage.setItem(saveKey(),JSON.stringify({days,bonuses,taxEnabled,dayOverrides,expenses:expenseItems,_ts:Date.now()}));
     renderHistory();renderAchievements();
   }catch(e){}
-  scheduleSaveToFirestore();
+  markPeriodDirty(periodFsKey());
 }
 function load(){
   try{
@@ -4499,34 +4505,14 @@ function enterApp(user){
   _cloudLoaded=true;
   (async()=>{
     try{
-      await loadAllUserData();
-      await migrateLocalStorageToSupabase();
+      await flushPending();      // push edits queued offline before this load
+      await loadAllUserData();   // pull + timestamp merge
+      await flushPending();      // push legacy / local-only periods found in merge
       renderAll();startRealtimeSync();setupSyncListeners();
       await loadAppConfig();   // pull global announcement / maintenance state
       startAppConfigRealtime();
     }catch(e){console.error('cloud sync',e);}
   })();
-}
-
-async function migrateLocalStorageToSupabase(){
-  if(!currentUser||!sbClient)return;
-  try{
-    const {data:existing}=await sbClient.from('user_settings').select('user_id').eq('user_id',currentUser.id).maybeSingle();
-    if(existing)return;
-    const lsTemplates=JSON.parse(localStorage.getItem('salary_templates')||'[]');
-    const lsGoals=JSON.parse(localStorage.getItem('salary_goals')||'{"period":0,"week":0,"month":0}');
-    const lsTheme=localStorage.getItem('salary_theme')||'dark';
-    const periodKeys=[];
-    for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&/^salary_\d+_\d+_\d+$/.test(k))periodKeys.push(k);}
-    if(!lsTemplates.length&&!lsGoals.period&&!periodKeys.length)return;
-    await sbClient.from('user_settings').upsert({user_id:currentUser.id,templates:lsTemplates,goals:lsGoals,theme:lsTheme});
-    for(const k of periodKeys){
-      try{
-        const data=JSON.parse(localStorage.getItem(k)||'{}');
-        await sbClient.from('periods').upsert({user_id:currentUser.id,period_key:k.replace('salary_',''),days:data.days||{},bonuses:data.bonuses||[],tax_enabled:!!data.taxEnabled,day_overrides:data.dayOverrides||{},expenses:data.expenses||[]},{onConflict:'user_id,period_key'});
-      }catch(e){}
-    }
-  }catch(e){console.error('migration',e);}
 }
 
 function showAuthOverlay(show){
@@ -4578,62 +4564,81 @@ async function doForgotPassword(){
 }
 async function doFirebaseLogout(){if(confirm('Выйти из аккаунта?'))await sbClient.auth.signOut();}
 
+// Pull cloud state and merge it into localStorage by timestamp (last-writer-
+// wins). Records queued for upload (dirty) are skipped — local always wins
+// until its write lands. Legacy records without a _ts keep the old "empty cloud
+// never wipes non-empty local" guard so the migration to timestamps is lossless.
 async function loadAllUserData(){
   if(!currentUser||!sbClient)return;
   // Run settings + periods in parallel so one slow query can't time out the
-  // whole chain. Each query is tolerated independently: a failure on one
-  // never discards data already pulled from the other. Timeouts and retries
+  // whole chain. Each query is tolerated independently. Timeouts and retries
   // are handled by fetchWithRetry at the transport level.
   const settledData=async(query)=>{try{const{data}=await query;return data;}catch(e){console.error('loadAllUserData query',e);return undefined;}};
   const[s,periods]=await Promise.all([
     settledData(sbClient.from('user_settings').select('*').eq('user_id',currentUser.id).maybeSingle()),
-    settledData(sbClient.from('periods').select('period_key,days,bonuses,tax_enabled,day_overrides,expenses').eq('user_id',currentUser.id))
+    settledData(sbClient.from('periods').select('period_key,days,bonuses,tax_enabled,day_overrides,expenses,updated_at').eq('user_id',currentUser.id))
   ]);
-  if(s){
-    if(s.templates){templates=s.templates;localStorage.setItem('salary_templates',JSON.stringify(templates));}
-    if(s.goals){goals=s.goals;localStorage.setItem('salary_goals',JSON.stringify(goals));loadCalcInput();renderProfile();}
-    if(s.theme){localStorage.setItem('salary_theme',s.theme);lightTheme=s.theme==='light';document.body.classList.toggle('light',lightTheme);document.getElementById('themeBtn').textContent=lightTheme?'🌙':'☀️';}
+  const pend=pendingGet();
+  const nz=v=>!!v&&(Array.isArray(v)?v.length>0:(typeof v==='object'&&Object.keys(v).length>0));
+  const ms=iso=>{const t=iso?Date.parse(iso):0;return isNaN(t)?0:t;};
+
+  // ── Settings ──
+  if(s&&!pend.includes('settings')){
+    const rts=ms(s.updated_at);
+    const lts=parseInt(localStorage.getItem(SETTINGS_TS_KEY)||'0',10)||0;
+    const remoteRich=nz(s.templates)||nz(s.goals)||!!s.theme;
+    if(rts>lts&&(lts>0||remoteRich)){
+      // Cloud is newer — adopt it.
+      if(s.templates){templates=s.templates;localStorage.setItem('salary_templates',JSON.stringify(templates));}
+      if(s.goals){goals=s.goals;localStorage.setItem('salary_goals',JSON.stringify(goals));loadCalcInput();renderProfile();}
+      if(s.theme){localStorage.setItem('salary_theme',s.theme);lightTheme=s.theme==='light';document.body.classList.toggle('light',lightTheme);document.getElementById('themeBtn').textContent=lightTheme?'🌙':'☀️';}
+      localStorage.setItem(SETTINGS_TS_KEY,String(rts));
+    }else if(lts===0&&(nz(templates)||nz(goals))){
+      // Legacy local settings never synced and cloud isn't better — keep & upload.
+      localStorage.setItem(SETTINGS_TS_KEY,String(Date.now()));pendingAdd('settings');
+    }
   }
+
+  // ── Periods ──
   if(periods){
-    // True non-empty check for both objects (days/overrides) and arrays
-    // (bonuses/expenses).
-    const nz=v=>!!v&&(Array.isArray(v)?v.length>0:(typeof v==='object'&&Object.keys(v).length>0));
     const cloudKeys=new Set();
-    const toPush=[]; // period keys whose local data must be (re)uploaded to cloud
     periods.forEach(p=>{
       cloudKeys.add(p.period_key);
-      let local=null;
-      try{local=JSON.parse(localStorage.getItem('salary_'+p.period_key)||'null');}catch(_){}
-      // Prefer cloud, but NEVER let an empty cloud field wipe non-empty local
-      // data. This is the core data-loss guard — previously only expenses were
-      // protected, so an empty cloud days/bonuses/overrides could erase a
-      // populated period on first login from a device.
+      if(pend.includes(p.period_key))return; // local edit pending — it wins
+      const local=periodPayload(p.period_key);
+      const rts=ms(p.updated_at);
+      const lts=local&&local._ts?local._ts:0;
       let days=p.days||{},bonuses=p.bonuses||[],ov=p.day_overrides||{},exp=p.expenses||[];
-      let recovered=false;
-      if(!nz(days)&&local&&nz(local.days)){days=local.days;recovered=true;}
-      if(!nz(bonuses)&&local&&nz(local.bonuses)){bonuses=local.bonuses;recovered=true;}
-      if(!nz(ov)&&local&&nz(local.dayOverrides)){ov=local.dayOverrides;recovered=true;}
-      if(!nz(exp)&&local&&nz(local.expenses)){exp=local.expenses;recovered=true;}
-      localStorage.setItem('salary_'+p.period_key,JSON.stringify({days,bonuses,taxEnabled:!!p.tax_enabled,dayOverrides:ov,expenses:exp}));
-      if(recovered)toPush.push(p.period_key);
+      if(lts===0&&local){
+        // Legacy local without timestamp: protect non-empty fields from being
+        // wiped by an empty cloud value; re-upload the merged result.
+        let recovered=false;
+        if(!nz(days)&&nz(local.days)){days=local.days;recovered=true;}
+        if(!nz(bonuses)&&nz(local.bonuses)){bonuses=local.bonuses;recovered=true;}
+        if(!nz(ov)&&nz(local.dayOverrides)){ov=local.dayOverrides;recovered=true;}
+        if(!nz(exp)&&nz(local.expenses)){exp=local.expenses;recovered=true;}
+        localStorage.setItem('salary_'+p.period_key,JSON.stringify({days,bonuses,taxEnabled:!!p.tax_enabled,dayOverrides:ov,expenses:exp,_ts:recovered?Date.now():rts}));
+        if(recovered)pendingAdd(p.period_key);
+      }else if(rts>lts){
+        // Cloud is strictly newer — adopt it.
+        localStorage.setItem('salary_'+p.period_key,JSON.stringify({days,bonuses,taxEnabled:!!p.tax_enabled,dayOverrides:ov,expenses:exp,_ts:rts}));
+      }
     });
-    // Periods that only exist locally (never reached the cloud) must be pushed
-    // up, not silently kept on one device.
+    // Periods that exist only locally (never reached the cloud) must be queued.
     for(let i=0;i<localStorage.length;i++){
       const k=localStorage.key(i);
       if(k&&/^salary_\d+_\d+_\d+$/.test(k)){
         const pk=k.replace('salary_','');
-        if(!cloudKeys.has(pk))toPush.push(pk);
+        if(!cloudKeys.has(pk)&&!pend.includes(pk)){
+          const lp=periodPayload(pk);
+          if(lp&&!lp._ts){lp._ts=Date.now();try{localStorage.setItem(k,JSON.stringify(lp));}catch(_){}}
+          pendingAdd(pk);
+        }
       }
     }
-    // Re-upload recovered / local-only periods so the cloud reflects this device.
-    for(const pk of toPush){
-      try{
-        const d=JSON.parse(localStorage.getItem('salary_'+pk)||'{}');
-        await sbClient.from('periods').upsert({user_id:currentUser.id,period_key:pk,days:d.days||{},bonuses:d.bonuses||[],tax_enabled:!!d.taxEnabled,day_overrides:d.dayOverrides||{},expenses:d.expenses||[],updated_at:new Date().toISOString()},{onConflict:'user_id,period_key'});
-      }catch(e){console.error('reupload period',pk,e);}
-    }
   }
+  // If the merge queued anything (legacy/local-only), make sure it gets sent.
+  if(pendingGet().length)scheduleFlush();
   // Hydrate the current period from the (now merged) localStorage.
   load();
 }
@@ -4663,14 +4668,71 @@ function startRealtimeSync(){
     });
 }
 
-// Tell other open devices that this client just wrote something.
-function broadcastChange(kind,key){
+// Tell other open devices that this client just wrote something, so they pull.
+function broadcastChange(){
   if(!realtimeChannel)return;
-  try{realtimeChannel.send({type:'broadcast',event:'data-updated',payload:{kind,key,from:CLIENT_ID}});}catch(e){}
+  try{realtimeChannel.send({type:'broadcast',event:'data-updated',payload:{from:CLIENT_ID}});}catch(e){}
 }
 
-// Pull the freshest cloud state and re-render. Guarded against concurrent runs
-// and throttled so a burst of focus/visibility events can't hammer the network.
+// ── Dirty queue ──
+// Keys awaiting upload, persisted so an offline edit survives a reload. A key is
+// either a period key ("2026_6_2") or the literal "settings".
+function pendingGet(){try{const a=JSON.parse(localStorage.getItem(PENDING_KEY)||'[]');return Array.isArray(a)?a:[];}catch(_){return[];}}
+function pendingSet(a){try{localStorage.setItem(PENDING_KEY,JSON.stringify(Array.from(new Set(a))));}catch(_){}}
+function pendingAdd(k){const a=pendingGet();if(!a.includes(k)){a.push(k);pendingSet(a);}}
+function pendingDel(k){pendingSet(pendingGet().filter(x=>x!==k));}
+function periodPayload(key){try{return JSON.parse(localStorage.getItem('salary_'+key)||'null');}catch(_){return null;}}
+
+// Mark a record edited locally: bump its timestamp, queue it, schedule a flush.
+function markPeriodDirty(key){
+  const p=periodPayload(key);if(p){p._ts=Date.now();try{localStorage.setItem('salary_'+key,JSON.stringify(p));}catch(_){}}
+  pendingAdd(key);scheduleFlush();
+}
+function markSettingsDirty(){
+  try{localStorage.setItem(SETTINGS_TS_KEY,String(Date.now()));}catch(_){}
+  pendingAdd('settings');scheduleFlush();
+}
+// Back-compat names used throughout the app.
+function scheduleSaveToFirestore(){markPeriodDirty(periodFsKey());}
+function scheduleSettingsSave(){markSettingsDirty();}
+function saveSettingsToFirestore(){markSettingsDirty();}
+
+function scheduleFlush(){clearTimeout(_flushTimer);_flushTimer=setTimeout(flushPending,1200);}
+
+// Upload every queued record. Each carries its own _ts as updated_at so cloud
+// reflects edit time, not write time. Failures keep the key queued and retry
+// with exponential backoff — an edit is never silently dropped.
+async function flushPending(){
+  if(!currentUser||!sbClient||_flushing)return;
+  const keys=pendingGet();if(!keys.length)return;
+  _flushing=true;let allOk=true,uploaded=false;
+  try{
+    for(const k of keys){
+      try{
+        if(k==='settings'){
+          const ts=parseInt(localStorage.getItem(SETTINGS_TS_KEY)||'0',10)||Date.now();
+          const{error}=await sbClient.from('user_settings').upsert({user_id:currentUser.id,templates,goals,theme:lightTheme?'light':'dark',updated_at:new Date(ts).toISOString()},{onConflict:'user_id'});
+          if(error)throw error;
+        }else{
+          const p=periodPayload(k);
+          if(!p){pendingDel(k);continue;}
+          const ts=p._ts||Date.now();
+          const{error}=await sbClient.from('periods').upsert({user_id:currentUser.id,period_key:k,days:p.days||{},bonuses:p.bonuses||[],tax_enabled:!!p.taxEnabled,day_overrides:p.dayOverrides||{},expenses:p.expenses||[],updated_at:new Date(ts).toISOString()},{onConflict:'user_id,period_key'});
+          if(error)throw error;
+        }
+        pendingDel(k);uploaded=true;
+      }catch(e){allOk=false;console.error('flush',k,e);}
+    }
+  }finally{_flushing=false;}
+  if(uploaded)broadcastChange();
+  if(allOk){_flushBackoff=1000;}
+  else{clearTimeout(_flushTimer);_flushTimer=setTimeout(flushPending,_flushBackoff);_flushBackoff=Math.min(_flushBackoff*2,30000);}
+}
+
+// Push local edits first, then pull cloud and timestamp-merge, then push any
+// legacy/local-only records discovered during the merge. Flushing before the
+// pull is what kills the "refetch reverts my unsaved edit" race: our writes
+// reach the cloud before we read it back. Guarded + throttled against bursts.
 async function refreshFromCloud(force){
   if(!currentUser||!sbClient)return;
   if(_refreshing)return;
@@ -4678,66 +4740,30 @@ async function refreshFromCloud(force){
   if(!force&&now-_lastRefresh<3000)return;
   _refreshing=true;_lastRefresh=now;
   try{
-    await loadAllUserData();   // merges cloud + local, hydrates current period
+    await flushPending();
+    await loadAllUserData();   // pull + timestamp merge (skips queued keys)
     await loadAppConfig();     // refresh global announcement / maintenance too
+    await flushPending();      // upload legacy/local-only periods found in merge
     renderAll();
   }catch(e){console.error('refreshFromCloud',e);}
   finally{_refreshing=false;}
 }
 
-// Variant A: keep data fresh without table replication. Refetch whenever the
-// app regains attention (focus/visible), the network returns, or a light poll
-// ticks while visible; flush pending writes before the tab is hidden/closed so
-// the 2s debounce can't drop the last edit.
+// Keep data fresh without table replication: refetch when the app regains
+// attention (focus/visible), the network returns, or a light poll ticks while
+// visible; flush queued writes before the tab is hidden/closed so nothing is
+// lost on backgrounding.
 function setupSyncListeners(){
   if(_syncWired)return;_syncWired=true;
   document.addEventListener('visibilitychange',()=>{
     if(document.visibilityState==='visible')refreshFromCloud();
-    else flushPendingSaves();
+    else flushPending();
   });
   window.addEventListener('focus',()=>refreshFromCloud());
-  window.addEventListener('online',()=>{refreshFromCloud(true);startRealtimeSync();});
-  window.addEventListener('pagehide',flushPendingSaves);
+  window.addEventListener('online',()=>{flushPending();refreshFromCloud(true);startRealtimeSync();});
+  window.addEventListener('pagehide',flushPending);
   _pollTimer=setInterval(()=>{if(document.visibilityState==='visible')refreshFromCloud();},25000);
 }
-
-// Force out any debounced writes immediately (used before the tab backgrounds).
-function flushPendingSaves(){
-  if(_periodDirty)savePeriodNow();
-  if(_settingsDirty)saveSettingsNow();
-}
-
-async function savePeriodNow(){
-  if(!currentUser||!sbClient)return;
-  clearTimeout(saveDebounceTimer);_periodDirty=false;
-  const key=periodFsKey();
-  const row={user_id:currentUser.id,period_key:key,days,bonuses,tax_enabled:taxEnabled,day_overrides:dayOverrides,updated_at:new Date().toISOString()};
-  // Never let an empty expenses list overwrite a non-empty one in the cloud.
-  // Omitting the column on update leaves the stored value untouched; to clear
-  // expenses entirely, delete them via "Восстановить" flow or edit in place.
-  if(expenseItems.length)row.expenses=expenseItems;
-  try{await sbClient.from('periods').upsert(row,{onConflict:'user_id,period_key'});broadcastChange('period',key);}
-  catch(e){console.error('save period',e);}
-}
-function scheduleSaveToFirestore(){
-  if(!currentUser||!sbClient)return;
-  _periodDirty=true;
-  clearTimeout(saveDebounceTimer);
-  saveDebounceTimer=setTimeout(savePeriodNow,2000);
-}
-async function saveSettingsNow(){
-  if(!currentUser||!sbClient)return;
-  clearTimeout(settingsSaveTimer);_settingsDirty=false;
-  try{await sbClient.from('user_settings').upsert({user_id:currentUser.id,templates,goals,theme:lightTheme?'light':'dark',updated_at:new Date().toISOString()},{onConflict:'user_id'});broadcastChange('settings');}
-  catch(e){console.error('save settings',e);}
-}
-function scheduleSettingsSave(){
-  if(!currentUser||!sbClient)return;
-  _settingsDirty=true;
-  clearTimeout(settingsSaveTimer);
-  settingsSaveTimer=setTimeout(saveSettingsNow,2000);
-}
-function saveSettingsToFirestore(){scheduleSettingsSave();}
 function renderAll(){
   renderTotal();renderChart();renderGoals();renderExpenses();
   renderDayStrip();renderDayPanel();renderBonuses();renderTemplates();
