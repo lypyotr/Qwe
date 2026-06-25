@@ -2594,7 +2594,24 @@ function counterEdit(){counter.running=false;stopCounterTimer();saveCounter();re
 function counterReset(){if(!confirm('Обнулить счётчик изделий?'))return;counter.count=0;saveCounter();haptic('medium');renderCounterActive(document.getElementById('counterCard'));}
 function toggleCounterEarn(){counter.earnHidden=!counter.earnHidden;saveCounter();haptic('light');renderCounterActive(document.getElementById('counterCard'));}
 
-function startCounterTimer(){stopCounterTimer();counterTimer=setInterval(()=>{if(counter.enabled&&counter.running){const c=document.getElementById('counterCard');if(c)renderCounterActive(c);}},30000);}
+// Tick the live values every second without rebuilding the card (no flicker,
+// buttons stay responsive) — only the time-dependent bits are updated.
+function updateCounterLive(){
+  if(!(counter.enabled&&counter.running))return;
+  const card=document.getElementById('counterCard');
+  if(!card||card.style.display==='none')return;
+  if(!document.getElementById('cntLeftEl')){renderCounterActive(card);return;}
+  const st=counterStatus();
+  const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+  set('cntReqEl',st.reqStr);set('cntCurEl',st.curStr);set('cntLeftEl',st.leftStr);
+  const stEl=document.getElementById('cntStatusEl');
+  if(stEl){stEl.className='cnt-status '+st.cls;stEl.textContent=st.icon+' '+st.text;}
+  const mark=document.getElementById('cntMarkEl');
+  if(mark)mark.style.left=st.expectMark+'%';
+  const fill=document.getElementById('cntBarFill');
+  if(fill)fill.className='cnt-bar-fill '+(st.behind?'warn':'ok');
+}
+function startCounterTimer(){stopCounterTimer();counterTimer=setInterval(updateCounterLive,1000);}
 function stopCounterTimer(){if(counterTimer){clearInterval(counterTimer);counterTimer=null;}}
 
 function counterStatus(){
@@ -2680,14 +2697,14 @@ function renderCounterActive(card){
       <button class="cnt-btn plus" onclick="cntInc(1)">+</button>
     </div>
     <div class="cnt-bar">
-      <div class="cnt-bar-fill ${st.behind?'warn':'ok'}" style="width:${pct}%"></div>
-      <div class="cnt-bar-mark" style="left:${st.expectMark}%" title="норма к этому времени"></div>
+      <div class="cnt-bar-fill ${st.behind?'warn':'ok'}" id="cntBarFill" style="width:${pct}%"></div>
+      <div class="cnt-bar-mark" id="cntMarkEl" style="left:${st.expectMark}%" title="норма к этому времени"></div>
     </div>
-    <div class="cnt-status ${st.cls}">${st.icon} ${st.text}</div>
+    <div class="cnt-status ${st.cls}" id="cntStatusEl">${st.icon} ${st.text}</div>
     <div class="cnt-stats">
-      <div class="cnt-stat"><div class="cnt-stat-v">${st.reqStr}</div><div class="cnt-stat-l">нужно/час</div></div>
-      <div class="cnt-stat"><div class="cnt-stat-v">${st.curStr}</div><div class="cnt-stat-l">сейчас/час</div></div>
-      <div class="cnt-stat"><div class="cnt-stat-v">${st.leftStr}</div><div class="cnt-stat-l">до конца</div></div>
+      <div class="cnt-stat"><div class="cnt-stat-v" id="cntReqEl">${st.reqStr}</div><div class="cnt-stat-l">нужно/час</div></div>
+      <div class="cnt-stat"><div class="cnt-stat-v" id="cntCurEl">${st.curStr}</div><div class="cnt-stat-l">сейчас/час</div></div>
+      <div class="cnt-stat"><div class="cnt-stat-v" id="cntLeftEl">${st.leftStr}</div><div class="cnt-stat-l">до конца</div></div>
     </div>
     ${rate>0?`<div class="cnt-earn" onclick="toggleCounterEarn()" title="Скрыть/показать заработок"><span class="cnt-eye">${counter.earnHidden?'🙈':'👁'}</span>≈ ${counter.earnHidden?'•••':M(counter.count*rate)} заработано</div>`:''}
     <button class="cnt-reset" onclick="counterReset()">Сбросить счёт</button>`;
@@ -3808,7 +3825,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-24 #56';
+const BUILD_VER='2026-06-24 #57';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
