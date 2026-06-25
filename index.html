@@ -287,7 +287,8 @@ body.light .cur-toggle.usd{background:rgba(74,222,128,.2);color:var(--text)}
 .cnt-btn{width:54px;height:54px;border-radius:16px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:28px;font-weight:800;cursor:pointer;line-height:1;flex:none;transition:transform .1s}
 .cnt-btn:active{transform:scale(.9)}
 .cnt-btn.plus{background:var(--accent);color:#0d1a0f;border-color:transparent}
-.cnt-count{flex:1;text-align:center;min-width:0}
+.cnt-count{flex:1;text-align:center;min-width:0;cursor:pointer}
+.cnt-count-input{width:130px;max-width:100%;text-align:center;font-size:44px;font-weight:800;color:var(--accent);background:transparent;border:none;border-bottom:2px solid var(--accent);outline:none;font-family:'Manrope',sans-serif;letter-spacing:-1px;-webkit-appearance:none;padding:0}
 .cnt-now{font-size:46px;font-weight:800;color:var(--accent);letter-spacing:-1px;line-height:1}
 .cnt-of{font-size:16px;font-weight:700;color:var(--muted);margin-left:4px}
 .cnt-bar{height:8px;border-radius:5px;background:var(--surface2);position:relative;overflow:hidden;margin-bottom:12px}
@@ -2590,6 +2591,23 @@ function cntInc(d){
   saveCounter();haptic(d>0?'light':'medium');
   renderCounterActive(document.getElementById('counterCard'));
 }
+// Tap the number to type an exact count.
+function editCounterCount(){
+  const wrap=document.getElementById('cntCountWrap');
+  if(!wrap)return;
+  wrap.innerHTML=`<input class="cnt-count-input" id="cntCountInput" type="number" inputmode="numeric" min="0" value="${counter.count||0}">`;
+  const inp=document.getElementById('cntCountInput');
+  inp.focus();inp.select();
+  inp.addEventListener('blur',commitCounterCount);
+  inp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();inp.blur();}});
+}
+function commitCounterCount(){
+  const inp=document.getElementById('cntCountInput');
+  if(!inp)return;
+  counter.count=Math.max(0,parseInt(inp.value)||0);
+  saveCounter();haptic('light');
+  renderCounterActive(document.getElementById('counterCard'));
+}
 function counterEdit(){counter.running=false;stopCounterTimer();saveCounter();renderCounter();}
 function counterReset(){if(!confirm('Обнулить счётчик изделий?'))return;counter.count=0;saveCounter();haptic('medium');renderCounterActive(document.getElementById('counterCard'));}
 function toggleCounterEarn(){counter.earnHidden=!counter.earnHidden;saveCounter();haptic('light');renderCounterActive(document.getElementById('counterCard'));}
@@ -2693,7 +2711,7 @@ function renderCounterActive(card){
     </div>
     <div class="cnt-count-row">
       <button class="cnt-btn minus" onclick="cntInc(-1)">−</button>
-      <div class="cnt-count"><span class="cnt-now">${fmt(counter.count)}</span><span class="cnt-of">/ ${fmt(counter.target)}</span></div>
+      <div class="cnt-count" id="cntCountWrap" onclick="editCounterCount()" title="Нажми, чтобы ввести число"><span class="cnt-now">${fmt(counter.count)}</span><span class="cnt-of">/ ${fmt(counter.target)}</span></div>
       <button class="cnt-btn plus" onclick="cntInc(1)">+</button>
     </div>
     <div class="cnt-bar">
@@ -3825,7 +3843,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-24 #57';
+const BUILD_VER='2026-06-24 #58';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
