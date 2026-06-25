@@ -2568,11 +2568,26 @@ function toggleTax(){
 // ══════════════════════════════════════════════
 //  PRODUCTION COUNTER (live shift pace tracker)
 // ══════════════════════════════════════════════
-// Device-local (per shift) — kept in localStorage, not synced.
-let counter={enabled:false,tplId:'',target:0,count:0,startMode:'now',startTime:'',endTime:'',startTs:null,running:false};
+// Synced across devices: the counter rides inside the settings blob (goals._counter)
+// so it gets the same timestamp last-writer-wins + live broadcast as the rest of
+// the settings. Kept in localStorage too for instant local load / offline use.
+const COUNTER_DEFAULTS={enabled:false,tplId:'',target:0,count:0,startMode:'now',startTime:'',endTime:'',startTs:null,running:false};
+let counter=Object.assign({},COUNTER_DEFAULTS);
 let counterTimer=null;
 function loadCounter(){try{const c=JSON.parse(localStorage.getItem('salary_counter')||'null');if(c&&typeof c==='object')counter=Object.assign(counter,c);}catch(e){}}
-function saveCounter(){try{localStorage.setItem('salary_counter',JSON.stringify(counter));}catch(e){}}
+// Persist locally only (no cloud) — used when applying a counter pulled FROM the
+// cloud, so it doesn't bounce straight back as a local edit.
+function persistCounter(){try{localStorage.setItem('salary_counter',JSON.stringify(counter));}catch(e){}}
+// A local counter edit: persist and queue the settings blob for upload.
+function saveCounter(){persistCounter();if(currentUser)markSettingsDirty();}
+// Apply a counter received from another device, then resync its live timer.
+function applyCounterFromSync(c){
+  if(!c||typeof c!=='object')return;
+  counter=Object.assign({},COUNTER_DEFAULTS,c);
+  persistCounter();
+  if(counter.enabled&&counter.running)startCounterTimer();else stopCounterTimer();
+  renderCounter();
+}
 // today at HH:MM → ms
 function todayTs(hhmm){const d=new Date();if(hhmm){const a=hhmm.split(':');d.setHours(parseInt(a[0])||0,parseInt(a[1])||0,0,0);}return d.getTime();}
 // End-of-shift timestamp relative to a start. If the end time is at or before
@@ -3566,6 +3581,7 @@ async function forceSyncToCloud(){
     // settings
     const tpl=JSON.parse(localStorage.getItem('salary_templates')||'[]');
     const gl=JSON.parse(localStorage.getItem('salary_goals')||'{"period":0,"week":0,"month":0}');
+    gl._counter=counter;  // carry the synced production counter (see goals._counter)
     const th=localStorage.getItem('salary_theme')||'dark';
     const r1=await sbClient.from('user_settings').upsert({user_id:currentUser.id,templates:tpl,goals:gl,theme:th,updated_at:new Date().toISOString()},{onConflict:'user_id'});
     if(r1.error)throw r1.error;
@@ -4590,7 +4606,12 @@ async function loadAllUserData(){
     if(rts>lts&&(lts>0||remoteRich)){
       // Cloud is newer — adopt it.
       if(s.templates){templates=s.templates;localStorage.setItem('salary_templates',JSON.stringify(templates));}
-      if(s.goals){goals=s.goals;localStorage.setItem('salary_goals',JSON.stringify(goals));loadCalcInput();renderProfile();}
+      if(s.goals){
+        // Extract the embedded counter, then keep goals clean of the transport key.
+        const sc=s.goals._counter;if(sc!==undefined)delete s.goals._counter;
+        goals=s.goals;localStorage.setItem('salary_goals',JSON.stringify(goals));loadCalcInput();renderProfile();
+        applyCounterFromSync(sc);
+      }
       if(s.theme){localStorage.setItem('salary_theme',s.theme);lightTheme=s.theme==='light';document.body.classList.toggle('light',lightTheme);document.getElementById('themeBtn').textContent=lightTheme?'🌙':'☀️';}
       localStorage.setItem(SETTINGS_TS_KEY,String(rts));
     }else if(lts===0&&(nz(templates)||nz(goals))){
@@ -4711,7 +4732,10 @@ async function flushPending(){
       try{
         if(k==='settings'){
           const ts=parseInt(localStorage.getItem(SETTINGS_TS_KEY)||'0',10)||Date.now();
-          const{error}=await sbClient.from('user_settings').upsert({user_id:currentUser.id,templates,goals,theme:lightTheme?'light':'dark',updated_at:new Date(ts).toISOString()},{onConflict:'user_id'});
+          // Carry the production counter inside goals so it syncs with no schema
+          // change (mirrors the existing goals.calc pattern).
+          const goalsOut=Object.assign({},goals,{_counter:counter});
+          const{error}=await sbClient.from('user_settings').upsert({user_id:currentUser.id,templates,goals:goalsOut,theme:lightTheme?'light':'dark',updated_at:new Date(ts).toISOString()},{onConflict:'user_id'});
           if(error)throw error;
         }else{
           const p=periodPayload(k);
