@@ -1658,6 +1658,14 @@ let sbClient = null;
 let currentUser = null;
 let realtimeChannel = null;
 let saveDebounceTimer = null;
+// Cross-device sync state. Replication (Postgres Changes) is off — it's a paid
+// feature — so live sync runs over Realtime Broadcast (free) plus refetch on
+// focus/visibility/online/poll. Each client tags its broadcasts so it ignores
+// its own echoes.
+const CLIENT_ID = Math.random().toString(36).slice(2) + Date.now().toString(36);
+let _periodDirty = false, _settingsDirty = false;
+let _refreshing = false, _lastRefresh = 0, _resyncTimer = null;
+let _syncWired = false, _pollTimer = null;
 
 // ══════════════════════════════════════════════
 //  HOLIDAYS
@@ -4489,7 +4497,7 @@ function enterApp(user){
     try{
       await loadAllUserData();
       await migrateLocalStorageToSupabase();
-      renderAll();startRealtimeSync();
+      renderAll();startRealtimeSync();setupSyncListeners();
       await loadAppConfig();   // pull global announcement / maintenance state
       startAppConfigRealtime();
     }catch(e){console.error('cloud sync',e);}
@@ -4626,42 +4634,104 @@ async function loadAllUserData(){
   load();
 }
 
+// Live cross-device sync over Realtime Broadcast (works on the free plan, no
+// table replication needed). When another device saves, it broadcasts a tiny
+// "data-updated" ping and every other open client refetches the latest rows.
+// Offline devices never see the ping — refreshFromCloud() on focus/poll covers
+// that gap (see setupSyncListeners).
 function startRealtimeSync(){
   if(!currentUser||!sbClient)return;
-  if(realtimeChannel){sbClient.removeChannel(realtimeChannel);realtimeChannel=null;}
-  realtimeChannel=sbClient.channel('periods-sync')
-    .on('postgres_changes',{event:'*',schema:'public',table:'periods',filter:`user_id=eq.${currentUser.id}`},payload=>{
-      const p=payload.new;
-      if(p&&p.period_key===periodFsKey()){
-        let exp=p.expenses||[];
-        if(!exp.length&&Array.isArray(expenseItems)&&expenseItems.length)exp=expenseItems; // don't let an empty update wipe current expenses
-        days=p.days||{};bonuses=p.bonuses||[];taxEnabled=!!p.tax_enabled;dayOverrides=p.day_overrides||{};expenseItems=exp;
-        localStorage.setItem(saveKey(),JSON.stringify({days,bonuses,taxEnabled,dayOverrides,expenses:expenseItems}));
-        renderAll();
+  // Tear down any previous channel without letting its async status callback
+  // (which may fire CLOSED) trigger a reconnect of the new one.
+  if(realtimeChannel){const old=realtimeChannel;realtimeChannel=null;sbClient.removeChannel(old);}
+  const ch=sbClient.channel('user-sync-'+currentUser.id,{config:{broadcast:{self:false}}});
+  realtimeChannel=ch;
+  ch.on('broadcast',{event:'data-updated'},({payload})=>{
+      if(payload&&payload.from===CLIENT_ID)return; // ignore our own echo
+      refreshFromCloud();
+    })
+    .subscribe(status=>{
+      if(realtimeChannel!==ch)return; // stale channel — ignore
+      if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){
+        clearTimeout(_resyncTimer);
+        _resyncTimer=setTimeout(()=>{if(realtimeChannel===ch)startRealtimeSync();},3000);
       }
-    }).subscribe();
+    });
 }
 
+// Tell other open devices that this client just wrote something.
+function broadcastChange(kind,key){
+  if(!realtimeChannel)return;
+  try{realtimeChannel.send({type:'broadcast',event:'data-updated',payload:{kind,key,from:CLIENT_ID}});}catch(e){}
+}
+
+// Pull the freshest cloud state and re-render. Guarded against concurrent runs
+// and throttled so a burst of focus/visibility events can't hammer the network.
+async function refreshFromCloud(force){
+  if(!currentUser||!sbClient)return;
+  if(_refreshing)return;
+  const now=Date.now();
+  if(!force&&now-_lastRefresh<3000)return;
+  _refreshing=true;_lastRefresh=now;
+  try{
+    await loadAllUserData();   // merges cloud + local, hydrates current period
+    await loadAppConfig();     // refresh global announcement / maintenance too
+    renderAll();
+  }catch(e){console.error('refreshFromCloud',e);}
+  finally{_refreshing=false;}
+}
+
+// Variant A: keep data fresh without table replication. Refetch whenever the
+// app regains attention (focus/visible), the network returns, or a light poll
+// ticks while visible; flush pending writes before the tab is hidden/closed so
+// the 2s debounce can't drop the last edit.
+function setupSyncListeners(){
+  if(_syncWired)return;_syncWired=true;
+  document.addEventListener('visibilitychange',()=>{
+    if(document.visibilityState==='visible')refreshFromCloud();
+    else flushPendingSaves();
+  });
+  window.addEventListener('focus',()=>refreshFromCloud());
+  window.addEventListener('online',()=>{refreshFromCloud(true);startRealtimeSync();});
+  window.addEventListener('pagehide',flushPendingSaves);
+  _pollTimer=setInterval(()=>{if(document.visibilityState==='visible')refreshFromCloud();},25000);
+}
+
+// Force out any debounced writes immediately (used before the tab backgrounds).
+function flushPendingSaves(){
+  if(_periodDirty)savePeriodNow();
+  if(_settingsDirty)saveSettingsNow();
+}
+
+async function savePeriodNow(){
+  if(!currentUser||!sbClient)return;
+  clearTimeout(saveDebounceTimer);_periodDirty=false;
+  const key=periodFsKey();
+  const row={user_id:currentUser.id,period_key:key,days,bonuses,tax_enabled:taxEnabled,day_overrides:dayOverrides,updated_at:new Date().toISOString()};
+  // Never let an empty expenses list overwrite a non-empty one in the cloud.
+  // Omitting the column on update leaves the stored value untouched; to clear
+  // expenses entirely, delete them via "Восстановить" flow or edit in place.
+  if(expenseItems.length)row.expenses=expenseItems;
+  try{await sbClient.from('periods').upsert(row,{onConflict:'user_id,period_key'});broadcastChange('period',key);}
+  catch(e){console.error('save period',e);}
+}
 function scheduleSaveToFirestore(){
   if(!currentUser||!sbClient)return;
+  _periodDirty=true;
   clearTimeout(saveDebounceTimer);
-  saveDebounceTimer=setTimeout(async()=>{
-    const row={user_id:currentUser.id,period_key:periodFsKey(),days,bonuses,tax_enabled:taxEnabled,day_overrides:dayOverrides,updated_at:new Date().toISOString()};
-    // Never let an empty expenses list overwrite a non-empty one in the cloud.
-    // Omitting the column on update leaves the stored value untouched; to clear
-    // expenses entirely, delete them via "Восстановить" flow or edit in place.
-    if(expenseItems.length)row.expenses=expenseItems;
-    try{await sbClient.from('periods').upsert(row,{onConflict:'user_id,period_key'});}
-    catch(e){console.error('save period',e);}
-  },2000);
+  saveDebounceTimer=setTimeout(savePeriodNow,2000);
+}
+async function saveSettingsNow(){
+  if(!currentUser||!sbClient)return;
+  clearTimeout(settingsSaveTimer);_settingsDirty=false;
+  try{await sbClient.from('user_settings').upsert({user_id:currentUser.id,templates,goals,theme:lightTheme?'light':'dark',updated_at:new Date().toISOString()},{onConflict:'user_id'});broadcastChange('settings');}
+  catch(e){console.error('save settings',e);}
 }
 function scheduleSettingsSave(){
   if(!currentUser||!sbClient)return;
+  _settingsDirty=true;
   clearTimeout(settingsSaveTimer);
-  settingsSaveTimer=setTimeout(async()=>{
-    try{await sbClient.from('user_settings').upsert({user_id:currentUser.id,templates,goals,theme:lightTheme?'light':'dark',updated_at:new Date().toISOString()},{onConflict:'user_id'});}
-    catch(e){console.error('save settings',e);}
-  },2000);
+  settingsSaveTimer=setTimeout(saveSettingsNow,2000);
 }
 function saveSettingsToFirestore(){scheduleSettingsSave();}
 function renderAll(){
