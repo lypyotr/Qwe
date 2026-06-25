@@ -262,6 +262,51 @@ body.light .cur-toggle.usd{background:rgba(74,222,128,.2);color:var(--text)}
 .toggle::after{content:'';position:absolute;top:3px;left:3px;width:22px;height:22px;background:white;border-radius:50%;transition:transform .2s;box-shadow:0 1px 4px rgba(0,0,0,.3)}
 .toggle.on::after{transform:translateX(20px)}
 
+/* ── PRODUCTION COUNTER ── */
+.cnt-card{margin:0 16px 12px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:var(--card-shadow)}
+.cnt-title{font-size:14px;font-weight:800;margin-bottom:4px}
+.cnt-sub{font-size:12px;color:var(--muted);line-height:1.4;margin-bottom:14px}
+.cnt-field{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.cnt-field>label{font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)}
+.cnt-input{font-family:'Manrope',sans-serif;font-size:15px;font-weight:600;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:11px 12px;outline:none;width:100%;box-sizing:border-box;-webkit-appearance:none}
+.cnt-input:focus{border-color:var(--accent)}
+.cnt-row2{display:flex;gap:10px}
+.cnt-row2 .cnt-field{flex:1;min-width:0}
+.cnt-seg{display:flex;background:var(--surface2);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.cnt-seg-opt{flex:1;text-align:center;font-size:13px;font-weight:700;padding:11px 8px;cursor:pointer;color:var(--muted);transition:all .15s}
+.cnt-seg-opt.active{background:var(--accent);color:#0d1a0f}
+.cnt-start-btn{width:100%;padding:14px;border:none;border-radius:12px;background:var(--accent);color:#0d1a0f;font-family:'Manrope',sans-serif;font-size:15px;font-weight:800;cursor:pointer;margin-top:4px;transition:transform .1s}
+.cnt-start-btn:active{transform:scale(.98)}
+.cnt-msg{font-size:13px;font-weight:600;text-align:center;color:var(--danger);min-height:16px;margin-top:8px}
+/* active state */
+.cnt-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:14px}
+.cnt-title-sm{font-size:16px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cnt-sub2{font-size:11px;color:var(--muted);margin-top:2px}
+.cnt-edit{font-size:15px;color:var(--muted);cursor:pointer;padding:2px 6px;flex:none}
+.cnt-count-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.cnt-btn{width:54px;height:54px;border-radius:16px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:28px;font-weight:800;cursor:pointer;line-height:1;flex:none;transition:transform .1s}
+.cnt-btn:active{transform:scale(.9)}
+.cnt-btn.plus{background:var(--accent);color:#0d1a0f;border-color:transparent}
+.cnt-count{flex:1;text-align:center;min-width:0}
+.cnt-now{font-size:46px;font-weight:800;color:var(--accent);letter-spacing:-1px;line-height:1}
+.cnt-of{font-size:16px;font-weight:700;color:var(--muted);margin-left:4px}
+.cnt-bar{height:8px;border-radius:5px;background:var(--surface2);position:relative;overflow:hidden;margin-bottom:12px}
+.cnt-bar-fill{height:100%;border-radius:5px;transition:width .35s}
+.cnt-bar-fill.ok{background:linear-gradient(90deg,#22c55e,#4ade80)}
+.cnt-bar-fill.warn{background:linear-gradient(90deg,#f59e0b,#f87171)}
+.cnt-bar-mark{position:absolute;top:-2px;width:2px;height:12px;background:var(--text);opacity:.5;border-radius:1px}
+.cnt-status{text-align:center;font-size:14px;font-weight:800;padding:9px;border-radius:10px;margin-bottom:12px}
+.cnt-status.ok{color:#22c55e;background:rgba(34,197,94,.12)}
+.cnt-status.warn{color:#f59e0b;background:rgba(245,158,11,.15)}
+.cnt-status.done{color:var(--accent);background:rgba(74,222,128,.15)}
+.cnt-stats{display:flex;gap:8px;margin-bottom:12px}
+.cnt-stat{flex:1;text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:9px 4px;min-width:0}
+.cnt-stat-v{font-size:16px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cnt-stat-l{font-size:9px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);margin-top:3px}
+.cnt-earn{text-align:center;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:10px}
+.cnt-reset{width:100%;padding:10px;border:1px solid var(--border);border-radius:10px;background:transparent;color:var(--muted);font-family:'Manrope',sans-serif;font-size:12px;font-weight:700;cursor:pointer}
+.cnt-reset:active{opacity:.6}
+
 /* ── SECTION ── */
 .section{margin:0 16px 14px}
 .section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
@@ -1076,6 +1121,16 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
 
 <!-- TODAY SUMMARY -->
 <div class="today-summary" id="todaySummaryCard" style="display:none"></div>
+
+<!-- PRODUCTION COUNTER -->
+<div class="tax-row" id="counterToggleRow">
+  <div class="tax-info">
+    <div class="tax-title">📦 Счётчик изделий</div>
+    <div class="tax-sub">Темп смены в реальном времени</div>
+  </div>
+  <div class="toggle" id="counterToggle" onclick="toggleCounter()"></div>
+</div>
+<div class="cnt-card" id="counterCard" style="display:none"></div>
 
 
 <!-- TAX -->
@@ -2494,6 +2549,148 @@ function toggleTax(){
 }
 
 // ══════════════════════════════════════════════
+//  PRODUCTION COUNTER (live shift pace tracker)
+// ══════════════════════════════════════════════
+// Device-local (per shift) — kept in localStorage, not synced.
+let counter={enabled:false,tplId:'',target:0,count:0,startMode:'now',startTime:'',endTime:'',startTs:null,running:false};
+let counterTimer=null;
+function loadCounter(){try{const c=JSON.parse(localStorage.getItem('salary_counter')||'null');if(c&&typeof c==='object')counter=Object.assign(counter,c);}catch(e){}}
+function saveCounter(){try{localStorage.setItem('salary_counter',JSON.stringify(counter));}catch(e){}}
+// today at HH:MM → ms
+function todayTs(hhmm){const d=new Date();if(hhmm){const a=hhmm.split(':');d.setHours(parseInt(a[0])||0,parseInt(a[1])||0,0,0);}return d.getTime();}
+
+function toggleCounter(){
+  counter.enabled=!counter.enabled;
+  haptic('light');
+  if(!counter.enabled){counter.running=false;stopCounterTimer();}
+  else if(!counter.tplId&&templates.length)counter.tplId=String(templates[0].id);
+  saveCounter();renderCounter();
+}
+function cntSet(field,value){
+  if(field==='target')counter.target=Math.max(0,parseInt(value)||0);
+  else counter[field]=value;
+  saveCounter();
+}
+function cntSetStartMode(m){counter.startMode=m;saveCounter();renderCounter();}
+function startCounter(){
+  const msg=t=>{const e=document.getElementById('cntMsg');if(e)e.textContent=t;};
+  if(!(counter.target>0)){msg('Укажи план (шт)');return;}
+  if(!counter.endTime){msg('Укажи время конца смены');return;}
+  if(counter.startMode==='time'&&!counter.startTime){msg('Укажи время начала');return;}
+  const startTs=counter.startMode==='time'?todayTs(counter.startTime):Date.now();
+  const endTs=todayTs(counter.endTime);
+  if(endTs<=startTs){msg('Конец смены должен быть позже начала');return;}
+  counter.startTs=startTs;counter.running=true;
+  saveCounter();haptic('medium');renderCounter();startCounterTimer();
+}
+function cntInc(d){
+  counter.count=Math.max(0,(counter.count||0)+d);
+  saveCounter();haptic(d>0?'light':'medium');
+  renderCounterActive(document.getElementById('counterCard'));
+}
+function counterEdit(){counter.running=false;stopCounterTimer();saveCounter();renderCounter();}
+function counterReset(){if(!confirm('Обнулить счётчик изделий?'))return;counter.count=0;saveCounter();haptic('medium');renderCounterActive(document.getElementById('counterCard'));}
+
+function startCounterTimer(){stopCounterTimer();counterTimer=setInterval(()=>{if(counter.enabled&&counter.running){const c=document.getElementById('counterCard');if(c)renderCounterActive(c);}},30000);}
+function stopCounterTimer(){if(counterTimer){clearInterval(counterTimer);counterTimer=null;}}
+
+function counterStatus(){
+  const now=Date.now();
+  const startTs=counter.startTs||now;
+  const endTs=todayTs(counter.endTime);
+  const total=Math.max(1,endTs-startTs);
+  const elapsed=Math.min(Math.max(0,now-startTs),total);
+  const expected=counter.target*(elapsed/total);
+  const remaining=Math.max(0,counter.target-counter.count);
+  const hoursLeft=Math.max(0,(endTs-now)/3600000);
+  const elapsedH=Math.max(0,(now-startTs)/3600000);
+  const curPerH=elapsedH>0.01?counter.count/elapsedH:0;
+  const reqPerH=hoursLeft>0.01?remaining/hoursLeft:(remaining>0?Infinity:0);
+  const behind=counter.count<expected-0.001&&remaining>0;
+  const done=counter.target>0&&counter.count>=counter.target;
+  const ended=now>=endTs;
+  let text,icon,cls;
+  if(done){text='План выполнен — отлично!';icon='🎉';cls='done';}
+  else if(ended){text='Смена окончена · '+fmt(counter.count)+'/'+fmt(counter.target);icon='⏱';cls='warn';}
+  else if(behind){text='Нужно ускориться';icon='⚡';cls='warn';}
+  else{text='Идёшь в темпе';icon='✅';cls='ok';}
+  const n1=x=>!isFinite(x)?'∞':(Math.round(x*10)/10).toLocaleString('ru-RU');
+  const leftStr=hoursLeft>=1?Math.floor(hoursLeft)+'ч '+Math.round((hoursLeft%1)*60)+'м':Math.max(0,Math.round(hoursLeft*60))+'м';
+  return{cls,text,icon,behind,done,
+    reqStr:n1(reqPerH),curStr:n1(curPerH),leftStr,
+    expectMark:counter.target>0?Math.min(100,expected/counter.target*100):0};
+}
+
+function renderCounter(){
+  const card=document.getElementById('counterCard');
+  if(!card)return;
+  const tog=document.getElementById('counterToggle');
+  if(tog)tog.classList.toggle('on',counter.enabled);
+  if(!counter.enabled){card.style.display='none';stopCounterTimer();return;}
+  card.style.display='';
+  if(counter.running)renderCounterActive(card);
+  else renderCounterConfig(card);
+}
+function renderCounterConfig(card){
+  const opts=templates.length
+    ? templates.map(t=>`<option value="${t.id}"${String(t.id)===String(counter.tplId)?' selected':''}>${esc(t.name)} · ${fmt(t.price)} ₽</option>`).join('')
+    : '<option value="">Нет шаблонов — создай ниже</option>';
+  card.innerHTML=`
+    <div class="cnt-title">📦 Новый отсчёт</div>
+    <div class="cnt-sub">Выбери изделие и план до конца смены — покажу темп в реальном времени.</div>
+    <div class="cnt-field"><label>Изделие</label>
+      <select class="cnt-input" onchange="cntSet('tplId',this.value)">${opts}</select></div>
+    <div class="cnt-row2">
+      <div class="cnt-field"><label>План, шт</label>
+        <input class="cnt-input" type="number" inputmode="numeric" min="1" placeholder="0" value="${counter.target||''}" oninput="cntSet('target',this.value)"></div>
+      <div class="cnt-field"><label>Конец смены</label>
+        <input class="cnt-input" type="time" value="${counter.endTime||''}" onchange="cntSet('endTime',this.value)"></div>
+    </div>
+    <div class="cnt-field"><label>Начало отсчёта</label>
+      <div class="cnt-seg">
+        <div class="cnt-seg-opt${counter.startMode==='now'?' active':''}" onclick="cntSetStartMode('now')">Сейчас</div>
+        <div class="cnt-seg-opt${counter.startMode==='time'?' active':''}" onclick="cntSetStartMode('time')">С времени</div>
+      </div>
+    </div>
+    ${counter.startMode==='time'?`<div class="cnt-field"><label>Время начала</label>
+      <input class="cnt-input" type="time" value="${counter.startTime||''}" onchange="cntSet('startTime',this.value)"></div>`:''}
+    <button class="cnt-start-btn" onclick="startCounter()">▶ Начать счёт</button>
+    <div class="cnt-msg" id="cntMsg"></div>`;
+}
+function renderCounterActive(card){
+  if(!card)return;
+  const st=counterStatus();
+  const tpl=templates.find(t=>String(t.id)===String(counter.tplId));
+  const pct=counter.target>0?Math.min(100,Math.round(counter.count/counter.target*100)):0;
+  const rate=tpl?parseFloat(tpl.price)||0:0;
+  card.innerHTML=`
+    <div class="cnt-head">
+      <div style="min-width:0">
+        <div class="cnt-title-sm">${tpl?esc(tpl.name):'Изделие'}</div>
+        <div class="cnt-sub2">до ${counter.endTime||'—'} · план ${fmt(counter.target)} шт</div>
+      </div>
+      <div class="cnt-edit" onclick="counterEdit()" title="Изменить">✎</div>
+    </div>
+    <div class="cnt-count-row">
+      <button class="cnt-btn minus" onclick="cntInc(-1)">−</button>
+      <div class="cnt-count"><span class="cnt-now">${fmt(counter.count)}</span><span class="cnt-of">/ ${fmt(counter.target)}</span></div>
+      <button class="cnt-btn plus" onclick="cntInc(1)">+</button>
+    </div>
+    <div class="cnt-bar">
+      <div class="cnt-bar-fill ${st.behind?'warn':'ok'}" style="width:${pct}%"></div>
+      <div class="cnt-bar-mark" style="left:${st.expectMark}%" title="норма к этому времени"></div>
+    </div>
+    <div class="cnt-status ${st.cls}">${st.icon} ${st.text}</div>
+    <div class="cnt-stats">
+      <div class="cnt-stat"><div class="cnt-stat-v">${st.reqStr}</div><div class="cnt-stat-l">нужно/час</div></div>
+      <div class="cnt-stat"><div class="cnt-stat-v">${st.curStr}</div><div class="cnt-stat-l">сейчас/час</div></div>
+      <div class="cnt-stat"><div class="cnt-stat-v">${st.leftStr}</div><div class="cnt-stat-l">до конца</div></div>
+    </div>
+    ${rate>0?`<div class="cnt-earn">≈ ${M(counter.count*rate)} заработано</div>`:''}
+    <button class="cnt-reset" onclick="counterReset()">Сбросить счёт</button>`;
+}
+
+// ══════════════════════════════════════════════
 //  TOTAL
 // ══════════════════════════════════════════════
 let totalView='net'; // 'gross' | 'net'
@@ -3608,7 +3805,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-24 #54';
+const BUILD_VER='2026-06-24 #55';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
@@ -4442,7 +4639,7 @@ function renderAll(){
 if('scrollRestoration' in history)history.scrollRestoration='manual';
 loadTheme();
 initMonths();
-loadTemplates();loadGoals();loadExpenses();loadCurrencyPrefs();
+loadTemplates();loadGoals();loadExpenses();loadCurrencyPrefs();loadCounter();
 document.getElementById('periodSel').value=new Date().getDate()<=15?'1':'2';
 load();
 renderPeriodCard();renderDayStrip();renderDayPanel();renderBonuses();renderTemplates();
@@ -4457,6 +4654,7 @@ try{
   localStorage.removeItem('salary_calc_money');
 }catch(e){}
 loadCalcInput();
+renderCounter();if(counter.enabled&&counter.running)startCounterTimer();
 restorePage();initPWA();initTotalSwipe();
 restoreScroll();
 initFirebase();
