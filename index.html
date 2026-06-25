@@ -303,7 +303,9 @@ body.light .cur-toggle.usd{background:rgba(74,222,128,.2);color:var(--text)}
 .cnt-stat{flex:1;text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:9px 4px;min-width:0}
 .cnt-stat-v{font-size:16px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cnt-stat-l{font-size:9px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);margin-top:3px}
-.cnt-earn{text-align:center;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:10px}
+.cnt-earn{text-align:center;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:10px;cursor:pointer;user-select:none}
+.cnt-earn:active{opacity:.6}
+.cnt-eye{opacity:.45;margin-right:5px;font-size:11px}
 .cnt-reset{width:100%;padding:10px;border:1px solid var(--border);border-radius:10px;background:transparent;color:var(--muted);font-family:'Manrope',sans-serif;font-size:12px;font-weight:700;cursor:pointer}
 .cnt-reset:active{opacity:.6}
 
@@ -2590,6 +2592,7 @@ function cntInc(d){
 }
 function counterEdit(){counter.running=false;stopCounterTimer();saveCounter();renderCounter();}
 function counterReset(){if(!confirm('Обнулить счётчик изделий?'))return;counter.count=0;saveCounter();haptic('medium');renderCounterActive(document.getElementById('counterCard'));}
+function toggleCounterEarn(){counter.earnHidden=!counter.earnHidden;saveCounter();haptic('light');renderCounterActive(document.getElementById('counterCard'));}
 
 function startCounterTimer(){stopCounterTimer();counterTimer=setInterval(()=>{if(counter.enabled&&counter.running){const c=document.getElementById('counterCard');if(c)renderCounterActive(c);}},30000);}
 function stopCounterTimer(){if(counterTimer){clearInterval(counterTimer);counterTimer=null;}}
@@ -2686,7 +2689,7 @@ function renderCounterActive(card){
       <div class="cnt-stat"><div class="cnt-stat-v">${st.curStr}</div><div class="cnt-stat-l">сейчас/час</div></div>
       <div class="cnt-stat"><div class="cnt-stat-v">${st.leftStr}</div><div class="cnt-stat-l">до конца</div></div>
     </div>
-    ${rate>0?`<div class="cnt-earn">≈ ${M(counter.count*rate)} заработано</div>`:''}
+    ${rate>0?`<div class="cnt-earn" onclick="toggleCounterEarn()" title="Скрыть/показать заработок"><span class="cnt-eye">${counter.earnHidden?'🙈':'👁'}</span>≈ ${counter.earnHidden?'•••':M(counter.count*rate)} заработано</div>`:''}
     <button class="cnt-reset" onclick="counterReset()">Сбросить счёт</button>`;
 }
 
@@ -3805,7 +3808,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-24 #55';
+const BUILD_VER='2026-06-24 #56';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
