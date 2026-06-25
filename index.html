@@ -2569,6 +2569,10 @@ function loadCounter(){try{const c=JSON.parse(localStorage.getItem('salary_count
 function saveCounter(){try{localStorage.setItem('salary_counter',JSON.stringify(counter));}catch(e){}}
 // today at HH:MM → ms
 function todayTs(hhmm){const d=new Date();if(hhmm){const a=hhmm.split(':');d.setHours(parseInt(a[0])||0,parseInt(a[1])||0,0,0);}return d.getTime();}
+// End-of-shift timestamp relative to a start. If the end time is at or before
+// the start (e.g. 20:00 → 08:00), the shift crosses midnight, so roll the end
+// to the next day.
+function shiftEndTs(startTs,hhmm){const d=new Date(startTs);if(hhmm){const a=hhmm.split(':');d.setHours(parseInt(a[0])||0,parseInt(a[1])||0,0,0);}let e=d.getTime();if(e<=startTs)e+=86400000;return e;}
 
 function toggleCounter(){
   counter.enabled=!counter.enabled;
@@ -2589,7 +2593,7 @@ function startCounter(){
   if(!counter.endTime){msg('Укажи время конца смены');return;}
   if(counter.startMode==='time'&&!counter.startTime){msg('Укажи время начала');return;}
   const startTs=counter.startMode==='time'?todayTs(counter.startTime):Date.now();
-  const endTs=todayTs(counter.endTime);
+  const endTs=shiftEndTs(startTs,counter.endTime);
   if(endTs<=startTs){msg('Конец смены должен быть позже начала');return;}
   counter.startTs=startTs;counter.running=true;
   saveCounter();haptic('medium');renderCounter();startCounterTimer();
@@ -2643,7 +2647,7 @@ function stopCounterTimer(){if(counterTimer){clearInterval(counterTimer);counter
 function counterStatus(){
   const now=Date.now();
   const startTs=counter.startTs||now;
-  const endTs=todayTs(counter.endTime);
+  const endTs=shiftEndTs(startTs,counter.endTime);
   const total=Math.max(1,endTs-startTs);
   const elapsed=Math.min(Math.max(0,now-startTs),total);
   const expected=counter.target*(elapsed/total);
