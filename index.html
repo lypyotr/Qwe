@@ -4661,7 +4661,10 @@ window.addEventListener('unhandledrejection',ev=>{
 });
 
 async function fetchWithRetry(input,init){
-  const tries=4,perTry=12000;   // headroom for slow / throttled connections
+  // Resilient to DPI/throttled networks that reset connections mid-request
+  // (net::ERR_CONNECTION_RESET). Resets fail fast, so 6 tries cost little time
+  // but give a dropped route several fresh chances to get through.
+  const tries=6,perTry=12000;
   let lastErr;
   for(let i=0;i<tries;i++){
     const ctrl=new AbortController();
@@ -4670,7 +4673,11 @@ async function fetchWithRetry(input,init){
       return await fetch(input,{...init,signal:ctrl.signal});
     }catch(e){
       lastErr=e;
-      if(i<tries-1)await new Promise(r=>setTimeout(r,400*(i+1)));
+      if(i<tries-1){
+        // Exponential backoff with jitter instead of hammering the same drop.
+        const base=Math.min(500*Math.pow(1.8,i),6000);
+        await new Promise(r=>setTimeout(r,base+Math.random()*400));
+      }
     }finally{clearTimeout(timer);}
   }
   throw lastErr;
