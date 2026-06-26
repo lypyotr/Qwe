@@ -1668,7 +1668,8 @@ let saveDebounceTimer = null;
 // broadcasts so it ignores its own echoes.
 const CLIENT_ID = Math.random().toString(36).slice(2) + Date.now().toString(36);
 const PENDING_KEY = 'salary_pending';     // JSON array of keys awaiting upload
-const SETTINGS_TS_KEY = 'salary_settings_ts';
+const SETTINGS_TS_KEY = 'salary_settings_ts';   // local edit time (sent as updated_at)
+const SETTINGS_REV_KEY = 'salary_settings_rev'; // last cloud updated_at we synced to
 let _refreshing = false, _lastRefresh = 0, _resyncTimer = null;
 let _syncWired = false, _pollTimer = null;
 let _flushTimer = null, _flushing = false, _flushBackoff = 1000;
@@ -4598,13 +4599,21 @@ async function loadAllUserData(){
   const nz=v=>!!v&&(Array.isArray(v)?v.length>0:(typeof v==='object'&&Object.keys(v).length>0));
   const ms=iso=>{const t=iso?Date.parse(iso):0;return isNaN(t)?0:t;};
 
+  // Reconciliation is by REVISION EQUALITY, not wall-clock ordering: each record
+  // remembers the cloud updated_at it last synced to (_rev), and we adopt the
+  // cloud copy whenever its updated_at differs from that remembered value. This
+  // is immune to clock skew between devices — comparing two devices' Date.now()
+  // values (the old `rts > lts`) silently dropped updates from whichever device
+  // had the slower clock (e.g. a PC behind an iPhone: PC edits never reached it).
+
   // ── Settings ──
   if(s&&!pend.includes('settings')){
-    const rts=ms(s.updated_at);
-    const lts=parseInt(localStorage.getItem(SETTINGS_TS_KEY)||'0',10)||0;
+    const rrev=ms(s.updated_at);
+    const srevRaw=localStorage.getItem(SETTINGS_REV_KEY);
+    const srev=srevRaw===null?null:(parseInt(srevRaw,10)||0);
     const remoteRich=nz(s.templates)||nz(s.goals)||!!s.theme;
-    if(rts>lts&&(lts>0||remoteRich)){
-      // Cloud is newer — adopt it.
+    if(srev===null?remoteRich:rrev!==srev){
+      // Cloud differs from what we last saw — adopt it.
       if(s.templates){templates=s.templates;localStorage.setItem('salary_templates',JSON.stringify(templates));}
       if(s.goals){
         // Extract the embedded counter, then keep goals clean of the transport key.
@@ -4613,8 +4622,8 @@ async function loadAllUserData(){
         applyCounterFromSync(sc);
       }
       if(s.theme){localStorage.setItem('salary_theme',s.theme);lightTheme=s.theme==='light';document.body.classList.toggle('light',lightTheme);document.getElementById('themeBtn').textContent=lightTheme?'🌙':'☀️';}
-      localStorage.setItem(SETTINGS_TS_KEY,String(rts));
-    }else if(lts===0&&(nz(templates)||nz(goals))){
+      localStorage.setItem(SETTINGS_REV_KEY,String(rrev));
+    }else if(srev===null&&(nz(templates)||nz(goals))){
       // Legacy local settings never synced and cloud isn't better — keep & upload.
       localStorage.setItem(SETTINGS_TS_KEY,String(Date.now()));pendingAdd('settings');
     }
@@ -4627,22 +4636,22 @@ async function loadAllUserData(){
       cloudKeys.add(p.period_key);
       if(pend.includes(p.period_key))return; // local edit pending — it wins
       const local=periodPayload(p.period_key);
-      const rts=ms(p.updated_at);
-      const lts=local&&local._ts?local._ts:0;
+      const rrev=ms(p.updated_at);
+      const lrev=local&&typeof local._rev==='number'?local._rev:null;
       let days=p.days||{},bonuses=p.bonuses||[],ov=p.day_overrides||{},exp=p.expenses||[];
-      if(lts===0&&local){
-        // Legacy local without timestamp: protect non-empty fields from being
-        // wiped by an empty cloud value; re-upload the merged result.
+      if(local&&lrev===null&&!local._ts){
+        // Truly legacy local (no sync metadata): protect non-empty fields from
+        // being wiped by an empty cloud value; re-upload the merged result.
         let recovered=false;
         if(!nz(days)&&nz(local.days)){days=local.days;recovered=true;}
         if(!nz(bonuses)&&nz(local.bonuses)){bonuses=local.bonuses;recovered=true;}
         if(!nz(ov)&&nz(local.dayOverrides)){ov=local.dayOverrides;recovered=true;}
         if(!nz(exp)&&nz(local.expenses)){exp=local.expenses;recovered=true;}
-        localStorage.setItem('salary_'+p.period_key,JSON.stringify({days,bonuses,taxEnabled:!!p.tax_enabled,dayOverrides:ov,expenses:exp,_ts:recovered?Date.now():rts}));
+        localStorage.setItem('salary_'+p.period_key,JSON.stringify({days,bonuses,taxEnabled:!!p.tax_enabled,dayOverrides:ov,expenses:exp,_rev:rrev,_ts:recovered?Date.now():rrev}));
         if(recovered)pendingAdd(p.period_key);
-      }else if(rts>lts){
-        // Cloud is strictly newer — adopt it.
-        localStorage.setItem('salary_'+p.period_key,JSON.stringify({days,bonuses,taxEnabled:!!p.tax_enabled,dayOverrides:ov,expenses:exp,_ts:rts}));
+      }else if(lrev===null||rrev!==lrev){
+        // Cloud differs from the revision we last saw — adopt it.
+        localStorage.setItem('salary_'+p.period_key,JSON.stringify({days,bonuses,taxEnabled:!!p.tax_enabled,dayOverrides:ov,expenses:exp,_rev:rrev,_ts:rrev}));
       }
     });
     // Periods that exist only locally (never reached the cloud) must be queued.
@@ -4737,12 +4746,16 @@ async function flushPending(){
           const goalsOut=Object.assign({},goals,{_counter:counter});
           const{error}=await sbClient.from('user_settings').upsert({user_id:currentUser.id,templates,goals:goalsOut,theme:lightTheme?'light':'dark',updated_at:new Date(ts).toISOString()},{onConflict:'user_id'});
           if(error)throw error;
+          // Remember the revision we just wrote so a later pull doesn't re-adopt
+          // our own write (and so equality reconciliation has a baseline).
+          localStorage.setItem(SETTINGS_REV_KEY,String(ts));
         }else{
           const p=periodPayload(k);
           if(!p){pendingDel(k);continue;}
           const ts=p._ts||Date.now();
           const{error}=await sbClient.from('periods').upsert({user_id:currentUser.id,period_key:k,days:p.days||{},bonuses:p.bonuses||[],tax_enabled:!!p.taxEnabled,day_overrides:p.dayOverrides||{},expenses:p.expenses||[],updated_at:new Date(ts).toISOString()},{onConflict:'user_id,period_key'});
           if(error)throw error;
+          p._rev=ts;try{localStorage.setItem('salary_'+k,JSON.stringify(p));}catch(_){}
         }
         pendingDel(k);uploaded=true;
       }catch(e){allOk=false;console.error('flush',k,e);}
