@@ -2855,7 +2855,7 @@ function renderCounterActive(card){
     ${rate>0?`<div class="cnt-earn" onclick="toggleCounterEarn()" title="Скрыть/показать заработок"><span class="cnt-eye">${counter.earnHidden?'🙈':'👁'}</span>≈ ${counter.earnHidden?'•••':M(counter.count*rate)} заработано</div>`:''}
     <div class="cnt-actions">
       <button class="cnt-act" onclick="counterToReport()">📥 В отчёт</button>
-      <button class="cnt-act tg" onclick="counterToTelegram(this)">✈️ В Телеграм</button>
+      ${isAdmin()?`<button class="cnt-act tg" onclick="counterToTelegram(this)">✈️ В Телеграм</button>`:''}
     </div>
     <button class="cnt-reset" onclick="counterReset()">Сбросить счёт</button>`;
 }
@@ -2894,8 +2894,8 @@ function counterToReport(){
   if(!Array.isArray(days[td]))days[td]=[];
   days[td].push({id:Date.now()+Math.random(),name:tpl?tpl.name:'Изделия',qty:String(qty),price:tpl?String(tpl.price):''});
   save();haptic('medium');
+  // Re-render in place (incl. the now-updated Period tab) without navigating away.
   renderPeriodCard();renderDayStrip();renderDayPanel();renderTotal();renderChart();renderGoals();renderHistory();renderArchive();
-  switchPage('period');
   toast('Перенесено в отчёт: '+fmt(qty)+' шт за '+td+' число',()=>restorePeriodSnapshot(snap));
 }
 
