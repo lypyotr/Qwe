@@ -2911,11 +2911,35 @@ async function counterToTelegram(btn){
   if(btn){btn.disabled=true;}
   try{
     const{data,error}=await sbClient.functions.invoke('tg-notify',{body:{text}});
-    if(error)throw error;
+    if(error){toast(await tgErrorMessage(error));console.error('tg-notify',error);return;}
     if(data&&data.ok){toast('✓ Отправлено в Телеграм');haptic('light');}
     else{toast('Телеграм: '+((data&&data.error)||'не удалось'));}
   }catch(e){toast('Не удалось отправить: '+((e&&e.message)||e));console.error('telegram',e);}
   finally{if(btn)btn.disabled=false;}
+}
+
+// Turn a functions.invoke error into a clear, actionable message — most usefully
+// the "function isn't deployed / not configured yet" cases.
+async function tgErrorMessage(error){
+  if(error&&error.name==='FunctionsFetchError')
+    return 'Сервис отправки недоступен — возможно, функция tg-notify ещё не задеплоена';
+  let status=0,body=null;
+  try{
+    if(error&&error.context&&typeof error.context.status==='number'){
+      status=error.context.status;
+      body=await error.context.json().catch(()=>null);
+    }
+  }catch(_){}
+  const desc=body&&body.error;
+  if(status===404)return 'Функция tg-notify не найдена — разверни Edge Function (см. README в supabase/functions/tg-notify)';
+  if(status===401)return 'Нужно войти в аккаунт, чтобы отправлять в Телеграм';
+  if(status===403)return 'Этот аккаунт не разрешён для отправки';
+  if(status===500)return desc==='function not configured'
+    ?'Функция не настроена: задай секреты TG_BOT_TOKEN и TG_CHAT_ID'
+    :'Ошибка функции'+(desc?(': '+desc):'');
+  if(status===502)return 'Telegram отклонил запрос'+(desc?(': '+desc):'');
+  if(status===400)return 'Пустое сообщение';
+  return 'Не удалось отправить'+(desc?(': '+desc):(status?(' ('+status+')'):''));
 }
 
 // ══════════════════════════════════════════════
