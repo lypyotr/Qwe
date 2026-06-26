@@ -4653,7 +4653,7 @@ window.addEventListener('unhandledrejection',ev=>{
 });
 
 async function fetchWithRetry(input,init){
-  const tries=3,perTry=8000;
+  const tries=4,perTry=12000;   // headroom for slow / throttled connections
   let lastErr;
   for(let i=0;i<tries;i++){
     const ctrl=new AbortController();
@@ -4773,10 +4773,14 @@ async function doFirebaseLogin(){
   const email=document.getElementById('authEmail').value.trim(),pass=document.getElementById('authPassword').value,errEl=document.getElementById('authError');
   errEl.textContent='';if(!email||!pass){errEl.textContent='Введи email и пароль';return;}
   document.getElementById('authLoading').style.display='';
-  const{error}=await sbClient.auth.signInWithPassword({email,password:pass});
+  const{data,error}=await sbClient.auth.signInWithPassword({email,password:pass});
   document.getElementById('authLoading').style.display='none';
-  if(error)errEl.textContent=supabaseErrMsg(error);
-  else _loginPassword=pass; // kept briefly so E2EE can unlock on this device
+  if(error){errEl.textContent=supabaseErrMsg(error);return;}
+  _loginPassword=pass; // kept briefly so E2EE can unlock on this device
+  // Enter directly from the awaited result instead of waiting on the async
+  // onAuthStateChange event — that event sometimes doesn't fire (race), which
+  // left the user stuck on the login screen until a 2nd/3rd attempt.
+  if(data&&data.user)enterApp(data.user);
 }
 async function doFirebaseRegister(){
   const email=document.getElementById('regEmail').value.trim(),pass=document.getElementById('regPassword').value,pass2=document.getElementById('regPassword2').value,errEl=document.getElementById('regError');
