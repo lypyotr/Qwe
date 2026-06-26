@@ -3,9 +3,10 @@
 // ONLY in this function's secrets — never in the public web client.
 //
 // Secrets (set via `supabase secrets set ...`):
-//   TG_BOT_TOKEN   — bot token from @BotFather (rotate the old leaked one!)
-//   TG_CHAT_ID     — destination chat id (e.g. 288165396)
-//   TG_ALLOWED_UID — (optional) restrict sending to a single Supabase user id
+//   TG_BOT_TOKEN     — bot token from @BotFather (rotate the old leaked one!)
+//   TG_CHAT_ID       — destination chat id (e.g. 288165396)
+//   TG_ALLOWED_EMAIL — (optional) restrict sending to this login email
+//   TG_ALLOWED_UID   — (optional) restrict sending to this Supabase user id
 //
 // Auth: the function verifies the caller is a logged-in Supabase user, so the
 // public anon key alone is not enough to trigger a send.
@@ -43,8 +44,18 @@ Deno.serve(async (req) => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return json({ error: "unauthorized" }, 401);
 
-  const allowed = Deno.env.get("TG_ALLOWED_UID");
-  if (allowed && user.id !== allowed) return json({ error: "forbidden" }, 403);
+  // Restrict to a single owner. Set TG_ALLOWED_EMAIL (easiest — your login email)
+  // and/or TG_ALLOWED_UID. If either is set, the caller must match it.
+  const allowedUid = Deno.env.get("TG_ALLOWED_UID");
+  if (allowedUid && user.id !== allowedUid) return json({ error: "forbidden" }, 403);
+
+  const allowedEmail = Deno.env.get("TG_ALLOWED_EMAIL");
+  if (
+    allowedEmail &&
+    (user.email ?? "").toLowerCase() !== allowedEmail.toLowerCase()
+  ) {
+    return json({ error: "forbidden" }, 403);
+  }
 
   let payload: { text?: string } = {};
   try {

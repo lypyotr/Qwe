@@ -15,10 +15,14 @@ with the signed-in user's session.
    ```bash
    supabase secrets set \
      TG_BOT_TOKEN=123456:NEW_TOKEN_FROM_BOTFATHER \
-     TG_CHAT_ID=288165396
-   # optional: lock sending to a single account
+     TG_CHAT_ID=288165396 \
+     TG_ALLOWED_EMAIL=lypyotr@yandex.ru
+   # alternatively lock by user id instead of email:
    # supabase secrets set TG_ALLOWED_UID=<your-supabase-user-uuid>
    ```
+
+   With `TG_ALLOWED_EMAIL` (or `TG_ALLOWED_UID`) set, only that account can send;
+   every other authenticated user gets `403 forbidden`.
 
    `SUPABASE_URL` and `SUPABASE_ANON_KEY` are injected automatically — do not set them.
 
