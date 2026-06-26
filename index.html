@@ -1032,16 +1032,18 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
   padding:4px 12px;border-radius:20px;cursor:pointer;
 }
 
-/* ── Sync status pill (header) ── */
+/* ── Sync status pill (compact, on every page) ── */
 .sync-pill{
-  display:inline-flex;align-items:center;gap:5px;
-  height:30px;padding:0 11px;border-radius:16px;cursor:pointer;
-  font-size:11px;font-weight:800;letter-spacing:.2px;white-space:nowrap;
+  display:inline-flex;align-items:center;gap:4px;flex:none;
+  height:22px;padding:0 8px;border-radius:12px;cursor:pointer;
+  font-size:10px;font-weight:800;letter-spacing:.2px;white-space:nowrap;
   background:var(--surface2);border:1px solid var(--border);color:var(--muted);
-  -webkit-user-select:none;user-select:none;transition:opacity .15s;
+  -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;transition:opacity .15s;
 }
 .sync-pill:active{transform:scale(.95)}
-.sync-pill .sp-dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:none}
+.sync-pill .sp-dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
+/* Thin right-aligned bar carrying the pill on pages without a .header */
+.synbar{display:flex;justify-content:flex-end;padding:calc(env(safe-area-inset-top) + 10px) 18px 0}
 .sync-pill.ok{color:var(--accent)}
 .sync-pill.busy{color:var(--accent2)}
 .sync-pill.busy .sp-dot{animation:spPulse 1s ease-in-out infinite}
@@ -1168,7 +1170,7 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
     <div class="user-info" id="userInfo" style="display:none"></div>
   </div>
   <div class="header-actions">
-    <div class="sync-pill" id="syncPill" onclick="manualSync()" title="Состояние синхронизации — нажми, чтобы обновить"><span class="sp-dot"></span><span id="syncPillTxt">—</span></div>
+    <div class="sync-pill" onclick="manualSync()" title="Состояние синхронизации — нажми, чтобы обновить"><span class="sp-dot"></span><span class="sp-txt">—</span></div>
     <div class="icon-btn" onclick="toggleTheme()" title="Тема" id="themeBtn">🌙</div>
   </div>
 </div>
@@ -1254,6 +1256,7 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
 
 <!-- ══ PAGE: PERIOD ══ -->
 <div class="page" id="page-period">
+<div class="synbar"><div class="sync-pill" onclick="manualSync()" title="Синхронизация — нажми, чтобы обновить"><span class="sp-dot"></span><span class="sp-txt">—</span></div></div>
 
 <!-- PERIOD CARD -->
 <div class="period-card">
@@ -1342,6 +1345,7 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
 
 <!-- ══ PAGE: ARCHIVE ══ -->
 <div class="page" id="page-archive">
+<div class="synbar"><div class="sync-pill" onclick="manualSync()" title="Синхронизация — нажми, чтобы обновить"><span class="sp-dot"></span><span class="sp-txt">—</span></div></div>
 
 <!-- ACHIEVEMENTS / STATS OVERVIEW -->
 <div class="stats-section" id="statsSection">
@@ -1391,6 +1395,7 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
 <div class="page" id="page-calc">
   <div class="header">
     <div class="header-left"><div class="header-label">🧮 Калькуляторы</div></div>
+    <div class="sync-pill" onclick="manualSync()" title="Синхронизация — нажми, чтобы обновить"><span class="sp-dot"></span><span class="sp-txt">—</span></div>
   </div>
   <div class="calc-wrap">
 
@@ -1417,6 +1422,7 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
 <div class="page" id="page-profile">
   <div class="header">
     <div class="header-left"><div class="header-label">👤 Профиль</div></div>
+    <div class="sync-pill" onclick="manualSync()" title="Синхронизация — нажми, чтобы обновить"><span class="sp-dot"></span><span class="sp-txt">—</span></div>
   </div>
   <div class="calc-wrap">
 
@@ -1481,6 +1487,7 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
 <div class="page" id="page-admin">
   <div class="header">
     <div class="header-left"><div class="header-label">🛡️ Админ-панель</div></div>
+    <div class="sync-pill" onclick="manualSync()" title="Синхронизация — нажми, чтобы обновить"><span class="sp-dot"></span><span class="sp-txt">—</span></div>
   </div>
   <div class="admin-wrap">
 
@@ -1557,6 +1564,7 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
 <div class="page" id="page-stats">
   <div class="header">
     <div class="header-left"><div class="header-label">📊 Статистика</div></div>
+    <div class="sync-pill" onclick="manualSync()" title="Синхронизация — нажми, чтобы обновить"><span class="sp-dot"></span><span class="sp-txt">—</span></div>
   </div>
   <div class="calc-wrap" id="statsBody">
     <!-- filled by renderStats() -->
@@ -5263,26 +5271,29 @@ function restorePeriodSnapshot(s){
 // ══════════════════════════════════════════════
 //  SYNC STATUS PILL
 // ══════════════════════════════════════════════
-function _agoStr(ms){
-  if(!ms)return '';
+// Compact "time since" for the pill: ✓ / 3м / 2ч / 1д.
+function _agoMini(ms){
+  if(!ms)return '✓';
   const s=Math.max(0,Math.round((Date.now()-ms)/1000));
-  if(s<5)return 'только что';
-  if(s<60)return s+' сек назад';
-  const m=Math.round(s/60);if(m<60)return m+' мин назад';
-  const h=Math.round(m/60);if(h<24)return h+' ч назад';
-  return Math.round(h/24)+' дн назад';
+  if(s<60)return '✓';
+  const m=Math.round(s/60);if(m<60)return m+'м';
+  const h=Math.round(m/60);if(h<24)return h+'ч';
+  return Math.round(h/24)+'д';
 }
+// Update every sync pill on the page (one per page header / synbar).
 function renderSyncStatus(){
-  const pill=document.getElementById('syncPill'),txt=document.getElementById('syncPillTxt');
-  if(!pill||!txt)return;
-  pill.classList.remove('ok','busy','warn','off');
-  if(!currentUser){pill.classList.add('warn');txt.textContent='Не вошёл';return;}
-  if(e2eeOn&&e2eeLocked){pill.classList.add('off');txt.textContent='🔒 Заблокировано';return;}
-  if(navigator.onLine===false){pill.classList.add('off');const n=pendingGet().length;txt.textContent=n?('Офлайн · '+n):'Офлайн';return;}
-  const pend=pendingGet().length;
-  if(_flushing||_refreshing){pill.classList.add('busy');txt.textContent='Синхронизация…';return;}
-  if(pend>0){pill.classList.add('warn');txt.textContent='В очереди: '+pend;return;}
-  pill.classList.add('ok');txt.textContent=_lastRefresh?('Синхр. '+_agoStr(_lastRefresh)):'Синхронизировано';
+  const pills=document.querySelectorAll('.sync-pill');
+  if(!pills.length)return;
+  let cls='',txt='';
+  if(!currentUser){cls='warn';txt='вход';}
+  else if(e2eeOn&&e2eeLocked){cls='off';txt='🔒';}
+  else if(navigator.onLine===false){const n=pendingGet().length;cls='off';txt=n?('⚡'+n):'⚡';}
+  else if(_flushing||_refreshing){cls='busy';txt='⟳';}
+  else{const pend=pendingGet().length;if(pend>0){cls='warn';txt='↑'+pend;}else{cls='ok';txt=_agoMini(_lastRefresh);}}
+  pills.forEach(p=>{
+    p.classList.remove('ok','busy','warn','off');if(cls)p.classList.add(cls);
+    const t=p.querySelector('.sp-txt');if(t)t.textContent=txt;
+  });
 }
 // Tap the pill to force an immediate sync.
 function manualSync(){
