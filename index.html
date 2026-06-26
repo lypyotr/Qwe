@@ -2899,27 +2899,22 @@ function counterToReport(){
   toast('Перенесено в отчёт: '+fmt(qty)+' шт за '+td+' число',()=>restorePeriodSnapshot(snap));
 }
 
-// Send the shift summary to Telegram via the Bot API.
-// SECURITY: this token ships inside the public client bundle and is therefore
-// readable by anyone who opens the page source. Treat it as compromised once
-// deployed publicly — rotate it in @BotFather and/or move sending behind a
-// server-side proxy if abuse is a concern.
-const TG_BOT_TOKEN='5672372169:AAG4yVvNB6OZh8DJEK3IKVYnatN0x17ax7U';
-const TG_CHAT_ID='288165396';
+// Send the shift summary to Telegram. The bot token and chat id live as secrets
+// inside a Supabase Edge Function ("tg-notify"), never in this client. We invoke
+// it with the user's session, so only an authenticated account can trigger a
+// send and the token is never exposed in the page source.
 async function counterToTelegram(btn){
   if((counter.count||0)<=0){toast('Счётчик пуст — нечего отправлять');return;}
+  if(!sbClient||!currentUser){toast('Войдите в аккаунт для отправки');return;}
   if(navigator.onLine===false){toast('Нет сети — попробуйте позже');return;}
   const text=counterSummary();
   if(btn){btn.disabled=true;}
   try{
-    const r=await fetch('https://api.telegram.org/bot'+TG_BOT_TOKEN+'/sendMessage',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({chat_id:TG_CHAT_ID,text})
-    });
-    const j=await r.json().catch(()=>({}));
-    if(r.ok&&j.ok){toast('✓ Отправлено в Телеграм');haptic('light');}
-    else{toast('Телеграм: '+(j.description||('ошибка '+r.status)));}
-  }catch(e){toast('Не удалось отправить (сеть/CORS)');console.error('telegram',e);}
+    const{data,error}=await sbClient.functions.invoke('tg-notify',{body:{text}});
+    if(error)throw error;
+    if(data&&data.ok){toast('✓ Отправлено в Телеграм');haptic('light');}
+    else{toast('Телеграм: '+((data&&data.error)||'не удалось'));}
+  }catch(e){toast('Не удалось отправить: '+((e&&e.message)||e));console.error('telegram',e);}
   finally{if(btn)btn.disabled=false;}
 }
 
