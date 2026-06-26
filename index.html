@@ -4814,6 +4814,16 @@ async function loadAllUserData(){
     settledData(sbClient.from('user_settings').select('*').eq('user_id',currentUser.id).maybeSingle()),
     settledData(sbClient.from('periods').select('*').eq('user_id',currentUser.id))
   ]);
+  // Cross-device detection: if the account's rows are encrypted but this device
+  // didn't know yet, turn E2EE on and unlock (or lock) before reading anything.
+  if(!e2eeOn){
+    const enc=(s&&isCipher(s.cipher))||(Array.isArray(periods)&&periods.some(p=>isCipher(p.cipher)));
+    if(enc){e2eeOn=true;localStorage.setItem(E2EE_FLAG_KEY,'1');}
+  }
+  if(e2eeOn&&!e2eeDEK){
+    if(_loginPassword){await e2eeUnlock(_loginPassword,'pw');_loginPassword='';}
+    if(!e2eeDEK){e2eeLocked=true;renderSyncStatus();return;} // locked: don't misread ciphertext
+  }
   // Decrypt E2EE rows in place so the merge below sees plain fields.
   if(e2eeOn&&e2eeDEK){
     if(s&&isCipher(s.cipher)){try{const c=await decField(s.cipher);s.templates=c.templates;s.goals=c.goals;s.theme=c.theme;}catch(e){console.error('decrypt settings',e);}}
@@ -5153,11 +5163,10 @@ function copyRecovery(){const el=document.getElementById('recoveryCode');if(el&&
 // the device) and unlock the DEK from the local cache or the login password.
 async function e2eeInit(){
   if(!currentUser||!sbClient)return;
+  // Only act if E2EE is enabled on THIS device. Enabling it on another device is
+  // detected later from the encrypted rows themselves (see loadAllUserData), so we
+  // never query user_keys — and never log a 404 — for accounts not using E2EE.
   e2eeOn=localStorage.getItem(E2EE_FLAG_KEY)==='1';
-  if(!e2eeOn){
-    const blob=await fetchKeyBlob();        // enabled on another device?
-    if(blob){e2eeOn=true;localStorage.setItem(E2EE_FLAG_KEY,'1');}
-  }
   if(!e2eeOn)return;
   if(await loadDEKLocal()){e2eeLocked=false;_loginPassword='';return;}
   if(_loginPassword&&await e2eeUnlock(_loginPassword,'pw')){_loginPassword='';return;}
