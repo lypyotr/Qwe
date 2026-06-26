@@ -284,8 +284,12 @@ body.light .cur-toggle.usd{background:rgba(74,222,128,.2);color:var(--text)}
 .cnt-sub2{font-size:11px;color:var(--muted);margin-top:2px}
 .cnt-edit{font-size:15px;color:var(--muted);cursor:pointer;padding:2px 6px;flex:none}
 .cnt-count-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
-.cnt-btn{width:54px;height:54px;border-radius:16px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:28px;font-weight:800;cursor:pointer;line-height:1;flex:none;transition:transform .1s}
+.cnt-btn{width:54px;height:54px;border-radius:16px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:28px;font-weight:800;cursor:pointer;line-height:1;flex:none;transition:transform .1s;touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
 .cnt-btn:active{transform:scale(.9)}
+/* Rapid taps on +/- must not be read as double-tap-to-zoom (whole row, incl. the
+   count and the gaps where a mis-tap could land). Normal pinch-zoom is unaffected. */
+.cnt-count-row{touch-action:manipulation}
+.cnt-count{touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
 .cnt-btn.plus{background:var(--accent);color:#0d1a0f;border-color:transparent}
 .cnt-count{flex:1;text-align:center;min-width:0;cursor:pointer}
 .cnt-count-input{width:130px;max-width:100%;text-align:center;font-size:44px;font-weight:800;color:var(--accent);background:transparent;border:none;border-bottom:2px solid var(--accent);outline:none;font-family:'Manrope',sans-serif;letter-spacing:-1px;-webkit-appearance:none;padding:0}
@@ -309,6 +313,11 @@ body.light .cur-toggle.usd{background:rgba(74,222,128,.2);color:var(--text)}
 .cnt-eye{opacity:.45;margin-right:5px;font-size:11px}
 .cnt-reset{width:100%;padding:10px;border:1px solid var(--border);border-radius:10px;background:transparent;color:var(--muted);font-family:'Manrope',sans-serif;font-size:12px;font-weight:700;cursor:pointer}
 .cnt-reset:active{opacity:.6}
+.cnt-actions{display:flex;gap:8px;margin-bottom:10px}
+.cnt-act{flex:1;padding:12px 8px;border:1px solid var(--border);border-radius:12px;background:var(--surface2);color:var(--text);font-family:'Manrope',sans-serif;font-size:12.5px;font-weight:800;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:transform .1s}
+.cnt-act:active{transform:scale(.96)}
+.cnt-act.tg{background:#229ED9;color:#fff;border-color:transparent}
+.cnt-act:disabled{opacity:.55}
 
 /* ── SECTION ── */
 .section{margin:0 16px 14px}
@@ -2844,7 +2853,93 @@ function renderCounterActive(card){
       <div class="cnt-stat"><div class="cnt-stat-v" id="cntLeftEl">${st.leftStr}</div><div class="cnt-stat-l">до конца</div></div>
     </div>
     ${rate>0?`<div class="cnt-earn" onclick="toggleCounterEarn()" title="Скрыть/показать заработок"><span class="cnt-eye">${counter.earnHidden?'🙈':'👁'}</span>≈ ${counter.earnHidden?'•••':M(counter.count*rate)} заработано</div>`:''}
+    <div class="cnt-actions">
+      <button class="cnt-act" onclick="counterToReport()">📥 В отчёт</button>
+      <button class="cnt-act tg" onclick="counterToTelegram(this)">✈️ В Телеграм</button>
+    </div>
     <button class="cnt-reset" onclick="counterReset()">Сбросить счёт</button>`;
+}
+
+// Build a human-readable shift summary used by both the report transfer and the
+// Telegram message.
+function counterSummary(){
+  const tpl=templates.find(t=>String(t.id)===String(counter.tplId));
+  const rate=tpl?parseFloat(tpl.price)||0:0;
+  const st=counterStatus();
+  const lines=[
+    '📦 Счётчик изделий',
+    'Изделие: '+(tpl?tpl.name:'—'),
+    'Сделано: '+fmt(counter.count)+' / '+fmt(counter.target)+' шт',
+  ];
+  if(rate>0)lines.push('Заработано: ≈ '+M(counter.count*rate));
+  lines.push('Темп: '+st.curStr+' шт/час'+(counter.endTime?(' · до '+counter.endTime):''));
+  lines.push('Дата: '+new Date().toLocaleString('ru-RU'));
+  return lines.join('\n');
+}
+
+// Transfer the counter result into the work report: add a day entry (изделие ×
+// count at the template's rate) to TODAY in the current period, then show it.
+function counterToReport(){
+  const qty=counter.count||0;
+  if(qty<=0){toast('Счётчик пуст — нечего переносить');return;}
+  const tpl=templates.find(t=>String(t.id)===String(counter.tplId));
+  const now=new Date();
+  const td=now.getDate(),tp=td<=15?1:2;
+  // Jump to today's period and load it into memory.
+  document.getElementById('monthSel').value=`${now.getFullYear()}-${now.getMonth()}`;
+  document.getElementById('periodSel').value=String(tp);
+  load();
+  const snap=periodSnapshot();
+  selectedDay=td;
+  if(!Array.isArray(days[td]))days[td]=[];
+  days[td].push({id:Date.now()+Math.random(),name:tpl?tpl.name:'Изделия',qty:String(qty),price:tpl?String(tpl.price):''});
+  save();haptic('medium');
+  renderPeriodCard();renderDayStrip();renderDayPanel();renderTotal();renderChart();renderGoals();renderHistory();renderArchive();
+  switchPage('period');
+  toast('Перенесено в отчёт: '+fmt(qty)+' шт за '+td+' число',()=>restorePeriodSnapshot(snap));
+}
+
+// Send the shift summary to Telegram. The bot token and chat id live as secrets
+// inside a Supabase Edge Function ("tg-notify"), never in this client. We invoke
+// it with the user's session, so only an authenticated account can trigger a
+// send and the token is never exposed in the page source.
+async function counterToTelegram(btn){
+  if((counter.count||0)<=0){toast('Счётчик пуст — нечего отправлять');return;}
+  if(!sbClient||!currentUser){toast('Войдите в аккаунт для отправки');return;}
+  if(navigator.onLine===false){toast('Нет сети — попробуйте позже');return;}
+  const text=counterSummary();
+  if(btn){btn.disabled=true;}
+  try{
+    const{data,error}=await sbClient.functions.invoke('tg-notify',{body:{text}});
+    if(error){toast(await tgErrorMessage(error));console.error('tg-notify',error);return;}
+    if(data&&data.ok){toast('✓ Отправлено в Телеграм');haptic('light');}
+    else{toast('Телеграм: '+((data&&data.error)||'не удалось'));}
+  }catch(e){toast('Не удалось отправить: '+((e&&e.message)||e));console.error('telegram',e);}
+  finally{if(btn)btn.disabled=false;}
+}
+
+// Turn a functions.invoke error into a clear, actionable message — most usefully
+// the "function isn't deployed / not configured yet" cases.
+async function tgErrorMessage(error){
+  if(error&&error.name==='FunctionsFetchError')
+    return 'Сервис отправки недоступен — возможно, функция tg-notify ещё не задеплоена';
+  let status=0,body=null;
+  try{
+    if(error&&error.context&&typeof error.context.status==='number'){
+      status=error.context.status;
+      body=await error.context.json().catch(()=>null);
+    }
+  }catch(_){}
+  const desc=body&&body.error;
+  if(status===404)return 'Функция tg-notify не найдена — разверни Edge Function (см. README в supabase/functions/tg-notify)';
+  if(status===401)return 'Нужно войти в аккаунт, чтобы отправлять в Телеграм';
+  if(status===403)return 'Этот аккаунт не разрешён для отправки';
+  if(status===500)return desc==='function not configured'
+    ?'Функция не настроена: задай секреты TG_BOT_TOKEN и TG_CHAT_ID'
+    :'Ошибка функции'+(desc?(': '+desc):'');
+  if(status===502)return 'Telegram отклонил запрос'+(desc?(': '+desc):'');
+  if(status===400)return 'Пустое сообщение';
+  return 'Не удалось отправить'+(desc?(': '+desc):(status?(' ('+status+')'):''));
 }
 
 // ══════════════════════════════════════════════
