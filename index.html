@@ -313,6 +313,11 @@ body.light .cur-toggle.usd{background:rgba(74,222,128,.2);color:var(--text)}
 .cnt-eye{opacity:.45;margin-right:5px;font-size:11px}
 .cnt-reset{width:100%;padding:10px;border:1px solid var(--border);border-radius:10px;background:transparent;color:var(--muted);font-family:'Manrope',sans-serif;font-size:12px;font-weight:700;cursor:pointer}
 .cnt-reset:active{opacity:.6}
+.cnt-actions{display:flex;gap:8px;margin-bottom:10px}
+.cnt-act{flex:1;padding:12px 8px;border:1px solid var(--border);border-radius:12px;background:var(--surface2);color:var(--text);font-family:'Manrope',sans-serif;font-size:12.5px;font-weight:800;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:transform .1s}
+.cnt-act:active{transform:scale(.96)}
+.cnt-act.tg{background:#229ED9;color:#fff;border-color:transparent}
+.cnt-act:disabled{opacity:.55}
 
 /* ── SECTION ── */
 .section{margin:0 16px 14px}
@@ -2848,7 +2853,74 @@ function renderCounterActive(card){
       <div class="cnt-stat"><div class="cnt-stat-v" id="cntLeftEl">${st.leftStr}</div><div class="cnt-stat-l">до конца</div></div>
     </div>
     ${rate>0?`<div class="cnt-earn" onclick="toggleCounterEarn()" title="Скрыть/показать заработок"><span class="cnt-eye">${counter.earnHidden?'🙈':'👁'}</span>≈ ${counter.earnHidden?'•••':M(counter.count*rate)} заработано</div>`:''}
+    <div class="cnt-actions">
+      <button class="cnt-act" onclick="counterToReport()">📥 В отчёт</button>
+      <button class="cnt-act tg" onclick="counterToTelegram(this)">✈️ В Телеграм</button>
+    </div>
     <button class="cnt-reset" onclick="counterReset()">Сбросить счёт</button>`;
+}
+
+// Build a human-readable shift summary used by both the report transfer and the
+// Telegram message.
+function counterSummary(){
+  const tpl=templates.find(t=>String(t.id)===String(counter.tplId));
+  const rate=tpl?parseFloat(tpl.price)||0:0;
+  const st=counterStatus();
+  const lines=[
+    '📦 Счётчик изделий',
+    'Изделие: '+(tpl?tpl.name:'—'),
+    'Сделано: '+fmt(counter.count)+' / '+fmt(counter.target)+' шт',
+  ];
+  if(rate>0)lines.push('Заработано: ≈ '+M(counter.count*rate));
+  lines.push('Темп: '+st.curStr+' шт/час'+(counter.endTime?(' · до '+counter.endTime):''));
+  lines.push('Дата: '+new Date().toLocaleString('ru-RU'));
+  return lines.join('\n');
+}
+
+// Transfer the counter result into the work report: add a day entry (изделие ×
+// count at the template's rate) to TODAY in the current period, then show it.
+function counterToReport(){
+  const qty=counter.count||0;
+  if(qty<=0){toast('Счётчик пуст — нечего переносить');return;}
+  const tpl=templates.find(t=>String(t.id)===String(counter.tplId));
+  const now=new Date();
+  const td=now.getDate(),tp=td<=15?1:2;
+  // Jump to today's period and load it into memory.
+  document.getElementById('monthSel').value=`${now.getFullYear()}-${now.getMonth()}`;
+  document.getElementById('periodSel').value=String(tp);
+  load();
+  const snap=periodSnapshot();
+  selectedDay=td;
+  if(!Array.isArray(days[td]))days[td]=[];
+  days[td].push({id:Date.now()+Math.random(),name:tpl?tpl.name:'Изделия',qty:String(qty),price:tpl?String(tpl.price):''});
+  save();haptic('medium');
+  renderPeriodCard();renderDayStrip();renderDayPanel();renderTotal();renderChart();renderGoals();renderHistory();renderArchive();
+  switchPage('period');
+  toast('Перенесено в отчёт: '+fmt(qty)+' шт за '+td+' число',()=>restorePeriodSnapshot(snap));
+}
+
+// Send the shift summary to Telegram via the Bot API.
+// SECURITY: this token ships inside the public client bundle and is therefore
+// readable by anyone who opens the page source. Treat it as compromised once
+// deployed publicly — rotate it in @BotFather and/or move sending behind a
+// server-side proxy if abuse is a concern.
+const TG_BOT_TOKEN='5672372169:AAG4yVvNB6OZh8DJEK3IKVYnatN0x17ax7U';
+const TG_CHAT_ID='288165396';
+async function counterToTelegram(btn){
+  if((counter.count||0)<=0){toast('Счётчик пуст — нечего отправлять');return;}
+  if(navigator.onLine===false){toast('Нет сети — попробуйте позже');return;}
+  const text=counterSummary();
+  if(btn){btn.disabled=true;}
+  try{
+    const r=await fetch('https://api.telegram.org/bot'+TG_BOT_TOKEN+'/sendMessage',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({chat_id:TG_CHAT_ID,text})
+    });
+    const j=await r.json().catch(()=>({}));
+    if(r.ok&&j.ok){toast('✓ Отправлено в Телеграм');haptic('light');}
+    else{toast('Телеграм: '+(j.description||('ошибка '+r.status)));}
+  }catch(e){toast('Не удалось отправить (сеть/CORS)');console.error('telegram',e);}
+  finally{if(btn)btn.disabled=false;}
 }
 
 // ══════════════════════════════════════════════
