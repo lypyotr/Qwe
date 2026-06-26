@@ -1453,6 +1453,13 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
       <div class="calc-card-sub" id="backupReminder" style="margin-top:10px;display:none"></div>
     </div>
 
+    <!-- Encryption (E2EE) -->
+    <div class="calc-card">
+      <div class="calc-card-title">🔐 Шифрование данных</div>
+      <div class="calc-card-sub" id="encStatus" style="margin-bottom:12px">—</div>
+      <button class="modal-btn" id="encBtn" style="width:100%;padding:13px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="e2eeEnableFlow()">🔒 Включить шифрование</button>
+    </div>
+
     <!-- Account -->
     <div class="calc-card">
       <div class="calc-card-title">Аккаунт</div>
@@ -1703,6 +1710,17 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
 <!-- Toast / Undo host -->
 <div id="toastHost"></div>
 
+<!-- Recovery code overlay (shown once when E2EE is enabled) -->
+<div id="recoveryOverlay" class="hidden" style="display:none;position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.6);align-items:center;justify-content:center;padding:18px">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:20px;max-width:420px;width:100%;box-sizing:border-box">
+    <div style="font-size:18px;font-weight:800;margin-bottom:10px">🔑 Recovery-код</div>
+    <div style="font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:14px">Сохраните этот код в надёжном месте. Это единственный способ расшифровать данные, если вы забудете пароль. Показывается только один раз — потом восстановить нельзя.</div>
+    <div id="recoveryCode" style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:18px;font-weight:800;letter-spacing:1px;text-align:center;padding:14px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;word-break:break-all;margin-bottom:12px"></div>
+    <button class="modal-btn" style="width:100%;padding:12px;margin-bottom:8px" onclick="copyRecovery()">📋 Скопировать</button>
+    <button class="modal-btn" style="width:100%;padding:12px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="closeRecovery()">Я сохранил код</button>
+  </div>
+</div>
+
 <script>
 // ══════════════════════════════════════════════
 //  STATE
@@ -1716,7 +1734,7 @@ function switchPage(name){
   haptic('light');
   if(name==='admin'){renderAdminDiag();renderBackupInfo();initPlanCard();}
   if(name==='calc')renderSpendCalc();
-  if(name==='profile'){initProfilePage();renderBackupReminder();}
+  if(name==='profile'){initProfilePage();renderBackupReminder();renderEncryptionCard();}
   if(name==='stats')renderStats();
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
@@ -1761,6 +1779,13 @@ const SETTINGS_REV_KEY = 'salary_settings_rev'; // last cloud updated_at we sync
 let _refreshing = false, _lastRefresh = 0, _resyncTimer = null;
 let _syncWired = false, _pollTimer = null;
 let _flushTimer = null, _flushing = false, _flushBackoff = 1000;
+// ── End-to-end encryption (opt-in, off by default) ──
+// When on, period/settings CONTENTS are encrypted in-browser before upload and
+// only ciphertext reaches the DB. e2eeDEK is the in-memory data key; when E2EE
+// is on but the key isn't loaded (new device / cleared cache) the app is LOCKED
+// and must not sync until unlocked with the password or recovery code.
+const E2EE_FLAG_KEY='salary_e2ee';        // '1' once enabled for this account
+let e2eeOn=false, e2eeDEK=null, e2eeLocked=false, _loginPassword='';
 
 // ══════════════════════════════════════════════
 //  HOLIDAYS
@@ -4712,6 +4737,7 @@ function enterApp(user){
   _cloudLoaded=true;
   (async()=>{
     try{
+      await e2eeInit();          // detect/unlock encryption BEFORE any sync
       await flushPending();      // push edits queued offline before this load
       await loadAllUserData();   // pull + timestamp merge
       await flushPending();      // push legacy / local-only periods found in merge
@@ -4750,6 +4776,7 @@ async function doFirebaseLogin(){
   const{error}=await sbClient.auth.signInWithPassword({email,password:pass});
   document.getElementById('authLoading').style.display='none';
   if(error)errEl.textContent=supabaseErrMsg(error);
+  else _loginPassword=pass; // kept briefly so E2EE can unlock on this device
 }
 async function doFirebaseRegister(){
   const email=document.getElementById('regEmail').value.trim(),pass=document.getElementById('regPassword').value,pass2=document.getElementById('regPassword2').value,errEl=document.getElementById('regError');
@@ -4777,14 +4804,21 @@ async function doFirebaseLogout(){if(confirm('Выйти из аккаунта?'
 // never wipes non-empty local" guard so the migration to timestamps is lossless.
 async function loadAllUserData(){
   if(!currentUser||!sbClient)return;
+  // Locked E2EE: can't decrypt, so don't pull (would misread ciphertext).
+  if(e2eeOn&&(!e2eeDEK||e2eeLocked))return;
   // Run settings + periods in parallel so one slow query can't time out the
   // whole chain. Each query is tolerated independently. Timeouts and retries
   // are handled by fetchWithRetry at the transport level.
   const settledData=async(query)=>{try{const{data}=await query;return data;}catch(e){console.error('loadAllUserData query',e);return undefined;}};
   const[s,periods]=await Promise.all([
     settledData(sbClient.from('user_settings').select('*').eq('user_id',currentUser.id).maybeSingle()),
-    settledData(sbClient.from('periods').select('period_key,days,bonuses,tax_enabled,day_overrides,expenses,updated_at').eq('user_id',currentUser.id))
+    settledData(sbClient.from('periods').select('*').eq('user_id',currentUser.id))
   ]);
+  // Decrypt E2EE rows in place so the merge below sees plain fields.
+  if(e2eeOn&&e2eeDEK){
+    if(s&&isCipher(s.cipher)){try{const c=await decField(s.cipher);s.templates=c.templates;s.goals=c.goals;s.theme=c.theme;}catch(e){console.error('decrypt settings',e);}}
+    if(periods){for(const p of periods){if(isCipher(p.cipher)){try{const c=await decField(p.cipher);p.days=c.days;p.bonuses=c.bonuses;p.tax_enabled=c.taxEnabled;p.day_overrides=c.dayOverrides;p.expenses=c.expenses;}catch(e){console.error('decrypt period',p.period_key,e);}}}}
+  }
   const pend=pendingGet();
   const nz=v=>!!v&&(Array.isArray(v)?v.length>0:(typeof v==='object'&&Object.keys(v).length>0));
   const ms=iso=>{const t=iso?Date.parse(iso):0;return isNaN(t)?0:t;};
@@ -4924,6 +4958,8 @@ function scheduleFlush(){clearTimeout(_flushTimer);_flushTimer=setTimeout(flushP
 // with exponential backoff — an edit is never silently dropped.
 async function flushPending(){
   if(!currentUser||!sbClient||_flushing)return;
+  // Locked E2EE: never upload (we can't encrypt, and must not overwrite ciphertext).
+  if(e2eeOn&&(!e2eeDEK||e2eeLocked))return;
   const keys=pendingGet();if(!keys.length)return;
   _flushing=true;let allOk=true,uploaded=false;
   renderSyncStatus();
@@ -4935,7 +4971,17 @@ async function flushPending(){
           // Carry the production counter inside goals so it syncs with no schema
           // change (mirrors the existing goals.calc pattern).
           const goalsOut=Object.assign({},goals,{_counter:counter});
-          const{error}=await sbClient.from('user_settings').upsert({user_id:currentUser.id,templates,goals:goalsOut,theme:lightTheme?'light':'dark',updated_at:new Date(ts).toISOString()},{onConflict:'user_id'});
+          let row={user_id:currentUser.id,updated_at:new Date(ts).toISOString()};
+          if(e2eeOn&&e2eeDEK){
+            // Encrypt contents; send empty placeholders for the plaintext columns.
+            row.cipher=await encField({templates,goals:goalsOut,theme:lightTheme?'light':'dark'});
+            row.templates=[];row.goals={};row.theme='';
+          }else{
+            // Plaintext path: never reference the `cipher` column, so sync keeps
+            // working even if e2ee_setup.sql hasn't been run.
+            row.templates=templates;row.goals=goalsOut;row.theme=lightTheme?'light':'dark';
+          }
+          const{error}=await sbClient.from('user_settings').upsert(row,{onConflict:'user_id'});
           if(error)throw error;
           // Remember the revision we just wrote so a later pull doesn't re-adopt
           // our own write (and so equality reconciliation has a baseline).
@@ -4944,7 +4990,15 @@ async function flushPending(){
           const p=periodPayload(k);
           if(!p){pendingDel(k);continue;}
           const ts=p._ts||Date.now();
-          const{error}=await sbClient.from('periods').upsert({user_id:currentUser.id,period_key:k,days:p.days||{},bonuses:p.bonuses||[],tax_enabled:!!p.taxEnabled,day_overrides:p.dayOverrides||{},expenses:p.expenses||[],updated_at:new Date(ts).toISOString()},{onConflict:'user_id,period_key'});
+          let row={user_id:currentUser.id,period_key:k,updated_at:new Date(ts).toISOString()};
+          if(e2eeOn&&e2eeDEK){
+            row.cipher=await encField({days:p.days||{},bonuses:p.bonuses||[],taxEnabled:!!p.taxEnabled,dayOverrides:p.dayOverrides||{},expenses:p.expenses||[]});
+            row.days={};row.bonuses=[];row.tax_enabled=false;row.day_overrides={};row.expenses=[];
+          }else{
+            // Plaintext path: never reference the `cipher` column (see above).
+            row.days=p.days||{};row.bonuses=p.bonuses||[];row.tax_enabled=!!p.taxEnabled;row.day_overrides=p.dayOverrides||{};row.expenses=p.expenses||[];
+          }
+          const{error}=await sbClient.from('periods').upsert(row,{onConflict:'user_id,period_key'});
           if(error)throw error;
           p._rev=ts;try{localStorage.setItem('salary_'+k,JSON.stringify(p));}catch(_){}
         }
@@ -4997,6 +5051,160 @@ function setupSyncListeners(){
   setInterval(()=>{if(document.visibilityState==='visible')renderSyncStatus();},15000);
 }
 // ══════════════════════════════════════════════
+//  END-TO-END ENCRYPTION
+// ══════════════════════════════════════════════
+// Verified crypto core (see scratchpad e2ee_core.js tests): random DEK encrypts
+// all content; the DEK is wrapped by a password-derived key AND a recovery-code-
+// derived key (envelope), so a password change re-wraps without re-encrypting
+// and a forgotten password is recoverable via the code.
+const _sub=()=>window.crypto.subtle;
+const _enc=new TextEncoder(), _dec=new TextDecoder();
+const _b64=b=>btoa(String.fromCharCode(...new Uint8Array(b)));
+const _ub64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+function _rand(n){return window.crypto.getRandomValues(new Uint8Array(n));}
+async function _deriveKEK(secret,saltU8){
+  const base=await _sub().importKey('raw',_enc.encode(secret),'PBKDF2',false,['deriveKey']);
+  return _sub().deriveKey({name:'PBKDF2',salt:saltU8,iterations:200000,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['wrapKey','unwrapKey']);
+}
+async function _newDEK(){return _sub().generateKey({name:'AES-GCM',length:256},true,['encrypt','decrypt']);}
+async function _wrapDEK(dek,kek){const iv=_rand(12);const w=await _sub().wrapKey('raw',dek,kek,{name:'AES-GCM',iv});return{iv:_b64(iv),ct:_b64(w)};}
+async function _unwrapDEK(blob,kek){return _sub().unwrapKey('raw',_ub64(blob.ct),kek,{name:'AES-GCM',iv:_ub64(blob.iv)},{name:'AES-GCM',length:256},true,['encrypt','decrypt']);}
+async function encField(obj){
+  const iv=_rand(12);
+  const ct=await _sub().encrypt({name:'AES-GCM',iv},e2eeDEK,_enc.encode(JSON.stringify(obj)));
+  return 'e1.'+_b64(iv)+'.'+_b64(ct);
+}
+async function decField(packed){
+  const[,iv,ct]=packed.split('.');
+  const pt=await _sub().decrypt({name:'AES-GCM',iv:_ub64(iv)},e2eeDEK,_ub64(ct));
+  return JSON.parse(_dec.decode(pt));
+}
+function isCipher(v){return typeof v==='string'&&v.indexOf('e1.')===0;}
+function genRecovery(){const a='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',r=_rand(20);let s='';for(let i=0;i<r.length;i++){s+=a[r[i]%a.length];if(i%4===3&&i<r.length-1)s+='-';}return s;}
+
+// Per-device cache of the raw DEK so reloads don't need the password again.
+function _dekCacheKey(){return 'salary_dek_'+(currentUser?currentUser.id:'x');}
+async function cacheDEKLocal(){
+  try{const raw=await _sub().exportKey('raw',e2eeDEK);localStorage.setItem(_dekCacheKey(),_b64(raw));}catch(e){}
+}
+async function loadDEKLocal(){
+  try{const s=localStorage.getItem(_dekCacheKey());if(!s)return false;
+    e2eeDEK=await _sub().importKey('raw',_ub64(s),{name:'AES-GCM',length:256},true,['encrypt','decrypt']);
+    return true;}catch(e){return false;}
+}
+function clearDEKLocal(){try{localStorage.removeItem(_dekCacheKey());}catch(e){}}
+
+async function fetchKeyBlob(){
+  if(!currentUser||!sbClient)return null;
+  try{const{data}=await sbClient.from('user_keys').select('blob').eq('user_id',currentUser.id).maybeSingle();return data?data.blob:null;}catch(e){console.error('fetchKeyBlob',e);return null;}
+}
+// Unlock the DEK with the given secret using the matching wrapped copy.
+async function e2eeUnlock(secret,which){
+  const blob=await fetchKeyBlob();if(!blob)return false;
+  try{
+    const salt=_ub64(which==='rec'?blob.rsalt:blob.salt);
+    const kek=await _deriveKEK(secret,salt);
+    e2eeDEK=await _unwrapDEK(which==='rec'?blob.wrapRec:blob.wrapPw,kek);
+    e2eeLocked=false;await cacheDEKLocal();renderSyncStatus();return true;
+  }catch(e){return false;}
+}
+// On login we have the password in hand — try to unlock silently.
+async function e2eeTryUnlockWithPassword(password){
+  if(!e2eeOn)return;
+  if(await loadDEKLocal()){e2eeLocked=false;return;}
+  if(!(await e2eeUnlock(password,'pw'))){e2eeLocked=true;}
+}
+
+// Turn E2EE on: requires a fresh backup, generates keys, re-uploads everything
+// as ciphertext, and shows the recovery code.
+async function e2eeEnable(password){
+  if(!currentUser||!sbClient){toast('Войдите в аккаунт');return;}
+  if(e2eeOn){toast('Шифрование уже включено');return;}
+  const recovery=genRecovery();
+  const salt=_rand(16), rsalt=_rand(16);
+  const dek=await _newDEK();
+  const kekPw=await _deriveKEK(password,salt);
+  const kekRec=await _deriveKEK(recovery,rsalt);
+  const blob={v:1,salt:_b64(salt),rsalt:_b64(rsalt),wrapPw:await _wrapDEK(dek,kekPw),wrapRec:await _wrapDEK(dek,kekRec)};
+  // Self-check: make sure we can decrypt what we encrypt before touching data.
+  e2eeDEK=dek;
+  const probe=await encField({t:'probe'});
+  if((await decField(probe)).t!=='probe'){toast('Ошибка шифрования — отменено');e2eeDEK=null;return;}
+  const{error}=await sbClient.from('user_keys').upsert({user_id:currentUser.id,blob,updated_at:new Date().toISOString()},{onConflict:'user_id'});
+  if(error){toast('Не удалось сохранить ключ: '+error.message);e2eeDEK=null;return;}
+  e2eeOn=true;e2eeLocked=false;localStorage.setItem(E2EE_FLAG_KEY,'1');await cacheDEKLocal();
+  // Re-upload every period + settings as ciphertext.
+  for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&/^salary_\d+_\d+_\d+$/.test(k))pendingAdd(k.replace('salary_',''));}
+  pendingAdd('settings');
+  await flushPending();
+  renderSyncStatus();renderEncryptionCard();
+  showRecoveryCode(recovery);
+}
+
+function showRecoveryCode(code){
+  const ov=document.getElementById('recoveryOverlay'),el=document.getElementById('recoveryCode');
+  if(el)el.textContent=code;
+  if(ov){ov.classList.remove('hidden');ov.style.display='flex';}
+}
+function closeRecovery(){const ov=document.getElementById('recoveryOverlay');if(ov){ov.classList.add('hidden');ov.style.display='none';}}
+function copyRecovery(){const el=document.getElementById('recoveryCode');if(el&&navigator.clipboard){navigator.clipboard.writeText(el.textContent).then(()=>toast('Скопировано'),()=>{});}}
+
+// Detect whether this account uses E2EE (the key blob follows the account, not
+// the device) and unlock the DEK from the local cache or the login password.
+async function e2eeInit(){
+  if(!currentUser||!sbClient)return;
+  e2eeOn=localStorage.getItem(E2EE_FLAG_KEY)==='1';
+  if(!e2eeOn){
+    const blob=await fetchKeyBlob();        // enabled on another device?
+    if(blob){e2eeOn=true;localStorage.setItem(E2EE_FLAG_KEY,'1');}
+  }
+  if(!e2eeOn)return;
+  if(await loadDEKLocal()){e2eeLocked=false;_loginPassword='';return;}
+  if(_loginPassword&&await e2eeUnlock(_loginPassword,'pw')){_loginPassword='';return;}
+  e2eeLocked=true;                          // needs manual unlock
+  renderSyncStatus();
+}
+
+// Enable flow: confirm a backup, verify the password, then encrypt everything.
+async function e2eeEnableFlow(){
+  if(!currentUser){toast('Войдите в аккаунт');return;}
+  if(calcTotalWorkedDaysAllTime()>0&&!confirm('ВАЖНО: перед включением шифрования скачайте резервную копию (Профиль → Данные → Экспорт). Если потеряете и пароль, и recovery-код — данные восстановить будет НЕВОЗМОЖНО. Продолжить?'))return;
+  const pass=prompt('Подтвердите пароль от аккаунта (к нему привяжется ключ шифрования):');
+  if(!pass)return;
+  // Verify the password really matches the account, so the key isn't wrapped
+  // with a typo that no real login could ever unwrap.
+  const{error}=await sbClient.auth.signInWithPassword({email:currentUser.email,password:pass});
+  if(error){toast('Неверный пароль');return;}
+  toast('Включаю шифрование…',null,3000);
+  await e2eeEnable(pass);
+}
+
+// Unlock flow: try the account password, then the recovery code.
+async function e2eeUnlockFlow(){
+  const pass=prompt('Пароль от аккаунта для расшифровки данных:');
+  if(pass&&await e2eeUnlock(pass,'pw')){toast('Разблокировано');await refreshFromCloud(true);renderEncryptionCard();return;}
+  const rec=prompt('Не подошло. Введите recovery-код (как при включении, с дефисами):');
+  if(rec&&await e2eeUnlock(rec.trim(),'rec')){toast('Разблокировано по коду');await refreshFromCloud(true);renderEncryptionCard();return;}
+  if(pass||rec)toast('Не удалось разблокировать');
+}
+
+// Render the Security/Encryption card on the Profile page.
+function renderEncryptionCard(){
+  const el=document.getElementById('encStatus'),btn=document.getElementById('encBtn');
+  if(!el||!btn)return;
+  if(!e2eeOn){
+    el.innerHTML='Шифрование выключено. Данные хранятся в облаке в открытом виде (защищены только доступом).';
+    btn.textContent='🔒 Включить шифрование';btn.setAttribute('onclick','e2eeEnableFlow()');
+  }else if(e2eeLocked){
+    el.innerHTML='🔒 Шифрование включено, но <b>заблокировано</b> на этом устройстве. Разблокируйте, чтобы синхронизировать.';
+    btn.textContent='🔓 Разблокировать';btn.setAttribute('onclick','e2eeUnlockFlow()');
+  }else{
+    el.innerHTML='✓ Шифрование включено и активно. Данные в облаке зашифрованы — прочитать их без вашего пароля/recovery-кода нельзя.';
+    btn.textContent='Шифрование активно';btn.setAttribute('onclick','');
+  }
+}
+
+// ══════════════════════════════════════════════
 //  TOAST + UNDO
 // ══════════════════════════════════════════════
 let _toastTimer=null;
@@ -5043,6 +5251,7 @@ function renderSyncStatus(){
   if(!pill||!txt)return;
   pill.classList.remove('ok','busy','warn','off');
   if(!currentUser){pill.classList.add('warn');txt.textContent='Не вошёл';return;}
+  if(e2eeOn&&e2eeLocked){pill.classList.add('off');txt.textContent='🔒 Заблокировано';return;}
   if(navigator.onLine===false){pill.classList.add('off');const n=pendingGet().length;txt.textContent=n?('Офлайн · '+n):'Офлайн';return;}
   const pend=pendingGet().length;
   if(_flushing||_refreshing){pill.classList.add('busy');txt.textContent='Синхронизация…';return;}
@@ -5053,6 +5262,7 @@ function renderSyncStatus(){
 function manualSync(){
   haptic('light');
   if(!currentUser){toast('Войдите в аккаунт для синхронизации');return;}
+  if(e2eeOn&&e2eeLocked){e2eeUnlockFlow();return;}
   if(navigator.onLine===false){toast('Нет сети — изменения отправятся автоматически');renderSyncStatus();return;}
   toast('Синхронизирую…',null,1500);
   refreshFromCloud(true);
