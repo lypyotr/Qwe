@@ -1022,6 +1022,60 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
   font-family:'Manrope',sans-serif;font-size:12px;font-weight:700;
   padding:4px 12px;border-radius:20px;cursor:pointer;
 }
+
+/* ── Sync status pill (header) ── */
+.sync-pill{
+  display:inline-flex;align-items:center;gap:5px;
+  height:30px;padding:0 11px;border-radius:16px;cursor:pointer;
+  font-size:11px;font-weight:800;letter-spacing:.2px;white-space:nowrap;
+  background:var(--surface2);border:1px solid var(--border);color:var(--muted);
+  -webkit-user-select:none;user-select:none;transition:opacity .15s;
+}
+.sync-pill:active{transform:scale(.95)}
+.sync-pill .sp-dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:none}
+.sync-pill.ok{color:var(--accent)}
+.sync-pill.busy{color:var(--accent2)}
+.sync-pill.busy .sp-dot{animation:spPulse 1s ease-in-out infinite}
+.sync-pill.warn{color:var(--warn,#f5a623)}
+.sync-pill.off{color:var(--danger)}
+@keyframes spPulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ── Toast + Undo ── */
+#toastHost{
+  position:fixed;left:0;right:0;bottom:calc(72px + env(safe-area-inset-bottom));
+  display:flex;flex-direction:column;align-items:center;gap:8px;z-index:9000;
+  pointer-events:none;padding:0 14px;
+}
+.toast{
+  pointer-events:auto;max-width:440px;width:100%;box-sizing:border-box;
+  display:flex;align-items:center;gap:12px;
+  background:var(--surface2);border:1px solid var(--border);color:var(--text);
+  border-radius:14px;padding:12px 14px;font-size:13px;font-weight:600;
+  box-shadow:0 8px 28px rgba(0,0,0,.35);
+  transform:translateY(16px);opacity:0;transition:transform .22s,opacity .22s;
+}
+.toast.show{transform:translateY(0);opacity:1}
+.toast .toast-txt{flex:1;min-width:0}
+.toast .toast-undo{
+  flex:none;background:var(--accent);color:#06281e;border:none;
+  font-family:'Manrope',sans-serif;font-size:12px;font-weight:800;
+  padding:7px 14px;border-radius:10px;cursor:pointer;
+}
+.toast .toast-undo:active{transform:scale(.94)}
+
+/* ── Statistics page ── */
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.stat-box{background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:13px}
+.stat-box.wide{grid-column:1 / -1}
+.stat-box-lbl{font-size:10px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
+.stat-box-val{font-size:21px;font-weight:800;color:var(--text);margin-top:4px;line-height:1.1}
+.stat-box-sub{font-size:11px;font-weight:600;color:var(--muted);margin-top:3px}
+.stat-trend{display:flex;align-items:flex-end;gap:5px;height:84px;margin-top:10px}
+.stat-trend-bar{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0}
+.stat-tb-col{width:100%;display:flex;flex-direction:column;justify-content:flex-end;height:64px}
+.stat-tb-fill{width:100%;background:linear-gradient(180deg,var(--accent),var(--accent2));border-radius:5px 5px 2px 2px;min-height:3px}
+.stat-tb-lbl{font-size:8.5px;font-weight:700;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.stat-empty{text-align:center;color:var(--muted);font-weight:600;padding:30px 0}
 </style>
 </head>
 <body>
@@ -1105,6 +1159,7 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
     <div class="user-info" id="userInfo" style="display:none"></div>
   </div>
   <div class="header-actions">
+    <div class="sync-pill" id="syncPill" onclick="manualSync()" title="Состояние синхронизации — нажми, чтобы обновить"><span class="sp-dot"></span><span id="syncPillTxt">—</span></div>
     <div class="icon-btn" onclick="toggleTheme()" title="Тема" id="themeBtn">🌙</div>
   </div>
 </div>
@@ -1374,11 +1429,19 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
       <button class="modal-btn" style="width:100%;padding:13px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="toggleTheme()">🌗 Сменить тему</button>
     </div>
 
+    <!-- Statistics -->
+    <div class="calc-card">
+      <div class="calc-card-title">Статистика</div>
+      <div class="calc-card-sub">Заработок по месяцам, средние и тренды за всё время.</div>
+      <button class="modal-btn" style="width:100%;padding:13px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="switchPage('stats')">📊 Открыть статистику</button>
+    </div>
+
     <!-- Data -->
     <div class="calc-card">
       <div class="calc-card-title">Данные</div>
       <div class="calc-card-sub">Резервная копия, импорт/экспорт и биометрия.</div>
       <button class="modal-btn" style="width:100%;padding:13px" onclick="openDataModal()">💾 Импорт / экспорт данных</button>
+      <div class="calc-card-sub" id="backupReminder" style="margin-top:10px;display:none"></div>
     </div>
 
     <!-- Account -->
@@ -1473,6 +1536,16 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
 
   </div>
 </div><!-- /page-admin -->
+
+<!-- ══ PAGE: STATISTICS ══ -->
+<div class="page" id="page-stats">
+  <div class="header">
+    <div class="header-left"><div class="header-label">📊 Статистика</div></div>
+  </div>
+  <div class="calc-wrap" id="statsBody">
+    <!-- filled by renderStats() -->
+  </div>
+</div><!-- /page-stats -->
 
 <!-- TEMPLATE MODAL -->
 <div class="modal-overlay" id="tplModal" onclick="closeTplModal(event)">
@@ -1573,6 +1646,8 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
     <button class="modal-btn" style="width:100%;padding:13px;margin-bottom:10px" onclick="exportData()">📤 Экспорт в файл</button>
     <button class="modal-btn" style="width:100%;padding:13px;margin-bottom:10px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="document.getElementById('importFileIn').click()">📥 Импорт из файла</button>
     <input type="file" id="importFileIn" accept=".json,application/json" style="display:none" onchange="importData(event)">
+    <div id="autoBackupInfo" style="font-size:12px;color:var(--muted);margin:4px 0 8px;text-align:center"></div>
+    <button class="modal-btn" style="width:100%;padding:13px;margin-bottom:10px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="restoreAutoBackup()">♻️ Восстановить из авто-копии</button>
     <div id="bioSection" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
       <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Биометрия</div>
       <div id="bioStatus" style="font-size:13px;color:var(--muted);margin-bottom:10px"></div>
@@ -1616,6 +1691,9 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
   </div>
 </nav>
 
+<!-- Toast / Undo host -->
+<div id="toastHost"></div>
+
 <script>
 // ══════════════════════════════════════════════
 //  STATE
@@ -1629,7 +1707,8 @@ function switchPage(name){
   haptic('light');
   if(name==='admin'){renderAdminDiag();renderBackupInfo();initPlanCard();}
   if(name==='calc')renderSpendCalc();
-  if(name==='profile')initProfilePage();
+  if(name==='profile'){initProfilePage();renderBackupReminder();}
+  if(name==='stats')renderStats();
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
@@ -2335,9 +2414,11 @@ function addWork(){
 }
 function delWork(day,id){
   if(!days[day])return;
+  const snap=periodSnapshot();
   days[day]=days[day].filter(w=>w.id!==id);
   save();haptic('medium');
   renderDayPanel();renderDayStrip();renderTotal();renderChart();renderGoals();
+  toast('Запись удалена',()=>restorePeriodSnapshot(snap));
 }
 function updateWork(day,id,field,value){
   const w=(days[day]||[]).find(w=>w.id===id);
@@ -2508,7 +2589,7 @@ function addBonus(){
   save();renderBonuses();renderTotal();renderGoals();
   setTimeout(()=>{const els=document.querySelectorAll('.bonus-name');if(els.length)els[els.length-1].focus()},50);
 }
-function removeBonus(id){bonuses=bonuses.filter(b=>b.id!==id);save();haptic('medium');renderBonuses();renderTotal();renderGoals()}
+function removeBonus(id){const snap=periodSnapshot();bonuses=bonuses.filter(b=>b.id!==id);save();haptic('medium');renderBonuses();renderTotal();renderGoals();toast('Доплата удалена',()=>restorePeriodSnapshot(snap));}
 function updateBonus(id,f,v){const b=bonuses.find(b=>b.id===id);if(b){b[f]=v;save();renderTotal();renderGoals()}}
 function renderBonuses(){
   const list=document.getElementById('bonusList');
@@ -2643,7 +2724,11 @@ function commitCounterCount(){
   renderCounterActive(document.getElementById('counterCard'));
 }
 function counterEdit(){counter.running=false;stopCounterTimer();saveCounter();renderCounter();}
-function counterReset(){if(!confirm('Обнулить счётчик изделий?'))return;counter.count=0;saveCounter();haptic('medium');renderCounterActive(document.getElementById('counterCard'));}
+function counterReset(){
+  const prev=counter.count||0;if(prev===0)return;
+  counter.count=0;saveCounter();haptic('medium');renderCounterActive(document.getElementById('counterCard'));
+  toast('Счётчик обнулён',()=>{counter.count=prev;saveCounter();renderCounterActive(document.getElementById('counterCard'));});
+}
 function toggleCounterEarn(){counter.earnHidden=!counter.earnHidden;saveCounter();haptic('light');renderCounterActive(document.getElementById('counterCard'));}
 
 // Tick the live values every second without rebuilding the card (no flicker,
@@ -3317,9 +3402,11 @@ function addExpenseItem(){
   openExpEdit(id); // jump straight into editing the fresh card
 }
 function delExpense(id){
+  const snap=periodSnapshot();
   expenseItems=expenseItems.filter(e=>e.id!==id);
   saveExpenses();haptic('medium');
   renderExpenses();renderTotal();renderGoals();
+  toast('Расход удалён',()=>restorePeriodSnapshot(snap));
 }
 function updateExpense(id,field,value){
   const item=expenseItems.find(e=>e.id===id);
@@ -3541,6 +3628,12 @@ function collectAllKeys(){
 
 function openDataModal(){
   document.getElementById('dataMsg').textContent='';
+  // auto-backup status line
+  try{
+    const ab=JSON.parse(localStorage.getItem(AUTOBACKUP_KEY)||'null');
+    const el=document.getElementById('autoBackupInfo');
+    if(el)el.textContent=ab&&ab.at?('Авто-копия: '+new Date(ab.at).toLocaleString('ru-RU')):'Авто-копия ещё не создана';
+  }catch(_){}
   // quick stats
   const keys=collectAllKeys();
   const periods=keys.filter(k=>/^salary_\d+_\d+_\d+$/.test(k)).length;
@@ -3724,6 +3817,8 @@ function exportData(){
     document.body.appendChild(a);a.click();document.body.removeChild(a);
     setTimeout(()=>URL.revokeObjectURL(url),1000);
     haptic('light');
+    try{localStorage.setItem(LAST_EXPORT_KEY,String(Date.now()));}catch(_){}
+    renderBackupReminder();
     showDataMsg('✓ Файл сохранён','ok');
   }catch(e){
     showDataMsg('Не удалось сохранить файл','err');
@@ -4716,11 +4811,11 @@ function periodPayload(key){try{return JSON.parse(localStorage.getItem('salary_'
 // Mark a record edited locally: bump its timestamp, queue it, schedule a flush.
 function markPeriodDirty(key){
   const p=periodPayload(key);if(p){p._ts=Date.now();try{localStorage.setItem('salary_'+key,JSON.stringify(p));}catch(_){}}
-  pendingAdd(key);scheduleFlush();
+  pendingAdd(key);scheduleFlush();renderSyncStatus();
 }
 function markSettingsDirty(){
   try{localStorage.setItem(SETTINGS_TS_KEY,String(Date.now()));}catch(_){}
-  pendingAdd('settings');scheduleFlush();
+  pendingAdd('settings');scheduleFlush();renderSyncStatus();
 }
 // Back-compat names used throughout the app.
 function scheduleSaveToFirestore(){markPeriodDirty(periodFsKey());}
@@ -4736,6 +4831,7 @@ async function flushPending(){
   if(!currentUser||!sbClient||_flushing)return;
   const keys=pendingGet();if(!keys.length)return;
   _flushing=true;let allOk=true,uploaded=false;
+  renderSyncStatus();
   try{
     for(const k of keys){
       try{
@@ -4764,6 +4860,7 @@ async function flushPending(){
   if(uploaded)broadcastChange();
   if(allOk){_flushBackoff=1000;}
   else{clearTimeout(_flushTimer);_flushTimer=setTimeout(flushPending,_flushBackoff);_flushBackoff=Math.min(_flushBackoff*2,30000);}
+  renderSyncStatus();
 }
 
 // Push local edits first, then pull cloud and timestamp-merge, then push any
@@ -4783,7 +4880,7 @@ async function refreshFromCloud(force){
     await flushPending();      // upload legacy/local-only periods found in merge
     renderAll();
   }catch(e){console.error('refreshFromCloud',e);}
-  finally{_refreshing=false;}
+  finally{_refreshing=false;renderSyncStatus();}
 }
 
 // Keep data fresh without table replication: refetch when the app regains
@@ -4797,15 +4894,200 @@ function setupSyncListeners(){
     else flushPending();
   });
   window.addEventListener('focus',()=>refreshFromCloud());
-  window.addEventListener('online',()=>{flushPending();refreshFromCloud(true);startRealtimeSync();});
+  window.addEventListener('online',()=>{renderSyncStatus();flushPending();refreshFromCloud(true);startRealtimeSync();});
+  window.addEventListener('offline',renderSyncStatus);
   window.addEventListener('pagehide',flushPending);
   _pollTimer=setInterval(()=>{if(document.visibilityState==='visible')refreshFromCloud();},25000);
+  // Keep the "synced N ago" label fresh even when nothing is happening.
+  setInterval(()=>{if(document.visibilityState==='visible')renderSyncStatus();},15000);
 }
+// ══════════════════════════════════════════════
+//  TOAST + UNDO
+// ══════════════════════════════════════════════
+let _toastTimer=null;
+// Show a transient toast. If onUndo is given, an "Отменить" button runs it.
+function toast(text,onUndo,ms){
+  const host=document.getElementById('toastHost');if(!host)return;
+  host.innerHTML='';
+  const el=document.createElement('div');el.className='toast';
+  const txt=document.createElement('div');txt.className='toast-txt';txt.textContent=text;
+  el.appendChild(txt);
+  const dur=ms||(onUndo?6000:2600);
+  const close=()=>{el.classList.remove('show');setTimeout(()=>el.remove(),250);};
+  if(onUndo){
+    const btn=document.createElement('button');btn.className='toast-undo';btn.textContent='Отменить';
+    btn.onclick=()=>{clearTimeout(_toastTimer);try{onUndo();}catch(e){console.error('undo',e);}haptic('medium');close();};
+    el.appendChild(btn);
+  }
+  host.appendChild(el);
+  requestAnimationFrame(()=>el.classList.add('show'));
+  clearTimeout(_toastTimer);_toastTimer=setTimeout(close,dur);
+}
+// Snapshot the current period's editable state for a one-step undo.
+function periodSnapshot(){return JSON.parse(JSON.stringify({days,bonuses,taxEnabled,dayOverrides,expenses:expenseItems}));}
+function restorePeriodSnapshot(s){
+  days=s.days||{};bonuses=s.bonuses||[];taxEnabled=!!s.taxEnabled;dayOverrides=s.dayOverrides||{};expenseItems=s.expenses||[];
+  save(); // persists the whole period payload (expenses included) + queues sync
+  renderDayStrip();renderDayPanel();renderBonuses();renderTotal();renderChart();renderGoals();renderExpenses();
+}
+
+// ══════════════════════════════════════════════
+//  SYNC STATUS PILL
+// ══════════════════════════════════════════════
+function _agoStr(ms){
+  if(!ms)return '';
+  const s=Math.max(0,Math.round((Date.now()-ms)/1000));
+  if(s<5)return 'только что';
+  if(s<60)return s+' сек назад';
+  const m=Math.round(s/60);if(m<60)return m+' мин назад';
+  const h=Math.round(m/60);if(h<24)return h+' ч назад';
+  return Math.round(h/24)+' дн назад';
+}
+function renderSyncStatus(){
+  const pill=document.getElementById('syncPill'),txt=document.getElementById('syncPillTxt');
+  if(!pill||!txt)return;
+  pill.classList.remove('ok','busy','warn','off');
+  if(!currentUser){pill.classList.add('warn');txt.textContent='Не вошёл';return;}
+  if(navigator.onLine===false){pill.classList.add('off');const n=pendingGet().length;txt.textContent=n?('Офлайн · '+n):'Офлайн';return;}
+  const pend=pendingGet().length;
+  if(_flushing||_refreshing){pill.classList.add('busy');txt.textContent='Синхронизация…';return;}
+  if(pend>0){pill.classList.add('warn');txt.textContent='В очереди: '+pend;return;}
+  pill.classList.add('ok');txt.textContent=_lastRefresh?('Синхр. '+_agoStr(_lastRefresh)):'Синхронизировано';
+}
+// Tap the pill to force an immediate sync.
+function manualSync(){
+  haptic('light');
+  if(!currentUser){toast('Войдите в аккаунт для синхронизации');return;}
+  if(navigator.onLine===false){toast('Нет сети — изменения отправятся автоматически');renderSyncStatus();return;}
+  toast('Синхронизирую…',null,1500);
+  refreshFromCloud(true);
+}
+
+// ══════════════════════════════════════════════
+//  AUTO-BACKUP + REMINDER
+// ══════════════════════════════════════════════
+const AUTOBACKUP_KEY='salary_autobackup';
+const LAST_EXPORT_KEY='salary_last_export';
+const BACKUP_REMIND_DAYS=14;
+// Roll a local snapshot of all the user's data to localStorage, at most once a
+// day. This is an in-device safety net against an accidental wipe — restorable
+// from the Data screen — independent of the cloud.
+function autoBackupLocal(){
+  try{
+    const prev=JSON.parse(localStorage.getItem(AUTOBACKUP_KEY)||'null');
+    if(prev&&prev.at&&Date.now()-prev.at<20*3600*1000)return; // ~daily
+    const data={};
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(k&&(/^salary_\d+_\d+_\d+$/.test(k)||['salary_templates','salary_goals','salary_theme','salary_counter','salary_expenses'].includes(k))){
+        try{data[k]=JSON.parse(localStorage.getItem(k));}catch(_){data[k]=localStorage.getItem(k);}
+      }
+    }
+    if(!Object.keys(data).length)return;
+    localStorage.setItem(AUTOBACKUP_KEY,JSON.stringify({at:Date.now(),data}));
+  }catch(e){console.warn('autoBackupLocal',e);}
+}
+function restoreAutoBackup(){
+  let b;try{b=JSON.parse(localStorage.getItem(AUTOBACKUP_KEY)||'null');}catch(_){}
+  if(!b||!b.data){toast('Авто-копии пока нет');return;}
+  const when=new Date(b.at).toLocaleString('ru-RU');
+  if(!confirm('Восстановить данные из авто-копии от '+when+'?\nТекущие локальные данные будут заменены.'))return;
+  try{
+    Object.keys(b.data).forEach(k=>{
+      const v=b.data[k];localStorage.setItem(k,typeof v==='string'?v:JSON.stringify(v));
+    });
+    // Re-hydrate everything from the restored localStorage and re-upload.
+    loadTemplates();loadGoals();loadExpenses();loadCounter();load();
+    [].forEach.call(Object.keys(b.data),k=>{if(/^salary_\d+_\d+_\d+$/.test(k))pendingAdd(k.replace('salary_',''));});
+    markSettingsDirty();renderAll();renderCounter();scheduleFlush();
+    toast('Данные восстановлены из авто-копии');haptic('medium');
+  }catch(e){console.error('restoreAutoBackup',e);toast('Не удалось восстановить');}
+}
+// Show a gentle reminder on the Profile/Data card if it's been a while since the
+// user exported a real file backup.
+function renderBackupReminder(){
+  const el=document.getElementById('backupReminder');if(!el)return;
+  const last=parseInt(localStorage.getItem(LAST_EXPORT_KEY)||'0',10)||0;
+  const hasData=calcTotalWorkedDaysAllTime()>0;
+  if(!hasData){el.style.display='none';return;}
+  if(!last){el.style.display='';el.innerHTML='⚠️ Вы ещё не делали резервную копию в файл. Рекомендуется скачать на случай потери данных.';return;}
+  const days=Math.floor((Date.now()-last)/86400000);
+  if(days>=BACKUP_REMIND_DAYS){el.style.display='';el.innerHTML='⏳ Последний экспорт в файл — '+days+' дн назад. Стоит обновить резервную копию.';}
+  else{el.style.display='';el.innerHTML='✓ Резервная копия в файл: '+days+' дн назад.';}
+}
+// Called once on startup: if a backup is overdue, nudge with a toast.
+function checkBackupReminder(){
+  const last=parseInt(localStorage.getItem(LAST_EXPORT_KEY)||'0',10)||0;
+  if(calcTotalWorkedDaysAllTime()===0)return;
+  const overdue=!last||(Date.now()-last)/86400000>=BACKUP_REMIND_DAYS;
+  if(overdue)setTimeout(()=>toast('Давно не было резервной копии — загляните в Профиль → Данные',null,4500),2500);
+}
+
+// ══════════════════════════════════════════════
+//  STATISTICS
+// ══════════════════════════════════════════════
+// Aggregate every saved period into per-period figures (same formula as History).
+function collectPeriodStats(){
+  const items=[];
+  for(let i=0;i<localStorage.length;i++){
+    const k=localStorage.key(i);
+    if(!k||!/^salary_\d+_\d+_\d+$/.test(k))continue;
+    try{
+      const parts=k.replace('salary_','').split('_');
+      const y=parseInt(parts[0]),m=parseInt(parts[1]),p=parseInt(parts[2]);
+      const d=JSON.parse(localStorage.getItem(k)||'{}');
+      const base=[].concat.apply([],Object.values(d.days||{})).reduce((s,w)=>s+(parseFloat(w.qty)||0)*(parseFloat(w.price)||0),0);
+      const bonus=(d.bonuses||[]).reduce((s,b)=>s+(parseFloat(b.amount)||0),0);
+      const expenses=(d.expenses||[]).reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+      let total=base+bonus;if(d.taxEnabled)total*=0.87;total=Math.max(0,total);
+      const worked=Object.keys(d.days||{}).filter(day=>(d.days[day]||[]).reduce((s,w)=>s+(parseFloat(w.qty)||0)*(parseFloat(w.price)||0),0)>0).length;
+      items.push({k,y,m,p,total,base,bonus,expenses,worked});
+    }catch(e){}
+  }
+  return items.sort((a,b)=>a.y-b.y||a.m-b.m||a.p-b.p);
+}
+function renderStats(){
+  const body=document.getElementById('statsBody');if(!body)return;
+  const items=collectPeriodStats();
+  const withData=items.filter(x=>x.total>0||x.worked>0);
+  if(!withData.length){body.innerHTML='<div class="calc-card"><div class="stat-empty">Пока нет данных.<br>Заполните хотя бы один период.</div></div>';return;}
+  const sum=a=>a.reduce((s,x)=>s+x,0);
+  const totalEarned=sum(withData.map(x=>x.total));
+  const totalWorked=sum(withData.map(x=>x.worked));
+  const totalBonus=sum(withData.map(x=>x.bonus));
+  const totalExp=sum(withData.map(x=>x.expenses));
+  const avgPeriod=Math.round(totalEarned/withData.length);
+  const avgDay=totalWorked?Math.round(totalEarned/totalWorked):0;
+  const best=withData.reduce((a,b)=>b.total>a.total?b:a,withData[0]);
+  const pLbl=x=>`${MS[x.m]} ${x.y} · ${x.p===1?'аванс':'зп'}`;
+  // last up to 12 periods for the trend
+  const trend=withData.slice(-12);
+  const maxT=Math.max(...trend.map(x=>x.total),1);
+  const bars=trend.map(x=>{
+    const h=Math.max(3,Math.round(x.total/maxT*64));
+    return`<div class="stat-trend-bar"><div class="stat-tb-col"><div class="stat-tb-fill" style="height:${h}px" title="${M(x.total)}"></div></div><div class="stat-tb-lbl">${MS[x.m].slice(0,3)}${x.p===1?'¹':'²'}</div></div>`;
+  }).join('');
+  body.innerHTML=`
+    <div class="stat-grid">
+      <div class="stat-box wide"><div class="stat-box-lbl">Заработано всего</div><div class="stat-box-val">${M(totalEarned)}</div><div class="stat-box-sub">${withData.length} ${_periodWord(withData.length)} · ${totalWorked} ${dayWord(totalWorked)}</div></div>
+      <div class="stat-box"><div class="stat-box-lbl">Средний период</div><div class="stat-box-val">${M(avgPeriod)}</div></div>
+      <div class="stat-box"><div class="stat-box-lbl">Средний день</div><div class="stat-box-val">${M(avgDay)}</div></div>
+      <div class="stat-box"><div class="stat-box-lbl">Доплаты</div><div class="stat-box-val">${M(totalBonus)}</div></div>
+      <div class="stat-box"><div class="stat-box-lbl">Расходы</div><div class="stat-box-val">${M(totalExp)}</div></div>
+      <div class="stat-box wide"><div class="stat-box-lbl">🏆 Лучший период</div><div class="stat-box-val">${M(best.total)}</div><div class="stat-box-sub">${pLbl(best)}</div></div>
+    </div>
+    <div class="calc-card">
+      <div class="calc-card-title">Динамика (последние ${trend.length})</div>
+      <div class="stat-trend">${bars}</div>
+    </div>`;
+}
+function _periodWord(n){const a=n%10,b=n%100;return a===1&&b!==11?'период':a>=2&&a<=4&&(b<10||b>=20)?'периода':'периодов';}
+
 function renderAll(){
   renderTotal();renderChart();renderGoals();renderExpenses();
   renderDayStrip();renderDayPanel();renderBonuses();renderTemplates();
   renderHistory();renderArchive();renderTodaySummary();renderAchievements();
-  renderProfile();
+  renderProfile();renderSyncStatus();
 }
 
 // ══════════════════════════════════════════════
@@ -4834,6 +5116,9 @@ restorePage();initPWA();initTotalSwipe();
 restoreScroll();
 initFirebase();
 refreshUsdRateIfNeeded(); // fetch/refresh USD rate in the background
+autoBackupLocal();        // roll a local safety snapshot (~daily)
+renderSyncStatus();       // paint the header sync pill
+checkBackupReminder();    // nudge if a file backup is overdue
 </script>
 </body>
 </html>
