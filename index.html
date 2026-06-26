@@ -4682,7 +4682,7 @@ function startRealtimeSync(){
     })
     .subscribe(status=>{
       if(realtimeChannel!==ch)return; // stale channel — ignore
-      if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){
+      if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED'){
         clearTimeout(_resyncTimer);
         _resyncTimer=setTimeout(()=>{if(realtimeChannel===ch)startRealtimeSync();},3000);
       }
@@ -4780,7 +4780,7 @@ async function refreshFromCloud(force){
 function setupSyncListeners(){
   if(_syncWired)return;_syncWired=true;
   document.addEventListener('visibilitychange',()=>{
-    if(document.visibilityState==='visible')refreshFromCloud();
+    if(document.visibilityState==='visible'){startRealtimeSync();refreshFromCloud();}
     else flushPending();
   });
   window.addEventListener('focus',()=>refreshFromCloud());
