@@ -4796,7 +4796,20 @@ async function doForgotPassword(){
   if(error){msgEl.style.color='var(--danger)';msgEl.textContent=supabaseErrMsg(error);}
   else{msgEl.style.color='var(--accent)';msgEl.textContent='Письмо отправлено! Проверь почту.';}
 }
-async function doFirebaseLogout(){if(confirm('Выйти из аккаунта?'))await sbClient.auth.signOut();}
+async function doFirebaseLogout(){
+  if(!confirm('Выйти из аккаунта?'))return;
+  // Local scope clears the session on THIS device without the server-side revoke
+  // call that was returning 403 (stale session) and aborting the logout.
+  try{await sbClient.auth.signOut({scope:'local'});}
+  catch(e){console.warn('signOut',e);}
+  // Belt-and-suspenders: make sure we're logged out even if SIGNED_OUT didn't fire.
+  try{e2eeDEK=null;e2eeLocked=false;clearDEKLocal();}catch(_){}
+  if(currentUser){
+    currentUser=null;
+    if(realtimeChannel){sbClient.removeChannel(realtimeChannel);realtimeChannel=null;}
+    showAuthOverlay(true);showAuthLogin();refreshAdminUI();
+  }
+}
 
 // Pull cloud state and merge it into localStorage by timestamp (last-writer-
 // wins). Records queued for upload (dirty) are skipped — local always wins
