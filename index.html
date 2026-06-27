@@ -58,6 +58,7 @@ body{
 .user-name.empty{font-size:14px;font-weight:700;color:var(--muted);opacity:.7}
 /* section 2: extra profile info — smaller and quieter */
 .user-info{font-size:11px;font-weight:500;color:var(--muted);line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;opacity:.85}
+.user-id{font-size:10px;font-weight:700;letter-spacing:.5px;color:var(--muted);opacity:.45;margin-top:1px}
 .header-actions{display:flex;gap:8px;align-items:center;padding-bottom:4px}
 .icon-btn{
   width:36px;height:36px;border-radius:10px;border:1px solid var(--border);
@@ -1168,6 +1169,7 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
   <div class="header-left" onclick="switchPage('profile')">
     <div class="user-name empty" id="userName">Добавь имя</div>
     <div class="user-info" id="userInfo" style="display:none"></div>
+    <div class="user-id" id="userId"></div>
   </div>
   <div class="header-actions">
     <div class="sync-pill" onclick="manualSync()" title="Состояние синхронизации — нажми, чтобы обновить"><span class="sp-dot"></span><span class="sp-txt">—</span></div>
@@ -1999,6 +2001,31 @@ function renderProfile(){
     infoEl.textContent=inf;
     infoEl.style.display=inf?'':'none';
   }
+  renderUserId();
+}
+
+// ── Sequential public user number (#1, #2, …) ──
+let userSeq=null;
+function loadUserSeq(){try{const n=parseInt(localStorage.getItem('salary_user_seq')||'',10);if(n>0)userSeq=n;}catch(e){}}
+function renderUserId(){
+  const el=document.getElementById('userId');if(!el)return;
+  el.textContent=userSeq?('#'+userSeq):'';
+}
+// Fetch (or assign, on first login) this account's number; cache it locally so
+// it shows instantly and offline.
+async function ensureUserNumber(){
+  if(!currentUser||!sbClient)return;
+  try{
+    let{data}=await sbClient.from('user_numbers').select('seq').eq('user_id',currentUser.id).maybeSingle();
+    if(!data){
+      const ins=await sbClient.from('user_numbers').insert({user_id:currentUser.id}).select('seq').single();
+      if(ins.error){ // race or transient — re-read
+        const re=await sbClient.from('user_numbers').select('seq').eq('user_id',currentUser.id).maybeSingle();
+        data=re.data;
+      }else data=ins.data;
+    }
+    if(data&&data.seq){userSeq=data.seq;try{localStorage.setItem('salary_user_seq',String(userSeq));}catch(_){}renderUserId();}
+  }catch(e){console.warn('ensureUserNumber',e);}
 }
 // Fill the Profile page when it opens (inputs, account email, admin access).
 function initProfilePage(){
@@ -4760,6 +4787,7 @@ function enterApp(user){
       renderAll();startRealtimeSync();setupSyncListeners();
       await loadAppConfig();   // pull global announcement / maintenance state
       startAppConfigRealtime();
+      ensureUserNumber();      // assign/fetch this account's #number
     }catch(e){console.error('cloud sync',e);}
   })();
 }
@@ -5456,7 +5484,7 @@ function renderAll(){
 if('scrollRestoration' in history)history.scrollRestoration='manual';
 loadTheme();
 initMonths();
-loadTemplates();loadGoals();loadExpenses();loadCurrencyPrefs();loadCounter();
+loadTemplates();loadGoals();loadExpenses();loadCurrencyPrefs();loadCounter();loadUserSeq();
 document.getElementById('periodSel').value=new Date().getDate()<=15?'1':'2';
 load();
 renderPeriodCard();renderDayStrip();renderDayPanel();renderBonuses();renderTemplates();
