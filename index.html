@@ -4879,13 +4879,28 @@ async function doFirebaseLogout(){
   // call that was returning 403 (stale session) and aborting the logout.
   try{await sbClient.auth.signOut({scope:'local'});}
   catch(e){console.warn('signOut',e);}
-  // Belt-and-suspenders: make sure we're logged out even if SIGNED_OUT didn't fire.
+  // Hard-clear the persisted auth token ourselves. If signOut threw, or the
+  // autoRefreshToken timer rewrote storage after it ran, the session would be
+  // restored by getSession() on the next load and the user would look "still
+  // logged in" — i.e. logout silently fails. Remove the known key plus any
+  // supabase auth token left behind.
+  try{
+    localStorage.removeItem('salary-auth-token');
+    for(let i=localStorage.length-1;i>=0;i--){
+      const k=localStorage.key(i);
+      if(k&&(k.startsWith('sb-')||k.indexOf('auth-token')!==-1))localStorage.removeItem(k);
+    }
+  }catch(_){}
+  // Drop E2EE key material so the next account on this device can't read it.
   try{e2eeDEK=null;e2eeLocked=false;clearDEKLocal();}catch(_){}
-  if(currentUser){
-    currentUser=null;
-    if(realtimeChannel){sbClient.removeChannel(realtimeChannel);realtimeChannel=null;}
-    showAuthOverlay(true);showAuthLogin();refreshAdminUI();
-  }
+  // Tear down in-memory state and reload for a guaranteed-clean client: this
+  // stops the realtime channels and the token auto-refresh timer that could
+  // otherwise re-persist the session we just deleted.
+  currentUser=null;
+  try{if(realtimeChannel)sbClient.removeChannel(realtimeChannel);}catch(_){}
+  try{if(appConfigChannel)sbClient.removeChannel(appConfigChannel);}catch(_){}
+  realtimeChannel=null;appConfigChannel=null;
+  location.reload();
 }
 
 // Pull cloud state and merge it into localStorage by timestamp (last-writer-
