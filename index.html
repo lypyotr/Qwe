@@ -1787,6 +1787,7 @@ const SETTINGS_REV_KEY = 'salary_settings_rev'; // last cloud updated_at we sync
 let _refreshing = false, _lastRefresh = 0, _resyncTimer = null;
 let _syncWired = false, _pollTimer = null;
 let _flushTimer = null, _flushing = false, _flushBackoff = 1000;
+let _syncError = false;   // last cloud read/write actually failed (vs. silently ok)
 // ── End-to-end encryption (opt-in, off by default) ──
 // When on, period/settings CONTENTS are encrypted in-browser before upload and
 // only ciphertext reaches the DB. e2eeDEK is the in-memory data key; when E2EE
@@ -4841,11 +4842,15 @@ async function loadAllUserData(){
   // Run settings + periods in parallel so one slow query can't time out the
   // whole chain. Each query is tolerated independently. Timeouts and retries
   // are handled by fetchWithRetry at the transport level.
-  const settledData=async(query)=>{try{const{data}=await query;return data;}catch(e){console.error('loadAllUserData query',e);return undefined;}};
+  let _pullOk=true;
+  const settledData=async(query)=>{try{const{data,error}=await query;if(error){_pullOk=false;console.error('loadAllUserData query',error);return undefined;}return data;}catch(e){_pullOk=false;console.error('loadAllUserData query',e);return undefined;}};
   const[s,periods]=await Promise.all([
     settledData(sbClient.from('user_settings').select('*').eq('user_id',currentUser.id).maybeSingle()),
     settledData(sbClient.from('periods').select('*').eq('user_id',currentUser.id))
   ]);
+  // A real read failure (network/RLS) is now visible instead of silently doing
+  // nothing while the pill claims "synced".
+  _syncError=!_pullOk;
   // Cross-device detection: if the account's rows are encrypted but this device
   // didn't know yet, turn E2EE on and unlock (or lock) before reading anything.
   if(!e2eeOn){
@@ -5049,8 +5054,8 @@ async function flushPending(){
     }
   }finally{_flushing=false;}
   if(uploaded)broadcastChange();
-  if(allOk){_flushBackoff=1000;}
-  else{clearTimeout(_flushTimer);_flushTimer=setTimeout(flushPending,_flushBackoff);_flushBackoff=Math.min(_flushBackoff*2,30000);}
+  if(allOk){_flushBackoff=1000;_syncError=false;}
+  else{_syncError=true;clearTimeout(_flushTimer);_flushTimer=setTimeout(flushPending,_flushBackoff);_flushBackoff=Math.min(_flushBackoff*2,30000);}
   renderSyncStatus();
 }
 
@@ -5296,7 +5301,13 @@ function renderSyncStatus(){
   else if(e2eeOn&&e2eeLocked){cls='off';txt='🔒';}
   else if(navigator.onLine===false){const n=pendingGet().length;cls='off';txt=n?('⚡'+n):'⚡';}
   else if(_flushing||_refreshing){cls='busy';txt='⟳';}
-  else{const pend=pendingGet().length;if(pend>0){cls='warn';txt='↑'+pend;}else{cls='ok';txt=_agoMini(_lastRefresh);}}
+  else{
+    const pend=pendingGet().length;
+    if(pend>0){cls='warn';txt='↑'+pend;}
+    else if(_syncError){cls='off';txt='!';}        // last read/write actually failed
+    else if(!_lastRefresh){cls='warn';txt='…';}    // not synced yet this session
+    else{cls='ok';txt=_agoMini(_lastRefresh);}
+  }
   pills.forEach(p=>{
     p.classList.remove('ok','busy','warn','off');if(cls)p.classList.add(cls);
     const t=p.querySelector('.sp-txt');if(t)t.textContent=txt;
