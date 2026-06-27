@@ -4842,18 +4842,52 @@ function supabaseErrMsg(err){
   return msg||'Неизвестная ошибка';
 }
 
+// Remove any persisted Supabase auth token. A stale/partial token makes the
+// next signInWithPassword try to refresh the OLD session first, which is what
+// made login succeed only on the 2nd attempt — and a leftover token after
+// logout is what made logout need a 2nd press.
+function clearAuthTokens(){
+  try{
+    localStorage.removeItem('salary-auth-token');
+    for(let i=localStorage.length-1;i>=0;i--){
+      const k=localStorage.key(i);
+      if(k&&(k.startsWith('sb-')||k.indexOf('auth-token')!==-1))localStorage.removeItem(k);
+    }
+  }catch(_){}
+}
+// A transient (network/timeout) failure is worth one silent retry; a wrong
+// password or unconfirmed email is not.
+function isTransientErr(err){
+  const m=((err&&(err.message||err.msg||err))||'').toString().toLowerCase();
+  if(m.includes('invalid login')||m.includes('not confirmed')||m.includes('already registered')||m.includes('password should'))return false;
+  return m.includes('timeout')||m.includes('fetch')||m.includes('network')||m.includes('failed')||m.includes('abort')||m==='';
+}
+
+let _authBusy=false; // guard against double-clicks / Enter-key spam
 async function doFirebaseLogin(){
+  if(_authBusy)return;
   const email=document.getElementById('authEmail').value.trim(),pass=document.getElementById('authPassword').value,errEl=document.getElementById('authError');
   errEl.textContent='';if(!email||!pass){errEl.textContent='Введи email и пароль';return;}
-  document.getElementById('authLoading').style.display='';
-  const{data,error}=await sbClient.auth.signInWithPassword({email,password:pass});
-  document.getElementById('authLoading').style.display='none';
-  if(error){errEl.textContent=supabaseErrMsg(error);return;}
-  _loginPassword=pass; // kept briefly so E2EE can unlock on this device
-  // Enter directly from the awaited result instead of waiting on the async
-  // onAuthStateChange event — that event sometimes doesn't fire (race), which
-  // left the user stuck on the login screen until a 2nd/3rd attempt.
-  if(data&&data.user)enterApp(data.user);
+  _authBusy=true;
+  const loadingEl=document.getElementById('authLoading');loadingEl.style.display='';
+  try{
+    // Start from a clean auth state so the first attempt is the only attempt.
+    clearAuthTokens();
+    const signIn=()=>withTimeout(sbClient.auth.signInWithPassword({email,password:pass}),20000)
+      .then(r=>r,e=>({error:e}));
+    let res=await signIn();
+    // One automatic retry on a transient failure so the user never has to press
+    // "Войти" a second time.
+    if(res.error&&isTransientErr(res.error))res=await signIn();
+    if(res.error){errEl.textContent=supabaseErrMsg(res.error);return;}
+    _loginPassword=pass; // kept briefly so E2EE can unlock on this device
+    // Enter directly from the awaited result instead of waiting on the async
+    // onAuthStateChange event — that event sometimes doesn't fire (race), which
+    // left the user stuck on the login screen until a 2nd/3rd attempt.
+    if(res.data&&res.data.user){_cloudLoaded=false;enterApp(res.data.user);}
+  }finally{
+    loadingEl.style.display='none';_authBusy=false;
+  }
 }
 async function doFirebaseRegister(){
   const email=document.getElementById('regEmail').value.trim(),pass=document.getElementById('regPassword').value,pass2=document.getElementById('regPassword2').value,errEl=document.getElementById('regError');
@@ -4874,33 +4908,28 @@ async function doForgotPassword(){
   else{msgEl.style.color='var(--accent)';msgEl.textContent='Письмо отправлено! Проверь почту.';}
 }
 async function doFirebaseLogout(){
+  if(_authBusy)return;
   if(!confirm('Выйти из аккаунта?'))return;
-  // Local scope clears the session on THIS device without the server-side revoke
-  // call that was returning 403 (stale session) and aborting the logout.
-  try{await sbClient.auth.signOut({scope:'local'});}
-  catch(e){console.warn('signOut',e);}
-  // Hard-clear the persisted auth token ourselves. If signOut threw, or the
-  // autoRefreshToken timer rewrote storage after it ran, the session would be
-  // restored by getSession() on the next load and the user would look "still
-  // logged in" — i.e. logout silently fails. Remove the known key plus any
-  // supabase auth token left behind.
+  _authBusy=true;
   try{
-    localStorage.removeItem('salary-auth-token');
-    for(let i=localStorage.length-1;i>=0;i--){
-      const k=localStorage.key(i);
-      if(k&&(k.startsWith('sb-')||k.indexOf('auth-token')!==-1))localStorage.removeItem(k);
-    }
-  }catch(_){}
-  // Drop E2EE key material so the next account on this device can't read it.
-  try{e2eeDEK=null;e2eeLocked=false;clearDEKLocal();}catch(_){}
-  // Tear down in-memory state and reload for a guaranteed-clean client: this
-  // stops the realtime channels and the token auto-refresh timer that could
-  // otherwise re-persist the session we just deleted.
-  currentUser=null;
-  try{if(realtimeChannel)sbClient.removeChannel(realtimeChannel);}catch(_){}
-  try{if(appConfigChannel)sbClient.removeChannel(appConfigChannel);}catch(_){}
-  realtimeChannel=null;appConfigChannel=null;
-  location.reload();
+    // Local scope clears the session on THIS device without the server-side
+    // revoke call that was returning 403 (stale session) and aborting logout.
+    // Time-boxed so a hung call can't leave us half logged-out.
+    try{await withTimeout(sbClient.auth.signOut({scope:'local'}),8000);}
+    catch(e){console.warn('signOut',e);}
+    // Remove the token ourselves: if signOut threw or the autoRefresh timer
+    // rewrote storage, the session would be restored on the next load and the
+    // user would look "still logged in" (logout needing a 2nd press).
+    clearAuthTokens();
+    // Drop E2EE key material so the next account on this device can't read it.
+    try{e2eeDEK=null;e2eeLocked=false;clearDEKLocal();}catch(_){}
+    // Full in-memory reset so the next login starts clean and re-syncs cloud.
+    currentUser=null;_cloudLoaded=false;
+    try{if(realtimeChannel)sbClient.removeChannel(realtimeChannel);}catch(_){}
+    try{if(appConfigChannel)sbClient.removeChannel(appConfigChannel);}catch(_){}
+    realtimeChannel=null;appConfigChannel=null;
+    showAuthOverlay(true);showAuthLogin();refreshAdminUI();
+  }finally{_authBusy=false;}
 }
 
 // Pull cloud state and merge it into localStorage by timestamp (last-writer-
