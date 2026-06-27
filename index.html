@@ -1088,6 +1088,23 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
 .stat-tb-fill{width:100%;background:linear-gradient(180deg,var(--accent),var(--accent2));border-radius:5px 5px 2px 2px;min-height:3px}
 .stat-tb-lbl{font-size:8.5px;font-weight:700;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .stat-empty{text-align:center;color:var(--muted);font-weight:600;padding:30px 0}
+
+/* ── Earnings planner ── */
+.plan-select{width:100%;box-sizing:border-box;margin-bottom:10px;font-family:'Manrope',sans-serif;font-size:15px;font-weight:700;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:13px 14px;outline:none}
+.plan-select:focus{border-color:var(--accent)}
+.plan-field-lbl{font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin:4px 0 6px}
+.plan-result{margin-top:14px}
+.plan-empty{color:var(--muted);font-weight:600;font-size:13px;text-align:center;padding:16px 0;line-height:1.5}
+.plan-hero{text-align:center;background:linear-gradient(135deg,rgba(74,222,128,.14),rgba(96,165,250,.10));border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:9px}
+.plan-hero-lbl{font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.plan-hero-val{font-size:30px;font-weight:800;color:var(--accent);line-height:1.05;margin-top:5px}
+.plan-hero-sub{font-size:13px;font-weight:700;color:var(--text);opacity:.85;margin-top:5px}
+.plan-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.plan-tile{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:11px}
+.plan-tile.wide{grid-column:1 / -1}
+.pt-lbl{font-size:9.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)}
+.pt-val{font-size:17px;font-weight:800;color:var(--text);margin-top:3px;line-height:1.1}
+.pt-sub{font-size:10px;font-weight:600;color:var(--muted);margin-top:2px}
 </style>
 </head>
 <body>
@@ -1417,6 +1434,22 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
       <div class="calc-result" id="calcSpendResult"></div>
     </div>
 
+    <!-- Earnings planner -->
+    <div class="calc-card">
+      <div class="calc-card-title">🎯 Планировщик заработка</div>
+      <div class="calc-card-sub">Поставь цель на месяц и выбери работу — посчитаю норму на смену при графике 2 через 2.</div>
+      <div class="calc-input-row">
+        <input class="calc-input" id="planTargetIn" type="number" inputmode="decimal" placeholder="Цель за месяц" oninput="renderPlan()">
+        <span class="calc-cur">₽</span>
+      </div>
+      <select class="plan-select" id="planTplSel" onchange="renderPlan()"></select>
+      <div class="plan-field-lbl">Первый рабочий день (старт графика 2/2)</div>
+      <input class="plan-select" id="planFirstDay" type="date" onchange="onPlanFirstDayChange()">
+      <div id="planResult" class="plan-result"></div>
+      <button class="modal-btn" id="planGlobalBtn" style="width:100%;padding:12px;margin-top:10px;background:var(--surface2);color:var(--text);border:1px solid var(--border);display:none" onclick="planMakeGlobal()">🌍 Сделать первый день глобальным для всех</button>
+      <div class="admin-msg" id="planMsg"></div>
+    </div>
+
   </div>
 </div><!-- /page-calc -->
 
@@ -1546,18 +1579,6 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
       <div class="admin-msg" id="clearCacheMsg"></div>
     </div>
 
-    <!-- Earnings planner (test) -->
-    <div class="admin-card">
-      <div class="admin-card-title">🎯 Планировщик заработка</div>
-      <div class="admin-card-sub">Укажи цель на месяц и работу из шаблонов — посчитаю, сколько нужно делать в день при графике 2 через 2. Выбери первый рабочий день, чтобы разметить смены.</div>
-      <input class="modal-input" id="planTargetIn" type="number" inputmode="decimal" placeholder="Цель за месяц, ₽" style="width:100%;box-sizing:border-box;margin-bottom:10px" oninput="renderPlan()">
-      <select class="modal-input" id="planTplSel" style="width:100%;box-sizing:border-box;margin-bottom:10px" onchange="renderPlan()"></select>
-      <div style="font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin:2px 0 6px">Первый рабочий день</div>
-      <input class="modal-input" id="planFirstDay" type="date" style="width:100%;box-sizing:border-box;margin-bottom:12px" onchange="onPlanFirstDayChange()">
-      <div class="admin-diag" id="planResult">—</div>
-      <button class="modal-btn" id="planGlobalBtn" style="width:100%;padding:12px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="planMakeGlobal()">🌍 Сделать первый день глобальным</button>
-      <div class="admin-msg" id="planMsg"></div>
-    </div>
 
   </div>
 </div><!-- /page-admin -->
@@ -1742,8 +1763,8 @@ function switchPage(name){
   // Admin page is owner-only — quietly bounce everyone else to Работа.
   if(name==='admin'&&!isAdmin())name='work';
   haptic('light');
-  if(name==='admin'){renderAdminDiag();renderBackupInfo();initPlanCard();}
-  if(name==='calc')renderSpendCalc();
+  if(name==='admin'){renderAdminDiag();renderBackupInfo();}
+  if(name==='calc'){renderSpendCalc();initPlanCard();}
   if(name==='profile'){initProfilePage();renderBackupReminder();renderEncryptionCard();}
   if(name==='stats')renderStats();
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
@@ -4366,6 +4387,7 @@ function initPlanCard(){
     const fd=document.getElementById('planFirstDay');
     if(fd&&document.activeElement!==fd)fd.value=localStorage.getItem('salary_plan_first')||appConfig.first_work_day||'';
   }catch(e){}
+  const gb=document.getElementById('planGlobalBtn');if(gb)gb.style.display=isAdmin()?'':'none';
   renderPlan();
 }
 function onPlanFirstDayChange(){
@@ -4383,28 +4405,35 @@ function renderPlan(){
     localStorage.setItem('salary_plan_target',target>0?String(target):'');
     if(sel&&sel.value)localStorage.setItem('salary_plan_tpl',sel.value);
   }catch(e){}
-  if(!templates.length){res.textContent='Сначала создай шаблоны работ на главной.';return;}
-  if(target<=0){res.textContent='Введи цель за месяц.';return;}
+  const empty=msg=>{res.innerHTML='<div class="plan-empty">'+msg+'</div>';};
+  if(!templates.length){empty('Сначала создай шаблоны работ на главной.');return;}
+  if(target<=0){empty('Введи цель за месяц — посчитаю норму на смену.');return;}
   const tpl=templates.find(t=>String(t.id)===(sel&&sel.value));
   const rate=tpl?parseFloat(tpl.price)||0:0;
-  if(!tpl||rate<=0){res.textContent='Выбери работу с ненулевой ставкой.';return;}
+  if(!tpl||rate<=0){empty('Выбери работу с ненулевой ставкой.');return;}
   const now=new Date();
   const y=now.getFullYear(),m=now.getMonth();
   let anchor;
   if(firstStr){const p=firstStr.split('-').map(Number);anchor=new Date(p[0],p[1]-1,p[2]);}
   else anchor=new Date(y,m,1);
   const{workDays}=planWorkDays(y,m,anchor);
-  if(workDays<=0){res.textContent='В этом месяце нет рабочих смен по графику 2/2 — проверь первый рабочий день.';return;}
+  if(workDays<=0){empty('В этом месяце нет рабочих смен по графику 2/2 — проверь первый рабочий день.');return;}
   const totalUnits=target/rate;
   const perDayUnits=totalUnits/workDays;
   const perDayMoney=target/workDays;
-  res.textContent=
-    'месяц: '+PLAN_MONTHS_G[m]+' '+y
-    +'\nграфик: 2 через 2'+(firstStr?' (старт '+anchor.getDate()+' '+PLAN_MONTHS_G[anchor.getMonth()]+')':'')
-    +'\nрабочих смен: '+workDays
-    +'\nработа: '+(tpl.name||'—')+' · '+fmt(rate)+' ₽/ед.'
-    +'\n— нужно всего: '+fmt(Math.ceil(totalUnits))+' ед.'
-    +'\n— в смену: ~'+(Math.round(perDayUnits*10)/10).toLocaleString('ru-RU')+' ед. (~'+fmt(perDayMoney)+' ₽)';
+  const n1=x=>(Math.round(x*10)/10).toLocaleString('ru-RU');
+  res.innerHTML=
+    '<div class="plan-hero">'
+      +'<div class="plan-hero-lbl">Норма на смену</div>'
+      +'<div class="plan-hero-val">~'+n1(perDayUnits)+' ед.</div>'
+      +'<div class="plan-hero-sub">≈ '+fmt(perDayMoney)+' ₽ за смену</div>'
+    +'</div>'
+    +'<div class="plan-grid">'
+      +'<div class="plan-tile"><div class="pt-lbl">Рабочих смен</div><div class="pt-val">'+workDays+'</div><div class="pt-sub">'+PLAN_MONTHS_G[m]+' · график 2/2</div></div>'
+      +'<div class="plan-tile"><div class="pt-lbl">Всего за месяц</div><div class="pt-val">'+fmt(Math.ceil(totalUnits))+' ед.</div></div>'
+      +'<div class="plan-tile"><div class="pt-lbl">Работа</div><div class="pt-val" style="font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(tpl.name||'—')+'</div><div class="pt-sub">'+fmt(rate)+' ₽/ед.</div></div>'
+      +'<div class="plan-tile"><div class="pt-lbl">Цель месяца</div><div class="pt-val">'+fmt(target)+' ₽</div></div>'
+    +'</div>';
 }
 // Owner-only: store the chosen first working day in the global config.
 async function planMakeGlobal(){
