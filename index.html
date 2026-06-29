@@ -1817,7 +1817,7 @@ let _syncError = false;   // last cloud read/write actually failed (vs. silently
 // is on but the key isn't loaded (new device / cleared cache) the app is LOCKED
 // and must not sync until unlocked with the password or recovery code.
 const E2EE_FLAG_KEY='salary_e2ee';        // '1' once enabled for this account
-let e2eeOn=false, e2eeDEK=null, e2eeLocked=false, _loginPassword='';
+let e2eeOn=false, e2eeDEK=null, e2eeLocked=false, _loginPassword='', _e2eeBusy=false;
 
 // ══════════════════════════════════════════════
 //  HOLIDAYS
@@ -4906,7 +4906,7 @@ async function doFirebaseLogout(){
 // until its write lands. Legacy records without a _ts keep the old "empty cloud
 // never wipes non-empty local" guard so the migration to timestamps is lossless.
 async function loadAllUserData(){
-  if(!currentUser||!sbClient)return;
+  if(!currentUser||!sbClient||_e2eeBusy)return;
   // Locked E2EE: can't decrypt, so don't pull (would misread ciphertext).
   if(e2eeOn&&(!e2eeDEK||e2eeLocked))return;
   // Run settings + periods in parallel so one slow query can't time out the
@@ -5074,7 +5074,7 @@ function scheduleFlush(){clearTimeout(_flushTimer);_flushTimer=setTimeout(flushP
 // reflects edit time, not write time. Failures keep the key queued and retry
 // with exponential backoff — an edit is never silently dropped.
 async function flushPending(){
-  if(!currentUser||!sbClient||_flushing)return;
+  if(!currentUser||!sbClient||_flushing||_e2eeBusy)return;
   // Locked E2EE: never upload (we can't encrypt, and must not overwrite ciphertext).
   if(e2eeOn&&(!e2eeDEK||e2eeLocked))return;
   const keys=pendingGet();if(!keys.length)return;
@@ -5137,7 +5137,7 @@ async function flushPending(){
 // reach the cloud before we read it back. Guarded + throttled against bursts.
 async function refreshFromCloud(force){
   if(!currentUser||!sbClient)return;
-  if(_refreshing)return;
+  if(_refreshing||_e2eeBusy)return;
   const now=Date.now();
   if(!force&&now-_lastRefresh<3000)return;
   _refreshing=true;_lastRefresh=now;renderSyncStatus();
@@ -5283,10 +5283,59 @@ async function e2eeInit(){
   // never query user_keys — and never log a 404 — for accounts not using E2EE.
   e2eeOn=localStorage.getItem(E2EE_FLAG_KEY)==='1';
   if(!e2eeOn)return;
+  // If the key material was deleted (E2EE turned off on another device), follow
+  // suit here so we don't keep encrypting or lock ourselves out. Only a clean
+  // "row absent" disables; a network error keeps the current state (so a blip
+  // can't falsely disable us and clobber ciphertext). Queried only when the flag
+  // is set, so non-E2EE accounts never touch user_keys.
+  try{
+    const{data,error}=await sbClient.from('user_keys').select('user_id').eq('user_id',currentUser.id).maybeSingle();
+    if(error)throw error;
+    if(!data){
+      e2eeOn=false;e2eeDEK=null;e2eeLocked=false;
+      localStorage.removeItem(E2EE_FLAG_KEY);clearDEKLocal();
+      renderSyncStatus();return;
+    }
+  }catch(e){/* offline/transient — keep current state */}
   if(await loadDEKLocal()){e2eeLocked=false;_loginPassword='';return;}
   if(_loginPassword&&await e2eeUnlock(_loginPassword,'pw')){_loginPassword='';return;}
   e2eeLocked=true;                          // needs manual unlock
   renderSyncStatus();
+}
+
+// Turn E2EE OFF: re-upload all data as plaintext (from the always-plaintext
+// localStorage), clear the cipher columns, delete the key material. All-or-
+// nothing — on any failure E2EE stays on, so there's never a half-migrated state.
+async function e2eeDisable(){
+  if(!currentUser||!sbClient){toast('Войдите в аккаунт');return;}
+  if(!e2eeOn){toast('Шифрование уже выключено');return;}
+  if(e2eeLocked||!e2eeDEK){toast('Сначала разблокируйте на этом устройстве');return;}
+  if(!confirm('Отключить шифрование? Данные в облаке станут обычными (защита базы останется на уровне доступа RLS). Локальные данные не пострадают. Продолжить?'))return;
+  if(navigator.onLine===false){toast('Нужна сеть, чтобы отключить шифрование');return;}
+  _e2eeBusy=true;renderSyncStatus();toast('Отключаю шифрование…',null,5000);
+  try{
+    const keys=[];
+    for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&/^salary_\d+_\d+_\d+$/.test(k))keys.push(k.replace('salary_',''));}
+    for(const k of keys){
+      const p=periodPayload(k);if(!p)continue;
+      const ts=Date.now();
+      const{error}=await sbClient.from('periods').upsert({user_id:currentUser.id,period_key:k,days:p.days||{},bonuses:p.bonuses||[],tax_enabled:!!p.taxEnabled,day_overrides:p.dayOverrides||{},expenses:p.expenses||[],cipher:null,updated_at:new Date(ts).toISOString()},{onConflict:'user_id,period_key'});
+      if(error)throw error;
+      p._rev=ts;p._ts=ts;try{localStorage.setItem('salary_'+k,JSON.stringify(p));}catch(_){}
+    }
+    const ts=Date.now();
+    const goalsOut=Object.assign({},goals,{_counter:counter});
+    const{error:se}=await sbClient.from('user_settings').upsert({user_id:currentUser.id,templates,goals:goalsOut,theme:lightTheme?'light':'dark',expenses:[],cipher:null,updated_at:new Date(ts).toISOString()},{onConflict:'user_id'});
+    if(se)throw se;
+    localStorage.setItem(SETTINGS_REV_KEY,String(ts));
+    try{await sbClient.from('user_keys').delete().eq('user_id',currentUser.id);}catch(_){}
+    e2eeOn=false;e2eeDEK=null;e2eeLocked=false;
+    localStorage.removeItem(E2EE_FLAG_KEY);clearDEKLocal();
+    toast('✓ Шифрование отключено');haptic('medium');
+  }catch(e){
+    console.error('e2eeDisable',e);
+    toast('Не удалось отключить (сеть?). Шифрование осталось включено — попробуйте позже или через VPN.',null,6000);
+  }finally{_e2eeBusy=false;renderEncryptionCard();renderSyncStatus();}
 }
 
 // Enable flow: confirm a backup, verify the password, then encrypt everything.
@@ -5324,7 +5373,7 @@ function renderEncryptionCard(){
     btn.textContent='🔓 Разблокировать';btn.setAttribute('onclick','e2eeUnlockFlow()');
   }else{
     el.innerHTML='✓ Шифрование включено и активно. Данные в облаке зашифрованы — прочитать их без вашего пароля/recovery-кода нельзя.';
-    btn.textContent='Шифрование активно';btn.setAttribute('onclick','');
+    btn.textContent='🔓 Отключить шифрование';btn.setAttribute('onclick','e2eeDisable()');
   }
 }
 
