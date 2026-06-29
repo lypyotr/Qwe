@@ -4718,10 +4718,12 @@ window.addEventListener('unhandledrejection',ev=>{
 });
 
 async function fetchWithRetry(input,init){
-  // Resilient to DPI/throttled networks that reset connections mid-request
-  // (net::ERR_CONNECTION_RESET). Resets fail fast, so 6 tries cost little time
-  // but give a dropped route several fresh chances to get through.
-  const tries=6,perTry=12000;
+  // Balance two failure modes on DPI/throttled networks:
+  //  • reset connections fail fast → extra tries are cheap and help;
+  //  • SILENTLY HUNG connections wait the whole timeout, so keep the timeout
+  //    short and the try-count modest, otherwise a single request can stall for
+  //    over a minute and the sync indicator spins forever.
+  const tries=3,perTry=7000;
   let lastErr;
   for(let i=0;i<tries;i++){
     const ctrl=new AbortController();
@@ -4730,11 +4732,7 @@ async function fetchWithRetry(input,init){
       return await fetch(input,{...init,signal:ctrl.signal});
     }catch(e){
       lastErr=e;
-      if(i<tries-1){
-        // Exponential backoff with jitter instead of hammering the same drop.
-        const base=Math.min(500*Math.pow(1.8,i),6000);
-        await new Promise(r=>setTimeout(r,base+Math.random()*400));
-      }
+      if(i<tries-1)await new Promise(r=>setTimeout(r,500*(i+1)+Math.random()*300));
     }finally{clearTimeout(timer);}
   }
   throw lastErr;
@@ -5127,14 +5125,20 @@ async function refreshFromCloud(force){
   if(_refreshing)return;
   const now=Date.now();
   if(!force&&now-_lastRefresh<3000)return;
-  _refreshing=true;_lastRefresh=now;
-  try{
+  _refreshing=true;_lastRefresh=now;renderSyncStatus();
+  // Watchdog: never let the "busy" state hang forever on a dead/slow network.
+  // If the whole cycle exceeds the cap, give up, surface an error, and free the
+  // flag so the next attempt (or a tap) can run.
+  const work=(async()=>{
     await flushPending();
     await loadAllUserData();   // pull + timestamp merge (skips queued keys)
     await loadAppConfig();     // refresh global announcement / maintenance too
     await flushPending();      // upload legacy/local-only periods found in merge
     renderAll();
-  }catch(e){console.error('refreshFromCloud',e);}
+  })();
+  const guard=new Promise((_,rej)=>setTimeout(()=>rej(new Error('refresh timeout')),30000));
+  try{await Promise.race([work,guard]);}
+  catch(e){_syncError=true;console.error('refreshFromCloud',e);}
   finally{_refreshing=false;renderSyncStatus();}
 }
 
