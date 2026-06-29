@@ -5077,9 +5077,11 @@ async function flushPending(){
           const goalsOut=Object.assign({},goals,{_counter:counter});
           let row={user_id:currentUser.id,updated_at:new Date(ts).toISOString()};
           if(e2eeOn&&e2eeDEK){
-            // Encrypt contents; send empty placeholders for the plaintext columns.
+            // Encrypt contents; blank EVERY plaintext data column. expenses is a
+            // legacy/unused column on user_settings — clear it too so no plaintext
+            // lingers in an encrypted row.
             row.cipher=await encField({templates,goals:goalsOut,theme:lightTheme?'light':'dark'});
-            row.templates=[];row.goals={};row.theme='';
+            row.templates=[];row.goals={};row.theme='';row.expenses=[];
           }else{
             // Plaintext path: never reference the `cipher` column, so sync keeps
             // working even if e2ee_setup.sql hasn't been run.
