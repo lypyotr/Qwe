@@ -5366,14 +5366,14 @@ function renderEncryptionCard(){
   const el=document.getElementById('encStatus'),btn=document.getElementById('encBtn');
   if(!el||!btn)return;
   if(!e2eeOn){
-    el.innerHTML='Шифрование выключено. Данные хранятся в облаке в открытом виде (защищены только доступом).';
-    btn.textContent='🔒 Включить шифрование';btn.setAttribute('onclick','e2eeEnableFlow()');
+    el.innerHTML='Данные в облаке защищены доступом (RLS) и шифрованием Supabase на дисках (at-rest) + TLS в канале. Сквозное шифрование на сайте отключено.';
+    btn.style.display='none';
   }else if(e2eeLocked){
-    el.innerHTML='🔒 Шифрование включено, но <b>заблокировано</b> на этом устройстве. Разблокируйте, чтобы синхронизировать.';
-    btn.textContent='🔓 Разблокировать';btn.setAttribute('onclick','e2eeUnlockFlow()');
+    el.innerHTML='🔒 Шифрование пока включено и <b>заблокировано</b> на этом устройстве. Разблокируйте, чтобы отключить его.';
+    btn.style.display='';btn.textContent='🔓 Разблокировать';btn.setAttribute('onclick','e2eeUnlockFlow()');
   }else{
-    el.innerHTML='✓ Шифрование включено и активно. Данные в облаке зашифрованы — прочитать их без вашего пароля/recovery-кода нельзя.';
-    btn.textContent='🔓 Отключить шифрование';btn.setAttribute('onclick','e2eeDisable()');
+    el.innerHTML='Сквозное шифрование пока включено на вашем аккаунте. Нажмите, чтобы отключить — данные в облаке станут обычными (защита базы останется на RLS + at-rest Supabase).';
+    btn.style.display='';btn.textContent='🔓 Отключить шифрование';btn.setAttribute('onclick','e2eeDisable()');
   }
 }
 
