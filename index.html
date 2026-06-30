@@ -547,6 +547,14 @@ body.light .cur-toggle.usd{background:rgba(74,222,128,.2);color:var(--text)}
 }
 .exp-card-eff{font-size:10px;font-weight:600;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .exp-empty{padding:6px 16px 14px;font-size:13px;color:var(--muted)}
+/* Per-expense include/exclude toggle */
+.exp-toggle{position:absolute;top:9px;right:9px;width:34px;height:19px;background:var(--border);border-radius:10px;cursor:pointer;transition:background .2s;flex:none}
+.exp-toggle::after{content:'';position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;background:#fff;transition:transform .2s}
+.exp-toggle.on{background:var(--accent)}
+.exp-toggle.on::after{transform:translateX(15px)}
+.exp-card.off{opacity:.55;border-left-color:var(--muted)}
+.exp-card.off .exp-card-amount{color:var(--muted);text-decoration:line-through}
+.exp-card .exp-card-name{padding-right:40px}
 
 /* expense edit modal: amount + segmented mode control (reused) */
 .exp-mode{
@@ -3695,7 +3703,8 @@ function renderExpenses(){
     let eff='';
     if(item.mode==='day')eff=`${wd} дн → −${M(amt*wd)}`;
     else if(item.mode==='month')eff=`½ мес → −${M(amt/2)}`;
-    return `<div class="exp-card" onclick="openExpEdit(${item.id})">
+    return `<div class="exp-card${item.disabled?' off':''}" onclick="openExpEdit(${item.id})">
+      <div class="exp-toggle${item.disabled?'':' on'}" onclick="event.stopPropagation();toggleExpenseActive(${item.id})" title="Учитывать в выплате"></div>
       <div class="exp-card-name">${name}</div>
       <div class="exp-card-amount">${Mn(amt)}<span class="cur"> ${curSymFor(amt)}</span></div>
       <div class="exp-card-meta">
@@ -3706,9 +3715,19 @@ function renderExpenses(){
   }).join('');
   list.innerHTML=`<div class="exp-grid">${cards}</div>`;
 }
+// Flip whether an expense counts toward the payout. Tapping the toggle must not
+// open the edit modal (the card's own onclick) — caller stops propagation.
+function toggleExpenseActive(id){
+  const item=expenseItems.find(e=>e.id===id);
+  if(!item)return;
+  item.disabled=!item.disabled;
+  saveExpenses();haptic('light');
+  renderExpenses();renderTotal();renderGoals();
+}
 function calcExpensesTotal(){
   const wd=calcWorkedDays();
   return expenseItems.reduce((s,item)=>{
+    if(item.disabled)return s;          // excluded from the payout
     const amt=parseFloat(item.amount)||0;
     if(item.mode==='day') return s+amt*wd;
     if(item.mode==='month') return s+amt/2;
@@ -5570,7 +5589,7 @@ function collectPeriodStats(){
       const d=JSON.parse(localStorage.getItem(k)||'{}');
       const base=[].concat.apply([],Object.values(d.days||{})).reduce((s,w)=>s+(parseFloat(w.qty)||0)*(parseFloat(w.price)||0),0);
       const bonus=(d.bonuses||[]).reduce((s,b)=>s+(parseFloat(b.amount)||0),0);
-      const expenses=(d.expenses||[]).reduce((s,e)=>s+(parseFloat(e.amount)||0),0);
+      const expenses=(d.expenses||[]).reduce((s,e)=>e&&e.disabled?s:s+(parseFloat(e.amount)||0),0);
       let total=base+bonus;if(d.taxEnabled)total*=0.87;total=Math.max(0,total);
       const worked=Object.keys(d.days||{}).filter(day=>(d.days[day]||[]).reduce((s,w)=>s+(parseFloat(w.qty)||0)*(parseFloat(w.price)||0),0)>0).length;
       items.push({k,y,m,p,total,base,bonus,expenses,worked});
