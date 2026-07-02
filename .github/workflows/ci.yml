@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Fast fail: the whole app is one inline <script>; a syntax error or a
+      # duplicated function from a botched merge kills every feature at once.
+      - name: Inline script static checks
+        run: node scripts/check-inline-js.mjs
+
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+
+      - name: Boot smoke test (headless Chromium)
+        run: node scripts/smoke.mjs
