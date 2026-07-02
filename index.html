@@ -1940,32 +1940,20 @@ function switchPage(name){
 }
 function restorePage(){
   try{
-    const p = localStorage.getItem('salary_page') || 'work';
-
-    setTimeout(() => {
-      if (p === 'chat') {
-        // Пытаемся восстановить именно чат с последним другом
-        const lastChatFriend = localStorage.getItem('salary_last_chat');
-        if (lastChatFriend) {
-          setTimeout(() => {
-            if (typeof openChat === 'function') {
-              openChat(lastChatFriend);
-            } else {
-              switchPage('friends');
-            }
-          }, 400);
-        } else {
-          switchPage('friends');
-        }
-      } else if (p === 'friends') {
-        switchPage('friends');
-        setTimeout(() => {
-          if (typeof initFriendsPage === 'function') initFriendsPage();
-        }, 300);
-      } else {
-        switchPage(p);
-      }
-    }, 220);
+    const p=localStorage.getItem('salary_page');
+    if(p==='period')switchPage('period');
+    else if(p==='archive')switchPage('archive');
+    else if(p==='calc')switchPage('calc');
+    else if(p==='profile')switchPage('profile');
+    else if(p==='stats')switchPage('stats');
+        else if(p==='friends'){
+      switchPage('friends');
+      // Fix: friends not loading after page refresh
+      setTimeout(() => {
+        if (typeof initFriendsPage === 'function') initFriendsPage();
+      }, 350);
+    }
+    // 'chat' is deliberately not restored — it needs a selected friend.
   }catch(e){}
 }
 
@@ -5921,12 +5909,82 @@ function pingFriend(fid){
   }catch(e){}
 }
 // Incoming ping: refresh the open chat, or bump unread + notify.
-function onIncomingMsgPing(from){
-  if(!from||from===currentUser?.id)return;
-  const chatOpen=_chatFriend&&_chatFriend.id===from&&document.getElementById('page-chat').classList.contains('active');
-  if(chatOpen){loadChatMessages();markReadNow(from);return;}
+async function onIncomingMsgPing(from){
+  if(!from || from === currentUser?.id) return;
+
+  const chatOpen = _chatFriend && _chatFriend.id === from && 
+                   document.getElementById('page-chat').classList.contains('active');
+
+  if (chatOpen) {
+    loadChatMessages();
+    markReadNow(from);
+    return;
+  }
+
   bumpUnread(from);
-  loadProfiles([from]).then(()=>toast('💬 '+_pname(from)+': новое сообщение'));
+  await loadProfiles([from]);
+
+  const name = _pname(from);
+  toast('💬 ' + name + ': новое сообщение');
+
+  // Показываем уведомление с текстом сообщения (если возможно)
+  showMessageNotificationWithText(from, name);
+}
+
+// Показывает браузерное уведомление с текстом последнего сообщения
+async function showMessageNotificationWithText(fromId, name) {
+  if (!('Notification' in window)) return;
+
+  // Не показываем, если чат уже открыт с этим человеком
+  if (document.hasFocus() && _chatFriend && _chatFriend.id === fromId) {
+    return;
+  }
+
+  let bodyText = name + ' написал(а) тебе';
+
+  // Пытаемся получить и расшифровать последнее сообщение
+  try {
+    const { data: messages } = await sbClient
+      .from('messages')
+      .select('body, created_at')
+      .eq('sender', fromId)
+      .eq('recipient', currentUser.id)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (messages && messages.length > 0) {
+      const profile = _profileCache[fromId];
+      if (profile && profile.pubkey) {
+        const key = await msgConvKey(fromId, profile.pubkey);
+        const decrypted = await msgDecrypt(key, messages[0].body);
+        
+        // Обрезаем длинные сообщения
+        const preview = decrypted.length > 80 ? decrypted.substring(0, 77) + '...' : decrypted;
+        bodyText = name + ': ' + preview;
+      }
+    }
+  } catch (e) {
+    console.warn('Не удалось показать текст в уведомлении', e);
+  }
+
+  if (Notification.permission === 'granted') {
+    try {
+      const notification = new Notification('Новое сообщение', {
+        body: bodyText,
+        icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="22" fill="%236366f1"/><text y=".9em" font-size="72" x="12">💬</text></svg>',
+        tag: 'msg-' + fromId
+      });
+
+      notification.onclick = () => {
+        window.focus();
+        openChat(fromId);
+        notification.close();
+      };
+    } catch (e) {}
+  } 
+  else if (Notification.permission !== 'denied') {
+    Notification.requestPermission();
+  }
 }
 
 // Publish our public directory entry (name, #number, ECDH pubkey) so others can
@@ -6090,13 +6148,9 @@ async function openChat(fid){
   document.getElementById('chatMessages').innerHTML='<div class="chat-empty">Загрузка…</div>';
   _chatSig='';_chatMsgs=[];
   markReadNow(fid);clearUnread(fid);
-
-  // Запоминаем последнего открытого друга в чате (чтобы можно было восстановить после F5)
-  try { localStorage.setItem('salary_last_chat', fid); } catch(_) {}
-
   switchPage('chat');
   await loadChatMessages();
-  markReadNow(fid);
+  markReadNow(fid);   // everything shown is now read
   startChatPoll();
 }
 function startChatPoll(){stopChatPoll();_chatPoll=setInterval(loadChatMessages,4000);}
