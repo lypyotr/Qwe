@@ -1150,6 +1150,9 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
 .friend-id{font-size:11px;font-weight:700;color:var(--muted);opacity:.7}
 .friend-row-btn{flex:none;background:var(--accent);color:#06281e;border:none;font-family:'Manrope',sans-serif;font-size:12px;font-weight:800;padding:8px 12px;border-radius:10px;cursor:pointer}
 .friend-row-btn.ghost{background:var(--surface);color:var(--muted);border:1px solid var(--border)}
+.friend-unread{flex:none;min-width:20px;height:20px;border-radius:10px;background:var(--danger);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;padding:0 6px}
+.nav-btn{position:relative}
+.nav-dot{position:absolute;top:4px;right:calc(50% - 16px);width:8px;height:8px;border-radius:50%;background:var(--danger);display:none}
 
 /* Add-friend confirmation overlay */
 #addFriendOverlay{position:fixed;inset:0;z-index:9400;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;padding:20px}
@@ -1868,6 +1871,7 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
   <div class="nav-btn" id="navProfile" onclick="switchPage('profile')">
     <span class="nav-icon">👤</span>
     <span class="nav-lbl">Профиль</span>
+    <span class="nav-dot" id="navProfileDot"></span>
   </div>
 </nav>
 
@@ -4981,6 +4985,7 @@ function enterApp(user){
       startAppConfigRealtime();
       await ensureUserNumber();// assign/fetch this account's #number
       publishProfile();        // publish name/#/pubkey to the friends directory
+      recountUnread();         // unread badge without visiting the friends page
     }catch(e){console.error('cloud sync',e);}
   })();
 }
@@ -5205,6 +5210,7 @@ function startRealtimeSync(){
       // 3s throttle or an in-flight cycle (it queues a follow-up instead).
       refreshFromCloud(true);
     })
+    .on('broadcast',{event:'msg'},({payload})=>{onIncomingMsgPing(payload&&payload.from);})
     .subscribe(status=>{
       if(realtimeChannel!==ch)return; // stale channel — ignore
       if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED'){
@@ -5843,6 +5849,54 @@ async function msgConvKey(friendId,theirPubB64){
 async function msgEncrypt(key,text){const iv=_rand(12);const ct=await _sub().encrypt({name:'AES-GCM',iv},key,_enc.encode(text));return 'm1.'+_mb64(iv)+'.'+_mb64(ct);}
 async function msgDecrypt(key,packed){try{const a=String(packed).split('.');const pt=await _sub().decrypt({name:'AES-GCM',iv:_mub64(a[1])},key,_mub64(a[2]));return _dec.decode(pt);}catch(e){return '🔒 не удалось расшифровать';}}
 
+// ── Unread tracking ──
+// Source of truth is a per-friend "last read" timestamp; counts are recomputed
+// from the server on loadFriends (so messages that arrived while the app was
+// closed still count), and bumped live on incoming pings.
+const MSG_READ_KEY='salary_msg_read', UNREAD_KEY='salary_unread';
+function readMapGet(){try{return JSON.parse(localStorage.getItem(MSG_READ_KEY)||'{}')||{};}catch(_){return{};}}
+function markReadNow(fid){const m=readMapGet();m[fid]=new Date().toISOString();try{localStorage.setItem(MSG_READ_KEY,JSON.stringify(m));}catch(_){}}
+function unreadGet(){try{return JSON.parse(localStorage.getItem(UNREAD_KEY)||'{}')||{};}catch(_){return{};}}
+function unreadSet(m){try{localStorage.setItem(UNREAD_KEY,JSON.stringify(m));}catch(_){}renderNavUnread();}
+function bumpUnread(fid){const m=unreadGet();m[fid]=(m[fid]||0)+1;unreadSet(m);renderFriends();}
+function clearUnread(fid){const m=unreadGet();if(m[fid]){delete m[fid];unreadSet(m);}renderFriends();}
+function renderNavUnread(){
+  const dot=document.getElementById('navProfileDot');if(!dot)return;
+  const m=unreadGet();dot.style.display=Object.values(m).some(n=>n>0)?'block':'none';
+}
+// Recount unread from the server against the last-read marks.
+async function recountUnread(){
+  if(!currentUser||!sbClient)return;
+  try{
+    const{data}=await sbClient.from('messages').select('sender,created_at').eq('recipient',currentUser.id).order('created_at',{ascending:false}).limit(200);
+    const lr=readMapGet(),counts={};
+    (data||[]).forEach(mm=>{if(mm.created_at>(lr[mm.sender]||''))counts[mm.sender]=(counts[mm.sender]||0)+1;});
+    unreadSet(counts);
+  }catch(e){}
+}
+
+// ── Instant delivery: broadcast a ping into the RECIPIENT's user channel ──
+const _pingCh={};
+function pingFriend(fid){
+  if(!sbClient)return;
+  try{
+    let ch=_pingCh[fid];
+    if(ch&&ch.state==='joined'){ch.send({type:'broadcast',event:'msg',payload:{from:currentUser.id}});return;}
+    if(ch){try{sbClient.removeChannel(ch);}catch(_){}delete _pingCh[fid];}
+    ch=sbClient.channel('user-sync-'+fid);
+    _pingCh[fid]=ch;
+    ch.subscribe(st=>{if(st==='SUBSCRIBED')try{ch.send({type:'broadcast',event:'msg',payload:{from:currentUser.id}});}catch(_){}});
+  }catch(e){}
+}
+// Incoming ping: refresh the open chat, or bump unread + notify.
+function onIncomingMsgPing(from){
+  if(!from||from===currentUser?.id)return;
+  const chatOpen=_chatFriend&&_chatFriend.id===from&&document.getElementById('page-chat').classList.contains('active');
+  if(chatOpen){loadChatMessages();markReadNow(from);return;}
+  bumpUnread(from);
+  loadProfiles([from]).then(()=>toast('💬 '+_pname(from)+': новое сообщение'));
+}
+
 // Publish our public directory entry (name, #number, ECDH pubkey) so others can
 // find and message us. Never includes salary data.
 async function publishProfile(){
@@ -5882,6 +5936,7 @@ async function loadFriends(){
     await loadProfiles([...ids]);
     _friendsCache=rows.filter(r=>r.user_id===currentUser.id&&r.status==='accepted').map(r=>r.friend_id);
     _reqCache=rows.filter(r=>r.friend_id===currentUser.id&&r.status==='pending'&&!_friendsCache.includes(r.user_id)).map(r=>r.user_id);
+    await recountUnread();   // include messages that arrived while we were away
     renderFriends();
   }catch(e){console.warn('loadFriends',e);if(list)list.innerHTML='<div class="friend-empty">Не удалось загрузить друзей. Похоже, не выполнен social_setup.sql.</div>';}
 }
@@ -5889,9 +5944,11 @@ function friendRowHtml(id,kind){
   const action=kind==='req'
     ?`<button class="friend-row-btn" onclick="event.stopPropagation();friendAccept('${id}')">Принять</button>`:'';
   const click=kind==='friend'?`onclick="openChat('${id}')"`:'';
+  const un=kind==='friend'?(unreadGet()[id]||0):0;
   return `<div class="friend-row" ${click}>
     <div class="friend-av">${esc(_avatar(id))}</div>
     <div class="friend-info"><div class="friend-name">${esc(_pname(id))}</div><div class="friend-id">${_pseq(id)}</div></div>
+    ${un?`<span class="friend-unread">${un>99?'99+':un}</span>`:''}
     ${action}
   </div>`;
 }
@@ -5952,8 +6009,10 @@ async function openChat(fid){
   document.getElementById('chatTitle').textContent=_pname(fid);
   document.getElementById('chatSub').textContent='🔒 зашифровано '+_pseq(fid);
   document.getElementById('chatMessages').innerHTML='<div class="chat-empty">Загрузка…</div>';
+  markReadNow(fid);clearUnread(fid);
   switchPage('chat');
   await loadChatMessages();
+  markReadNow(fid);   // everything shown is now read
   startChatPoll();
 }
 function startChatPoll(){stopChatPoll();_chatPoll=setInterval(loadChatMessages,4000);}
@@ -5985,6 +6044,7 @@ async function chatSend(){
     const{error}=await sbClient.from('messages').insert({sender:currentUser.id,recipient:_chatFriend.id,body});
     if(error)throw error;
     _chatMsgs.push({me:true,text,t:new Date().toISOString()});renderChat(_chatMsgs);
+    pingFriend(_chatFriend.id);  // instant delivery: nudge the recipient to pull
   }catch(e){toast('Не отправлено: '+((e&&e.message)||e));inp.value=text;}
 }
 function renderChat(list){
