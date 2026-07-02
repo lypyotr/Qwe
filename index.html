@@ -851,7 +851,7 @@ body.light .cur-toggle.usd{background:rgba(74,222,128,.2);color:var(--text)}
 .maint-overlay .maint-title{font-size:22px;font-weight:800;margin-bottom:12px}
 .maint-overlay .maint-msg{font-size:15px;color:var(--muted);line-height:1.6;max-width:340px;white-space:pre-wrap}
 
-/* ── FIREBASE AUTH SCREEN ── */
+/* ── AUTH SCREEN ── */
 .auth-overlay{
   position:fixed;inset:0;z-index:1000;
   background:var(--bg);
@@ -1220,7 +1220,7 @@ body.chat-open .bottom-nav{display:none}
 </div>
 
 <!-- AUTH SCREEN -->
-<!-- APP LOADER (hides flash while Firebase resolves auth) -->
+<!-- APP LOADER (hides flash while Supabase resolves auth) -->
 <div id="appLoader" style="position:fixed;inset:0;z-index:2000;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:40px;transition:opacity .25s">💰</div>
 
 <div class="auth-overlay hidden" id="authOverlay">
@@ -1232,9 +1232,9 @@ body.chat-open .bottom-nav{display:none}
     <div id="authLoginForm">
       <input class="auth-input" id="authEmail" type="email" placeholder="Email" autocomplete="email">
       <input class="auth-input" id="authPassword" type="password" placeholder="Пароль" autocomplete="current-password"
-        onkeydown="if(event.key==='Enter')doFirebaseLogin()">
+        onkeydown="if(event.key==='Enter')doLogin()">
       <div class="auth-error" id="authError"></div>
-      <button class="auth-btn" onclick="doFirebaseLogin()">Войти</button>
+      <button class="auth-btn" onclick="doLogin()">Войти</button>
       <div class="auth-link" onclick="showAuthRegister()">Нет аккаунта? <span>Зарегистрироваться</span></div>
       <div class="auth-link" onclick="showAuthForgot()">Забыли пароль?</div>
     </div>
@@ -1244,9 +1244,9 @@ body.chat-open .bottom-nav{display:none}
       <input class="auth-input" id="regEmail" type="email" placeholder="Email" autocomplete="email">
       <input class="auth-input" id="regPassword" type="password" placeholder="Пароль (минимум 6 символов)" autocomplete="new-password">
       <input class="auth-input" id="regPassword2" type="password" placeholder="Повтори пароль" autocomplete="new-password"
-        onkeydown="if(event.key==='Enter')doFirebaseRegister()">
+        onkeydown="if(event.key==='Enter')doRegister()">
       <div class="auth-error" id="regError"></div>
-      <button class="auth-btn" onclick="doFirebaseRegister()">Создать аккаунт</button>
+      <button class="auth-btn" onclick="doRegister()">Создать аккаунт</button>
       <div class="auth-link" onclick="showAuthLogin()">Уже есть аккаунт? <span>Войти</span></div>
     </div>
 
@@ -1601,7 +1601,7 @@ body.chat-open .bottom-nav{display:none}
     <div class="calc-card">
       <div class="calc-card-title">Аккаунт</div>
       <div class="prof-email" id="profileEmail">—</div>
-      <button class="modal-btn" style="width:100%;padding:13px;background:rgba(248,113,113,.12);color:var(--danger);border:1px solid rgba(248,113,113,.3)" onclick="doFirebaseLogout()">Выйти из аккаунта</button>
+      <button class="modal-btn" style="width:100%;padding:13px;background:rgba(248,113,113,.12);color:var(--danger);border:1px solid rgba(248,113,113,.3)" onclick="doLogout()">Выйти из аккаунта</button>
     </div>
 
     <!-- Admin (owner only) -->
@@ -4982,7 +4982,7 @@ async function fetchWithRetry(input,init){
   throw lastErr;
 }
 
-function initFirebase(){
+function initSupabase(){
   try{
     sbClient=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{
       auth:{
@@ -5084,7 +5084,7 @@ function supabaseErrMsg(err){
   return msg||'Неизвестная ошибка';
 }
 
-async function doFirebaseLogin(){
+async function doLogin(){
   const email=document.getElementById('authEmail').value.trim(),pass=document.getElementById('authPassword').value,errEl=document.getElementById('authError');
   errEl.textContent='';if(!email||!pass){errEl.textContent='Введи email и пароль';return;}
   document.getElementById('authLoading').style.display='';
@@ -5097,7 +5097,7 @@ async function doFirebaseLogin(){
   // left the user stuck on the login screen until a 2nd/3rd attempt.
   if(data&&data.user)enterApp(data.user);
 }
-async function doFirebaseRegister(){
+async function doRegister(){
   const email=document.getElementById('regEmail').value.trim(),pass=document.getElementById('regPassword').value,pass2=document.getElementById('regPassword2').value,errEl=document.getElementById('regError');
   errEl.textContent='';if(!email||!pass){errEl.textContent='Заполни все поля';return;}
   if(pass!==pass2){errEl.textContent='Пароли не совпадают';return;}
@@ -5115,7 +5115,7 @@ async function doForgotPassword(){
   if(error){msgEl.style.color='var(--danger)';msgEl.textContent=supabaseErrMsg(error);}
   else{msgEl.style.color='var(--accent)';msgEl.textContent='Письмо отправлено! Проверь почту.';}
 }
-async function doFirebaseLogout(){
+async function doLogout(){
   if(!confirm('Выйти из аккаунта?'))return;
   // Local scope clears the session on THIS device without the server-side revoke
   // call that was returning 403 (stale session) and aborting the logout.
@@ -6328,7 +6328,7 @@ loadCalcInput();
 renderCounter();if(counter.enabled&&counter.running)startCounterTimer();
 restorePage();initPWA();initTotalSwipe();
 restoreScroll();
-initFirebase();
+initSupabase();
 refreshUsdRateIfNeeded(); // fetch/refresh USD rate in the background
 autoBackupLocal();        // roll a local safety snapshot (~daily)
 renderSyncStatus();       // paint the header sync pill
