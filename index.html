@@ -1847,7 +1847,7 @@ const CLIENT_ID = Math.random().toString(36).slice(2) + Date.now().toString(36);
 const PENDING_KEY = 'salary_pending';     // JSON array of keys awaiting upload
 const SETTINGS_TS_KEY = 'salary_settings_ts';   // local edit time (sent as updated_at)
 const SETTINGS_REV_KEY = 'salary_settings_rev'; // last cloud updated_at we synced to
-let _refreshing = false, _lastRefresh = 0, _resyncTimer = null;
+let _refreshing = false, _lastRefresh = 0, _resyncTimer = null, _refreshQueued = false;
 let _syncWired = false, _pollTimer = null;
 let _flushTimer = null, _flushing = false, _flushBackoff = 1000;
 let _syncError = false;   // last cloud read/write actually failed (vs. silently ok)
@@ -1959,7 +1959,12 @@ function getPeriod(){
 function saveKey(){const{year,month,period}=getPeriod();return`salary_${year}_${month}_${period}`}
 function save(){
   try{
-    localStorage.setItem(saveKey(),JSON.stringify({days,bonuses,taxEnabled,dayOverrides,expenses:expenseItems,_ts:Date.now()}));
+    // Preserve the sync revision (_rev = last cloud updated_at we synced to);
+    // dropping it would make reconciliation treat this record as never-synced.
+    let prev=null;try{prev=JSON.parse(localStorage.getItem(saveKey())||'null');}catch(_){}
+    const rec={days,bonuses,taxEnabled,dayOverrides,expenses:expenseItems,_ts:Date.now()};
+    if(prev&&typeof prev._rev==='number')rec._rev=prev._rev;
+    localStorage.setItem(saveKey(),JSON.stringify(rec));
     renderHistory();renderAchievements();
   }catch(e){}
   markPeriodDirty(periodFsKey());
@@ -1982,9 +1987,10 @@ function onPeriodChange(){
   selectedDay=null;load();
   renderPeriodCard();renderDayStrip();renderDayPanel();renderBonuses();
   renderTotal();renderChart();renderHistory();renderGoals();renderExpenses();
-  if (currentUser && sbClient) {
-    loadAllUserData().then(() => { renderAll(); startRealtimeSync(); }).catch(e=>console.error('period change',e));
-  }
+  // Full cycle (flush → pull → flush) with the watchdog and busy-guard, instead
+  // of a raw pull. The broadcast channel is per-user, not per-period — do NOT
+  // recreate it here (that dropped pings on every month/period switch).
+  if(currentUser&&sbClient)refreshFromCloud(true);
 }
 
 // Make sure the month dropdown has an option for (y,m), adding it (kept in
@@ -5020,6 +5026,12 @@ async function loadAllUserData(){
       // Legacy local settings never synced and cloud isn't better — keep & upload.
       localStorage.setItem(SETTINGS_TS_KEY,String(Date.now()));pendingAdd('settings');
     }
+  }else if(s===null&&_pullOk&&!pend.includes('settings')&&(nz(templates)||nz(goals))){
+    // Cloud has NO settings row at all (fresh project / wiped table) but this
+    // device has real settings — push them up instead of waiting for the next
+    // local edit. Guarded by _pullOk so a failed read can't masquerade as
+    // "row absent".
+    localStorage.setItem(SETTINGS_TS_KEY,String(Date.now()));pendingAdd('settings');
   }
 
   // ── Periods ──
@@ -5080,7 +5092,9 @@ function startRealtimeSync(){
   realtimeChannel=ch;
   ch.on('broadcast',{event:'data-updated'},({payload})=>{
       if(payload&&payload.from===CLIENT_ID)return; // ignore our own echo
-      refreshFromCloud();
+      // Force: a ping means another device JUST wrote — never drop it to the
+      // 3s throttle or an in-flight cycle (it queues a follow-up instead).
+      refreshFromCloud(true);
     })
     .subscribe(status=>{
       if(realtimeChannel!==ch)return; // stale channel — ignore
@@ -5090,6 +5104,10 @@ function startRealtimeSync(){
       }
     });
 }
+
+// True while the broadcast channel is actually joined — used to avoid tearing
+// down a healthy subscription (every teardown is a window of missed pings).
+function realtimeHealthy(){return !!(realtimeChannel&&realtimeChannel.state==='joined');}
 
 // Tell other open devices that this client just wrote something, so they pull.
 function broadcastChange(){
@@ -5126,7 +5144,10 @@ function scheduleFlush(){clearTimeout(_flushTimer);_flushTimer=setTimeout(flushP
 // reflects edit time, not write time. Failures keep the key queued and retry
 // with exponential backoff — an edit is never silently dropped.
 async function flushPending(){
-  if(!currentUser||!sbClient||_flushing||_e2eeBusy)return;
+  if(!currentUser||!sbClient||_e2eeBusy)return;
+  // Another flush in flight: re-arm instead of silently dropping, so an edit
+  // made during an upload is sent right after it, not on the next 25s poll.
+  if(_flushing){scheduleFlush();return;}
   // Locked E2EE: never upload (we can't encrypt, and must not overwrite ciphertext).
   if(e2eeOn&&(!e2eeDEK||e2eeLocked))return;
   const keys=pendingGet();if(!keys.length)return;
@@ -5157,6 +5178,11 @@ async function flushPending(){
           // Remember the revision we just wrote so a later pull doesn't re-adopt
           // our own write (and so equality reconciliation has a baseline).
           localStorage.setItem(SETTINGS_REV_KEY,String(ts));
+          // Only clear the queue if no newer settings edit landed while the
+          // upload was in flight — otherwise keep it queued for the next round.
+          const curTs=parseInt(localStorage.getItem(SETTINGS_TS_KEY)||'0',10)||0;
+          if(curTs===ts)pendingDel(k);
+          uploaded=true;
         }else{
           const p=periodPayload(k);
           if(!p){pendingDel(k);continue;}
@@ -5171,14 +5197,26 @@ async function flushPending(){
           }
           const{error}=await sbClient.from('periods').upsert(row,{onConflict:'user_id,period_key'});
           if(error)throw error;
-          p._rev=ts;try{localStorage.setItem('salary_'+k,JSON.stringify(p));}catch(_){}
+          // Re-read before writing back: an edit made DURING the network await
+          // must not be clobbered by the stale pre-upload payload, and must
+          // stay queued. Only stamp _rev / dequeue if nothing changed.
+          const cur=periodPayload(k);
+          if(cur&&(cur._ts||0)===ts){
+            cur._rev=ts;try{localStorage.setItem('salary_'+k,JSON.stringify(cur));}catch(_){}
+            pendingDel(k);
+          }
+          uploaded=true;
         }
-        pendingDel(k);uploaded=true;
       }catch(e){allOk=false;console.error('flush',k,e);}
     }
   }finally{_flushing=false;}
   if(uploaded)broadcastChange();
-  if(allOk){_flushBackoff=1000;_syncError=false;if(uploaded)syncLog('up','отправлено в облако: '+keys.length);}
+  if(allOk){
+    _flushBackoff=1000;_syncError=false;
+    if(uploaded)syncLog('up','отправлено в облако: '+keys.length);
+    // Anything still queued (kept above, or added mid-flight) goes next round.
+    if(pendingGet().length)scheduleFlush();
+  }
   else{_syncError=true;syncLog('err','не удалось отправить — повтор позже');clearTimeout(_flushTimer);_flushTimer=setTimeout(flushPending,_flushBackoff);_flushBackoff=Math.min(_flushBackoff*2,30000);}
   renderSyncStatus();
 }
@@ -5189,7 +5227,10 @@ async function flushPending(){
 // reach the cloud before we read it back. Guarded + throttled against bursts.
 async function refreshFromCloud(force){
   if(!currentUser||!sbClient)return;
-  if(_refreshing||_e2eeBusy)return;
+  // A forced refresh (broadcast ping, manual tap) arriving while one is already
+  // running must not be dropped — the running cycle may have read the cloud
+  // BEFORE the other device's write landed. Queue exactly one follow-up.
+  if(_refreshing||_e2eeBusy){if(force)_refreshQueued=true;return;}
   const now=Date.now();
   if(!force&&now-_lastRefresh<3000)return;
   _refreshing=true;_lastRefresh=now;renderSyncStatus();
@@ -5206,7 +5247,10 @@ async function refreshFromCloud(force){
   const guard=new Promise((_,rej)=>setTimeout(()=>rej(new Error('refresh timeout')),30000));
   try{await Promise.race([work,guard]);}
   catch(e){_syncError=true;syncLog('err','таймаут синхронизации (30с)');console.error('refreshFromCloud',e);}
-  finally{_refreshing=false;renderSyncStatus();}
+  finally{
+    _refreshing=false;renderSyncStatus();
+    if(_refreshQueued){_refreshQueued=false;setTimeout(()=>refreshFromCloud(true),300);}
+  }
 }
 
 // Keep data fresh without table replication: refetch when the app regains
@@ -5216,7 +5260,10 @@ async function refreshFromCloud(force){
 function setupSyncListeners(){
   if(_syncWired)return;_syncWired=true;
   document.addEventListener('visibilitychange',()=>{
-    if(document.visibilityState==='visible'){startRealtimeSync();refreshFromCloud();}
+    // Reconnect realtime only when the socket is actually dead (iOS closes it
+    // in background); recreating a healthy channel would drop pings for the
+    // duration of the resubscribe.
+    if(document.visibilityState==='visible'){if(!realtimeHealthy())startRealtimeSync();refreshFromCloud();}
     else flushPending();
   });
   window.addEventListener('focus',()=>refreshFromCloud());
