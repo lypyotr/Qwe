@@ -5909,7 +5909,7 @@ function pingFriend(fid){
   }catch(e){}
 }
 // Incoming ping: refresh the open chat, or bump unread + notify.
-async function onIncomingMsgPing(from){
+function onIncomingMsgPing(from){
   if(!from || from === currentUser?.id) return;
 
   const chatOpen = _chatFriend && _chatFriend.id === from && 
@@ -5922,68 +5922,50 @@ async function onIncomingMsgPing(from){
   }
 
   bumpUnread(from);
-  await loadProfiles([from]);
-
-  const name = _pname(from);
-  toast('💬 ' + name + ': новое сообщение');
-
-  // Показываем уведомление с текстом сообщения (если возможно)
-  showMessageNotificationWithText(from, name);
+  loadProfiles([from]).then(() => {
+    toast('💬 ' + _pname(from) + ': новое сообщение');
+    playMessageSound();           // звук уведомления
+  });
 }
 
-// Показывает браузерное уведомление с текстом последнего сообщения
-async function showMessageNotificationWithText(fromId, name) {
-  if (!('Notification' in window)) return;
-
-  // Не показываем, если чат уже открыт с этим человеком
-  if (document.hasFocus() && _chatFriend && _chatFriend.id === fromId) {
-    return;
-  }
-
-  let bodyText = name + ' написал(а) тебе';
-
-  // Пытаемся получить и расшифровать последнее сообщение
+// Простой приятный звук уведомления (Web Audio API)
+let _audioContext = null;
+function playMessageSound() {
   try {
-    const { data: messages } = await sbClient
-      .from('messages')
-      .select('body, created_at')
-      .eq('sender', fromId)
-      .eq('recipient', currentUser.id)
-      .order('created_at', { ascending: false })
-      .limit(1);
+    if (!('AudioContext' in window || 'webkitAudioContext' in window)) return;
 
-    if (messages && messages.length > 0) {
-      const profile = _profileCache[fromId];
-      if (profile && profile.pubkey) {
-        const key = await msgConvKey(fromId, profile.pubkey);
-        const decrypted = await msgDecrypt(key, messages[0].body);
-        
-        // Обрезаем длинные сообщения
-        const preview = decrypted.length > 80 ? decrypted.substring(0, 77) + '...' : decrypted;
-        bodyText = name + ': ' + preview;
-      }
+    if (!_audioContext) {
+      _audioContext = new (window.AudioContext || window.webkitAudioContext)();
     }
+
+    const ctx = _audioContext;
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+
+    // Приятный "ding" звук
+    oscillator.type = 'sine';
+    oscillator.frequency.value = 880; // A5
+
+    filter.type = 'lowpass';
+    filter.frequency.value = 1200;
+
+    gain.gain.value = 0.25;
+
+    // Envelope (fade out)
+    const now = ctx.currentTime;
+    gain.gain.setValueAtTime(0.25, now);
+    gain.gain.linearRampToValueAtTime(0.001, now + 0.6);
+
+    // Подключаем
+    oscillator.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+
+    oscillator.start(now);
+    oscillator.stop(now + 0.7);
   } catch (e) {
-    console.warn('Не удалось показать текст в уведомлении', e);
-  }
-
-  if (Notification.permission === 'granted') {
-    try {
-      const notification = new Notification('Новое сообщение', {
-        body: bodyText,
-        icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="22" fill="%236366f1"/><text y=".9em" font-size="72" x="12">💬</text></svg>',
-        tag: 'msg-' + fromId
-      });
-
-      notification.onclick = () => {
-        window.focus();
-        openChat(fromId);
-        notification.close();
-      };
-    } catch (e) {}
-  } 
-  else if (Notification.permission !== 'denied') {
-    Notification.requestPermission();
+    // silently fail if audio is blocked
   }
 }
 
