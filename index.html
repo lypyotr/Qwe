@@ -5065,14 +5065,16 @@ async function doForgotPassword(){
 async function doFirebaseLogout(){
   if(!confirm('Выйти из аккаунта?'))return;
 
-  // === ВАЖНО: полностью очищаем данные предыдущего пользователя ===
-  clearLocalUserData();
+  // === Очищаем данные предыдущего пользователя, НО НЕ трогаем ключ шифрования сообщений ===
+  // Ключ сообщений (MSG_PRIV_KEY) — device-bound, он должен остаться, иначе старые сообщения
+  // перестанут расшифровываться после повторного входа.
+  clearUserContentOnly();
 
-  // Local scope clears the session on THIS device
+  // Local scope clears the session
   try{await sbClient.auth.signOut({scope:'local'});}
   catch(e){console.warn('signOut',e);}
 
-  // Hard-clear auth tokens
+  // Clear auth tokens
   try{
     localStorage.removeItem('salary-auth-token');
     for(let i=localStorage.length-1;i>=0;i--){
@@ -5081,7 +5083,7 @@ async function doFirebaseLogout(){
     }
   }catch(_){}
 
-  // Reset E2EE
+  // Сбрасываем только app-level E2EE (данные зарплаты), но не messaging keys
   try{e2eeDEK=null;e2eeLocked=false;clearDEKLocal();}catch(_){}
 
   currentUser=null;
@@ -5092,19 +5094,21 @@ async function doFirebaseLogout(){
   location.reload();
 }
 
-// Полная очистка пользовательских данных из localStorage
-function clearLocalUserData(){
+// Очищает только контент пользователя (периоды, шаблоны, цели и т.д.),
+// но НЕ удаляет ключ шифрования сообщений (MSG_PRIV_KEY).
+function clearUserContentOnly(){
   try{
-    // Удаляем все периоды
+    // Удаляем все периоды и связанные данные
     for(let i=localStorage.length-1; i>=0; i--){
       const k = localStorage.key(i);
-      if(k && /^salary_/.test(k)){
+      if(k && /^salary_/.test(k) && 
+         !k.includes('msg_priv') &&           // не трогаем ключ сообщений
+         !k.includes(MSG_PRIV_KEY)) {
         localStorage.removeItem(k);
       }
     }
 
-    // Удаляем пользовательские настройки и кэши
-    const userKeys = [
+    const keysToClear = [
       'salary_templates',
       'salary_goals',
       'salary_counter',
@@ -5117,18 +5121,16 @@ function clearLocalUserData(){
       SETTINGS_REV_KEY,
       MSG_READ_KEY,
       UNREAD_KEY,
-      MSG_PRIV_KEY,
-      MSG_PRIV_KEY + '_pub',
       E2EE_FLAG_KEY
     ];
-    userKeys.forEach(k => { try{localStorage.removeItem(k);}catch(_){} });
+    keysToClear.forEach(k => { try { localStorage.removeItem(k); } catch(_) {} });
 
-    // Сбрасываем E2EE состояние
+    // Сбрасываем состояние app E2EE
     e2eeOn = false;
     e2eeDEK = null;
     e2eeLocked = false;
   }catch(e){
-    console.warn('clearLocalUserData', e);
+    console.warn('clearUserContentOnly', e);
   }
 }
 
