@@ -4919,7 +4919,7 @@ async function fetchWithRetry(input,init){
   //  • SILENTLY HUNG connections wait the whole timeout, so keep the timeout
   //    short and the try-count modest, otherwise a single request can stall for
   //    over a minute and the sync indicator spins forever.
-  const tries=3,perTry=12000;
+  const tries=3,perTry=15000;
   let lastErr;
   for(let i=0;i<tries;i++){
     const ctrl=new AbortController();
@@ -5973,12 +5973,24 @@ async function initFriendsPage(){
   }
 }
 async function loadFriends(){
+  async function loadFriends(){
   if(!currentUser||!sbClient)return;
   const list=document.getElementById('friendsList');
-  if(list) list.innerHTML = '<div class="friend-empty">Loading…</div>';
+  if(list) list.innerHTML = '<div class="friend-empty">Загрузка…</div>';
+
   try{
-    const{data,error}=await sbClient.from('friends').select('*').or(`user_id.eq.${currentUser.id},friend_id.eq.${currentUser.id}`);
-    if(error)throw error;
+    const{data,error}=await sbClient.from('friends')
+      .select('*')
+      .or(`user_id.eq.${currentUser.id},friend_id.eq.${currentUser.id}`);
+
+    if(error){
+      if(error.name === 'AbortError' || error.message?.includes('aborted')){
+        console.warn('loadFriends: запрос прерван (таймаут)');
+      } else {
+        console.error('loadFriends error', error);
+      }
+      throw error;
+    }
     const rows=data||[];
     const ids=new Set();rows.forEach(r=>ids.add(r.user_id===currentUser.id?r.friend_id:r.user_id));
     await loadProfiles([...ids]);
