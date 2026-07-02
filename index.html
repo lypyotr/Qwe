@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -2904,14 +2904,7 @@ function curSym(){return (currencyView==='usd'&&usdRate>0)?'$':'₽';} // generi
 function curSymFor(n){return moneyParts(n).sym;}                     // ¢ when n rounds to $0
 function Mn(n){return moneyParts(n).num;}
 function M(n){const p=moneyParts(n);return p.num+' '+p.sym;}
-function esc(s){
-  return (s || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')}
 
 // ══════════════════════════════════════════════
 //  TOGGLE
@@ -4942,7 +4935,13 @@ function initFirebase(){
         autoRefreshToken:true,
         detectSessionInUrl:true,
         storage:window.localStorage,
-        storageKey:'salary-auth-token'
+        storageKey:'salary-auth-token',
+        // Bypass the Web Locks API. supabase-js serialises auth with
+        // navigator.locks by default; in some browsers / multi-tab / private
+        // modes that lock can never resolve, leaving sign-in stuck on
+        // "Входим…" forever (it never even reaches the network call, so it
+        // never errors out). Running the callback directly avoids the deadlock.
+        lock:(name,acquireTimeout,fn)=>fn()
       },
       global:{fetch:fetchWithRetry}
     });
@@ -5932,11 +5931,63 @@ function pingFriend(fid){
 }
 // Incoming ping: refresh the open chat, or bump unread + notify.
 function onIncomingMsgPing(from){
-  if(!from||from===currentUser?.id)return;
-  const chatOpen=_chatFriend&&_chatFriend.id===from&&document.getElementById('page-chat').classList.contains('active');
-  if(chatOpen){loadChatMessages();markReadNow(from);return;}
+  if(!from || from === currentUser?.id) return;
+
+  const chatOpen = _chatFriend && _chatFriend.id === from && 
+                   document.getElementById('page-chat').classList.contains('active');
+
+  if (chatOpen) {
+    loadChatMessages();
+    markReadNow(from);
+    return;
+  }
+
   bumpUnread(from);
-  loadProfiles([from]).then(()=>toast('💬 '+_pname(from)+': новое сообщение'));
+  loadProfiles([from]).then(() => {
+    toast('💬 ' + _pname(from) + ': новое сообщение');
+    playMessageSound();           // звук уведомления
+  });
+}
+
+// Простой приятный звук уведомления (Web Audio API)
+let _audioContext = null;
+function playMessageSound() {
+  try {
+    if (!('AudioContext' in window || 'webkitAudioContext' in window)) return;
+
+    if (!_audioContext) {
+      _audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    const ctx = _audioContext;
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+
+    // Приятный "ding" звук
+    oscillator.type = 'sine';
+    oscillator.frequency.value = 880; // A5
+
+    filter.type = 'lowpass';
+    filter.frequency.value = 1200;
+
+    gain.gain.value = 0.25;
+
+    // Envelope (fade out)
+    const now = ctx.currentTime;
+    gain.gain.setValueAtTime(0.25, now);
+    gain.gain.linearRampToValueAtTime(0.001, now + 0.6);
+
+    // Подключаем
+    oscillator.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+
+    oscillator.start(now);
+    oscillator.stop(now + 0.7);
+  } catch (e) {
+    // silently fail if audio is blocked
+  }
 }
 
 // Publish our public directory entry (name, #number, ECDH pubkey) so others can
