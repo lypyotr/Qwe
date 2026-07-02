@@ -4919,7 +4919,7 @@ async function fetchWithRetry(input,init){
   //  • SILENTLY HUNG connections wait the whole timeout, so keep the timeout
   //    short and the try-count modest, otherwise a single request can stall for
   //    over a minute and the sync indicator spins forever.
-  const tries=3,perTry=7000;
+  const tries=3,perTry=12000;
   let lastErr;
   for(let i=0;i<tries;i++){
     const ctrl=new AbortController();
@@ -5105,7 +5105,28 @@ async function loadAllUserData(){
   // whole chain. Each query is tolerated independently. Timeouts and retries
   // are handled by fetchWithRetry at the transport level.
   let _pullOk=true;
-  const settledData=async(query)=>{try{const{data,error}=await query;if(error){_pullOk=false;console.error('loadAllUserData query',error);return undefined;}return data;}catch(e){_pullOk=false;console.error('loadAllUserData query',e);return undefined;}};
+  const settledData = async (query) => {
+  try {
+    const { data, error } = await query;
+    
+    if (error) {
+      // Не логируем AbortError как ошибку — это нормально при таймауте
+      if (error.name !== 'AbortError' && !error.message?.includes('aborted')) {
+        console.warn('loadAllUserData query warning:', error.message || error);
+      }
+      _pullOk = false;
+      return undefined;
+    }
+    return data;
+  } catch (e) {
+    // Игнорируем AbortError и сетевые таймауты
+    if (e?.name !== 'AbortError' && !e?.message?.toLowerCase().includes('aborted')) {
+      console.warn('loadAllUserData query error:', e?.message || e);
+    }
+    _pullOk = false;
+    return undefined;
+  }
+};
   const[s,periods]=await Promise.all([
     settledData(sbClient.from('user_settings').select('*').eq('user_id',currentUser.id).maybeSingle()),
     settledData(sbClient.from('periods').select('*').eq('user_id',currentUser.id))
@@ -5406,7 +5427,7 @@ function setupSyncListeners(){
   window.addEventListener('online',()=>{syncLog('net','сеть появилась');renderSyncStatus();flushPending();refreshFromCloud(true);startRealtimeSync();});
   window.addEventListener('offline',()=>{syncLog('net','офлайн');renderSyncStatus();});
   window.addEventListener('pagehide',flushPending);
-  _pollTimer=setInterval(()=>{if(document.visibilityState==='visible')refreshFromCloud();},25000);
+  _pollTimer=setInterval(()=>{if(document.visibilityState==='visible')refreshFromCloud();},45000);
   // Keep the "synced N ago" label fresh even when nothing is happening.
   setInterval(()=>{if(document.visibilityState==='visible')renderSyncStatus();},15000);
 }
