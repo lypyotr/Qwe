@@ -45,6 +45,14 @@ body{
   body{box-shadow:0 0 0 1px var(--border),0 24px 80px rgba(0,0,0,.35)}
 }
 
+.friend-row-btn.danger {
+  background: #c0392b;
+  color: white;
+}
+.friend-row-btn.danger:hover {
+  background: #e74c3c;
+}
+
 /* ── HEADER ── */
 .header{
   padding:52px 20px 14px;
@@ -5962,9 +5970,14 @@ async function loadFriends(){
   }catch(e){console.warn('loadFriends',e);if(list)list.innerHTML='<div class="friend-empty">Не удалось загрузить: нет связи, либо не выполнен social_setup.sql в Supabase.</div>';}
 }
 function friendRowHtml(id,kind){
-  const action=kind==='req'
-    ?`<button class="friend-row-btn" onclick="event.stopPropagation();friendAccept('${id}')">Принять</button>`
-    :kind==='out'?`<span class="friend-row-btn ghost">ожидает</span>`:'';
+  let action = '';
+if(kind === 'req'){
+  action = `<button class="friend-row-btn" onclick="event.stopPropagation();friendAccept('${id}')">Принять</button>`;
+} else if(kind === 'out'){
+  action = `<button class="friend-row-btn ghost" onclick="event.stopPropagation();removeFriend('${id}')">Отменить</button>`;
+} else if(kind === 'friend'){
+  action = `<button class="friend-row-btn danger" onclick="event.stopPropagation();removeFriend('${id}')">Удалить</button>`;
+}
   const click=kind==='friend'?`onclick="openChat('${id}')"`:'';
   const un=kind==='friend'?(unreadGet()[id]||0):0;
   return `<div class="friend-row" ${click}>
@@ -6029,6 +6042,30 @@ async function friendAccept(fid){
     await sbClient.from('friends').upsert({user_id:currentUser.id,friend_id:fid,status:'accepted'},{onConflict:'user_id,friend_id'});
     toast('Заявка принята');haptic('medium');loadFriends();
   }catch(e){toast('Ошибка: '+((e&&e.message)||e));}
+}
+
+async function removeFriend(id){
+  if(!currentUser || !sbClient) return;
+  if(!confirm('Удалить из друзей?')) return;
+
+  try{
+    // Удаляем обе записи (в обе стороны)
+    await sbClient.from('friends')
+      .delete()
+      .or(`and(user_id.eq.${currentUser.id},friend_id.eq.${id}),and(user_id.eq.${id},friend_id.eq.${currentUser.id})`);
+
+    toast('Удалено из друзей');
+    
+    // Обновляем кэш и список
+    _friendsCache = _friendsCache.filter(x => x !== id);
+    _reqCache = _reqCache.filter(x => x !== id);
+    _outCache = _outCache.filter(x => x !== id);
+    
+    renderFriends();
+  }catch(e){
+    console.error(e);
+    toast('Ошибка при удалении');
+  }
 }
 
 // ── Chat ──
