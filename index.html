@@ -894,7 +894,7 @@ body.light .cur-toggle.usd{background:rgba(74,222,128,.2);color:var(--text)}
 .bg-aurora{
   position:fixed;top:0;bottom:0;left:50%;transform:translateX(-50%);
   width:100%;max-width:var(--app-max);z-index:-2;overflow:hidden;pointer-events:none;
-  will-change:transform,filter;transform:translateX(-50%) translate3d(0,0,0);
+  will-change:transform;transform:translateX(-50%) translate3d(0,0,0);
 }
 .bg-aurora::before,.bg-aurora::after{
   content:'';position:absolute;inset:-35%;will-change:transform;
@@ -934,6 +934,12 @@ body.light .bg-aurora::after{
   100%{transform:translate3d(-3%,-2%,0) rotate(-5deg) scale(1)}
 }
 @media (prefers-reduced-motion:reduce){
+  .bg-aurora::before,.bg-aurora::after{animation:none}
+}
+/* Touch devices: freeze the drift — animating huge blurred gradient layers
+   keeps the GPU busy, janks scrolling and drains the battery. The static
+   gradients stay, so the glass look is preserved. */
+@media (hover:none) and (pointer:coarse){
   .bg-aurora::before,.bg-aurora::after{animation:none}
 }
 
@@ -2904,7 +2910,7 @@ function curSym(){return (currencyView==='usd'&&usdRate>0)?'$':'₽';} // generi
 function curSymFor(n){return moneyParts(n).sym;}                     // ¢ when n rounds to $0
 function Mn(n){return moneyParts(n).num;}
 function M(n){const p=moneyParts(n);return p.num+' '+p.sym;}
-function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')}
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#039;')}
 
 // ══════════════════════════════════════════════
 //  TOGGLE
@@ -4255,8 +4261,10 @@ function renderBioSection(){}
 function toggleBio(){}
 
 // ══════════════════════════════════════════════
-//  SCROLL SHIMMER (aurora hue-shift + parallax)
+//  SCROLL SHIMMER (aurora parallax)
 // ══════════════════════════════════════════════
+// transform-only: a scroll-driven hue-rotate filter used to live here, but it
+// re-rendered the full-screen aurora layer every frame — heavy on mobile GPUs.
 (function(){
   const aurora=document.getElementById('bgAurora');
   if(!aurora)return;
@@ -4264,9 +4272,7 @@ function toggleBio(){}
   let cur=0,target=0,raf=null;
   function frame(){
     cur+=(target-cur)*0.07;
-    const hue=(cur*0.14)%360;
     const y=Math.max(-60,Math.min(60,cur*-0.06));
-    aurora.style.filter=`hue-rotate(${hue}deg)`;
     aurora.style.transform=`translateX(-50%) translate3d(0,${y}px,0)`;
     if(Math.abs(target-cur)>0.5){raf=requestAnimationFrame(frame)}
     else{cur=target;raf=null}
@@ -4655,7 +4661,56 @@ const BACKUP_TABLES=[
   {name:'periods',      conflict:'user_id,period_key'},
   {name:'app_config',   conflict:'id'},
 ];
-const BACKUP_LS_KEY='salary_db_backup';
+const BACKUP_LS_KEY='salary_db_backup'; // record key in IDB; legacy localStorage key
+const BACKUP_IDB_NAME='salary_backups';
+const BACKUP_IDB_STORE='snapshots';
+
+// Snapshots live in IndexedDB: localStorage caps out around 5 MB and a full
+// DB dump (history, transactions, chats) blows past that quickly with a
+// QuotaExceededError. IndexedDB has no such hard limit.
+function idbBackupOpen(){
+  return new Promise((res,rej)=>{
+    if(!('indexedDB' in window)){rej(new Error('IndexedDB недоступна'));return;}
+    const req=indexedDB.open(BACKUP_IDB_NAME,1);
+    req.onupgradeneeded=()=>{
+      const db=req.result;
+      if(!db.objectStoreNames.contains(BACKUP_IDB_STORE))db.createObjectStore(BACKUP_IDB_STORE);
+    };
+    req.onsuccess=()=>res(req.result);
+    req.onerror=()=>rej(req.error||new Error('не удалось открыть IndexedDB'));
+  });
+}
+async function idbBackupSet(str){
+  const db=await idbBackupOpen();
+  try{
+    await new Promise((res,rej)=>{
+      const tx=db.transaction(BACKUP_IDB_STORE,'readwrite');
+      tx.objectStore(BACKUP_IDB_STORE).put(str,BACKUP_LS_KEY);
+      tx.oncomplete=res;
+      tx.onerror=tx.onabort=()=>rej(tx.error||new Error('не удалось записать в IndexedDB'));
+    });
+  }finally{db.close();}
+}
+async function idbBackupGet(){
+  try{
+    const db=await idbBackupOpen();
+    try{
+      const str=await new Promise((res,rej)=>{
+        const req=db.transaction(BACKUP_IDB_STORE,'readonly').objectStore(BACKUP_IDB_STORE).get(BACKUP_LS_KEY);
+        req.onsuccess=()=>res(req.result||null);
+        req.onerror=()=>rej(req.error);
+      });
+      if(str)return str;
+    }finally{db.close();}
+  }catch(e){console.warn('idbBackupGet',e);}
+  // One-time migration of a snapshot saved by older builds into localStorage.
+  try{
+    const legacy=localStorage.getItem(BACKUP_LS_KEY);
+    if(!legacy)return null;
+    try{await idbBackupSet(legacy);localStorage.removeItem(BACKUP_LS_KEY);}catch(_){/* keep legacy copy */}
+    return legacy;
+  }catch(e){return null;}
+}
 
 function backupMsg(t,kind){
   const e=document.getElementById('backupMsg');
@@ -4670,12 +4725,12 @@ function fmtBytes(n){
 }
 
 // Show whether a local backup already exists and when it was made.
-function renderBackupInfo(){
+async function renderBackupInfo(){
   const el=document.getElementById('backupInfo');
   if(!el)return;
   let line='локальный бэкап: нет';
   try{
-    const raw=localStorage.getItem(BACKUP_LS_KEY);
+    const raw=await idbBackupGet();
     if(raw){
       const p=JSON.parse(raw);
       const when=p&&p.exportedAt?new Date(p.exportedAt).toLocaleString('ru-RU'):'?';
@@ -4747,9 +4802,9 @@ async function adminBackupToLocal(){
     const payload=await adminFetchFullDb();
     const str=JSON.stringify(payload);
     try{
-      localStorage.setItem(BACKUP_LS_KEY,str);
+      await idbBackupSet(str);
     }catch(e){
-      backupMsg('Не помещается в localStorage ('+fmtBytes(str.length)+'). Скачай в файл.','err');
+      backupMsg('Не удалось сохранить локально ('+fmtBytes(str.length)+'): '+((e&&e.message)||e)+'. Скачай в файл.','err');
       return;
     }
     haptic('light');
@@ -4785,7 +4840,7 @@ async function adminRestoreFromLocal(){
   if(!isAdmin()){backupMsg('Доступно только владельцу','err');return;}
   let payload;
   try{
-    const raw=localStorage.getItem(BACKUP_LS_KEY);
+    const raw=await idbBackupGet();
     if(!raw){backupMsg('В локальном хранилище нет бэкапа','warn');return;}
     payload=JSON.parse(raw);
   }catch(e){backupMsg('Локальный бэкап повреждён','err');return;}
@@ -4935,13 +4990,11 @@ function initFirebase(){
         autoRefreshToken:true,
         detectSessionInUrl:true,
         storage:window.localStorage,
-        storageKey:'salary-auth-token',
-        // Bypass the Web Locks API. supabase-js serialises auth with
-        // navigator.locks by default; in some browsers / multi-tab / private
-        // modes that lock can never resolve, leaving sign-in stuck on
-        // "Входим…" forever (it never even reaches the network call, so it
-        // never errors out). Running the callback directly avoids the deadlock.
-        lock:(name,acquireTimeout,fn)=>fn()
+        storageKey:'salary-auth-token'
+        // No custom `lock` override: supabase-js serialises auth via the Web
+        // Locks API by default, which keeps token refresh consistent across
+        // tabs (a bypass caused session desync and random logouts). Where
+        // navigator.locks is unavailable, supabase-js falls back on its own.
       },
       global:{fetch:fetchWithRetry}
     });
@@ -5960,6 +6013,25 @@ function playMessageSound() {
     }
 
     const ctx = _audioContext;
+
+    // Autoplay policy: until the user has interacted with the page the
+    // context sits in 'suspended' and playback throws. Try to resume and
+    // play once it's actually running; otherwise skip the sound silently.
+    if (ctx.state === 'suspended') {
+      ctx.resume().then(() => {
+        if (ctx.state === 'running') _playDing(ctx);
+      }).catch(() => {});
+      return;
+    }
+
+    _playDing(ctx);
+  } catch (e) {
+    // silently fail if audio is blocked
+  }
+}
+
+function _playDing(ctx) {
+  try {
     const oscillator = ctx.createOscillator();
     const gain = ctx.createGain();
     const filter = ctx.createBiquadFilter();
@@ -6024,7 +6096,6 @@ async function initFriendsPage(){
   }
 }
 async function loadFriends(){
-  async function loadFriends(){
   if(!currentUser||!sbClient)return;
   const list=document.getElementById('friendsList');
   if(list) list.innerHTML = '<div class="friend-empty">Загрузка…</div>';
