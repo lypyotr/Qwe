@@ -6088,16 +6088,19 @@ async function initFriendsPage(){
   const my=document.getElementById('friendMyId');if(my)my.textContent=userSeq?('#'+userSeq):'#—';
   const m=document.getElementById('friendAddMsg');if(m)m.textContent='';
   publishProfile();
-  if(currentUser && sbClient){
-    await loadFriends();
-  } else {
-    // fallback if called too early
-    setTimeout(loadFriends, 400);
-  }
+  await loadFriends();
 }
-async function loadFriends(){
-  if(!currentUser||!sbClient)return;
+async function loadFriends(_retry){
   const list=document.getElementById('friendsList');
+  if(!currentUser||!sbClient){
+    // The tab can open before auth is ready. A silent return here would leave
+    // the static "Загрузка…" placeholder up forever, so retry briefly and
+    // then say what's wrong instead of spinning.
+    const n=_retry||0;
+    if(n<8){setTimeout(()=>loadFriends(n+1),500);}
+    else if(list)list.innerHTML='<div class="friend-empty">Нет сессии. Войди в аккаунт и открой вкладку снова.</div>';
+    return;
+  }
   if(list) list.innerHTML = '<div class="friend-empty">Загрузка…</div>';
 
   try{
