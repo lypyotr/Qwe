@@ -1938,7 +1938,13 @@ function restorePage(){
     else if(p==='calc')switchPage('calc');
     else if(p==='profile')switchPage('profile');
     else if(p==='stats')switchPage('stats');
-    else if(p==='friends')switchPage('friends');
+        else if(p==='friends'){
+      switchPage('friends');
+      // Fix: friends not loading after page refresh
+      setTimeout(() => {
+        if (typeof initFriendsPage === 'function') initFriendsPage();
+      }, 350);
+    }
     // 'chat' is deliberately not restored — it needs a selected friend.
   }catch(e){}
 }
@@ -5929,11 +5935,17 @@ async function initFriendsPage(){
   const my=document.getElementById('friendMyId');if(my)my.textContent=userSeq?('#'+userSeq):'#—';
   const m=document.getElementById('friendAddMsg');if(m)m.textContent='';
   publishProfile();
-  loadFriends();
+  if(currentUser && sbClient){
+    await loadFriends();
+  } else {
+    // fallback if called too early
+    setTimeout(loadFriends, 400);
+  }
 }
 async function loadFriends(){
   if(!currentUser||!sbClient)return;
   const list=document.getElementById('friendsList');
+  if(list) list.innerHTML = '<div class="friend-empty">Loading…</div>';
   try{
     const{data,error}=await sbClient.from('friends').select('*').or(`user_id.eq.${currentUser.id},friend_id.eq.${currentUser.id}`);
     if(error)throw error;
