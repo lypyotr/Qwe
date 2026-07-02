@@ -1131,6 +1131,48 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
 .synclog-empty{color:var(--muted);font-size:12px;text-align:center;padding:16px 0}
 .synclog-actions{display:flex;gap:8px}
 .synclog-actions .modal-btn{flex:1;padding:10px;font-size:13px}
+
+/* ── Friends ── */
+.friend-myid{font-size:30px;font-weight:800;color:var(--accent);letter-spacing:1px;margin-top:4px}
+.friend-add-row{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:4px 4px 4px 12px}
+.friend-add-hash{font-size:20px;font-weight:800;color:var(--muted);flex:none}
+.friend-add-input{flex:1;min-width:0;font-family:'Manrope',sans-serif;font-size:18px;font-weight:800;color:var(--text);background:transparent;border:none;outline:none;padding:10px 4px;-webkit-appearance:none}
+.friend-add-input::-webkit-outer-spin-button,.friend-add-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.friend-add-btn{flex:none;background:var(--accent);color:#06281e;border:none;font-family:'Manrope',sans-serif;font-size:13px;font-weight:800;padding:11px 16px;border-radius:11px;cursor:pointer;touch-action:manipulation}
+.friend-add-msg{font-size:12px;font-weight:600;margin-top:8px;min-height:16px;color:var(--muted)}
+.friend-section-title{font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);padding:4px 4px 8px;margin-top:6px}
+.friend-empty{color:var(--muted);font-size:13px;font-weight:600;padding:6px 4px 14px}
+.friend-row{display:flex;align-items:center;gap:12px;background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:11px 12px;margin-bottom:8px;cursor:pointer;touch-action:manipulation}
+.friend-row:active{transform:scale(.99)}
+.friend-av{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#06281e;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;flex:none}
+.friend-info{flex:1;min-width:0}
+.friend-name{font-size:14px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.friend-id{font-size:11px;font-weight:700;color:var(--muted);opacity:.7}
+.friend-row-btn{flex:none;background:var(--accent);color:#06281e;border:none;font-family:'Manrope',sans-serif;font-size:12px;font-weight:800;padding:8px 12px;border-radius:10px;cursor:pointer}
+.friend-row-btn.ghost{background:var(--surface);color:var(--muted);border:1px solid var(--border)}
+
+/* Add-friend confirmation overlay */
+#addFriendOverlay{position:fixed;inset:0;z-index:9400;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;padding:20px}
+.af-card{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:20px;max-width:360px;width:100%;box-sizing:border-box}
+.af-q{font-size:16px;font-weight:700;color:var(--text);line-height:1.45;margin-bottom:16px;text-align:center}
+.af-actions{display:flex;gap:8px}
+.af-actions .modal-btn{flex:1;padding:12px}
+
+/* ── Chat ── */
+#page-chat{display:none;flex-direction:column;height:100dvh}
+#page-chat.active{display:flex}
+.chat-sub{font-size:11px;font-weight:600;color:var(--accent);opacity:.85}
+.chat-messages{flex:1;overflow-y:auto;padding:12px 14px calc(12px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:6px}
+.chat-bubble{max-width:78%;padding:8px 12px;border-radius:16px;font-size:14px;font-weight:500;line-height:1.35;word-break:break-word;white-space:pre-wrap}
+.chat-bubble .cb-time{display:block;font-size:9px;font-weight:600;opacity:.6;margin-top:3px}
+.chat-bubble.me{align-self:flex-end;background:var(--accent);color:#06281e;border-bottom-right-radius:5px}
+.chat-bubble.them{align-self:flex-start;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-bottom-left-radius:5px}
+.chat-day{align-self:center;font-size:10px;font-weight:700;color:var(--muted);background:var(--surface2);border-radius:10px;padding:3px 10px;margin:6px 0}
+.chat-empty{align-self:center;color:var(--muted);font-size:13px;font-weight:600;margin-top:30px;text-align:center}
+.chat-input-bar{display:flex;gap:8px;padding:8px 12px calc(8px + env(safe-area-inset-bottom));background:var(--surface);border-top:1px solid var(--border)}
+.chat-input{flex:1;min-width:0;font-family:'Manrope',sans-serif;font-size:15px;font-weight:500;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:11px 16px;outline:none}
+.chat-send{flex:none;width:44px;height:44px;border-radius:50%;background:var(--accent);color:#06281e;border:none;font-size:18px;cursor:pointer;touch-action:manipulation}
+.chat-send:active{transform:scale(.94)}
 </style>
 </head>
 <body>
@@ -1507,6 +1549,13 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
       <button class="modal-btn" style="width:100%;padding:13px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="toggleTheme()">🌗 Сменить тему</button>
     </div>
 
+    <!-- Friends & messages -->
+    <div class="calc-card">
+      <div class="calc-card-title">👥 Друзья и сообщения</div>
+      <div class="calc-card-sub">Добавляй друзей по их ID и переписывайся — сообщения зашифрованы «от устройства к устройству».</div>
+      <button class="modal-btn" style="width:100%;padding:13px" onclick="switchPage('friends')">Открыть друзей</button>
+    </div>
+
     <!-- Statistics -->
     <div class="calc-card">
       <div class="calc-card-title">Статистика</div>
@@ -1621,6 +1670,62 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
     <!-- filled by renderStats() -->
   </div>
 </div><!-- /page-stats -->
+
+<!-- ══ PAGE: FRIENDS ══ -->
+<div class="page" id="page-friends">
+  <div class="header">
+    <div class="header-left"><div class="header-label">👥 Друзья</div></div>
+    <div class="sync-pill" onclick="openSyncLog()" title="Синхронизация"><span class="sp-dot"></span><span class="sp-txt">—</span></div>
+  </div>
+  <div class="calc-wrap">
+    <div class="calc-card">
+      <div class="calc-card-title">Твой ID</div>
+      <div class="calc-card-sub">Назови этот номер другу, чтобы он добавил тебя.</div>
+      <div class="friend-myid" id="friendMyId">#—</div>
+    </div>
+    <div class="calc-card">
+      <div class="calc-card-title">Добавить друга по ID</div>
+      <div class="friend-add-row">
+        <span class="friend-add-hash">#</span>
+        <input class="friend-add-input" id="friendAddInput" type="number" inputmode="numeric" min="1" placeholder="номер">
+        <button class="friend-add-btn" onclick="friendLookup()">Найти</button>
+      </div>
+      <div class="friend-add-msg" id="friendAddMsg"></div>
+    </div>
+    <div id="friendReqWrap" style="display:none">
+      <div class="friend-section-title">Заявки в друзья</div>
+      <div id="friendRequests"></div>
+    </div>
+    <div class="friend-section-title">Мои друзья</div>
+    <div id="friendsList"><div class="friend-empty">Загрузка…</div></div>
+  </div>
+</div><!-- /page-friends -->
+
+<!-- ══ PAGE: CHAT ══ -->
+<div class="page" id="page-chat">
+  <div class="header">
+    <div class="header-left" style="display:flex;flex-direction:row;align-items:center;gap:10px;cursor:pointer" onclick="switchPage('friends')">
+      <span style="font-size:22px">‹</span>
+      <div><div class="header-label" id="chatTitle" style="font-size:16px">Чат</div><div class="chat-sub" id="chatSub">🔒 зашифровано</div></div>
+    </div>
+  </div>
+  <div class="chat-messages" id="chatMessages"></div>
+  <div class="chat-input-bar">
+    <input class="chat-input" id="chatInput" type="text" placeholder="Сообщение…" onkeydown="if(event.key==='Enter')chatSend()">
+    <button class="chat-send" onclick="chatSend()">➤</button>
+  </div>
+</div><!-- /page-chat -->
+
+<!-- Add-friend confirmation -->
+<div id="addFriendOverlay" onclick="if(event.target===this)closeAddFriend()">
+  <div class="af-card">
+    <div class="af-q" id="addFriendQ">—</div>
+    <div class="af-actions">
+      <button class="modal-btn" onclick="friendConfirmAdd()">Добавить</button>
+      <button class="modal-btn" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="closeAddFriend()">Отмена</button>
+    </div>
+  </div>
+</div>
 
 <!-- TEMPLATE MODAL -->
 <div class="modal-overlay" id="tplModal" onclick="closeTplModal(event)">
@@ -1807,6 +1912,8 @@ function switchPage(name){
   if(name==='calc'){renderSpendCalc();initPlanCard();}
   if(name==='profile'){initProfilePage();renderBackupReminder();renderEncryptionCard();}
   if(name==='stats')renderStats();
+  if(name==='friends')initFriendsPage();
+  if(name!=='chat')stopChatPoll();   // leaving the chat view
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
@@ -2116,6 +2223,7 @@ function saveProfile(){
   goals.profile.name=name;goals.profile.info=info;
   try{localStorage.setItem('salary_goals',JSON.stringify(goals));}catch(e){}
   scheduleSettingsSave();   // sync to cloud
+  publishProfile();         // update the name shown to friends
   haptic('light');
   renderProfile();
   const msg=document.getElementById('profileMsg');
@@ -4871,7 +4979,8 @@ function enterApp(user){
       renderAll();startRealtimeSync();setupSyncListeners();
       await loadAppConfig();   // pull global announcement / maintenance state
       startAppConfigRealtime();
-      ensureUserNumber();      // assign/fetch this account's #number
+      await ensureUserNumber();// assign/fetch this account's #number
+      publishProfile();        // publish name/#/pubkey to the friends directory
     }catch(e){console.error('cloud sync',e);}
   })();
 }
@@ -5698,6 +5807,195 @@ function renderStats(){
     </div>`;
 }
 function _periodWord(n){const a=n%10,b=n%100;return a===1&&b!==11?'период':a>=2&&a<=4&&(b<10||b>=20)?'периода':'периодов';}
+
+// ══════════════════════════════════════════════
+//  FRIENDS & END-TO-END ENCRYPTED MESSAGING
+// ══════════════════════════════════════════════
+// Each user has an ECDH P-256 keypair; a conversation's AES-GCM key is the ECDH
+// shared secret between the two users, so the server only ever stores ciphertext.
+// (Crypto core verified in scratchpad msg_crypto.js.)
+const MSG_PRIV_KEY='salary_msg_priv';
+let _msgPriv=null,_msgPubB64=null;
+const _convKeys={},_profileCache={};
+let _friendsCache=[],_reqCache=[];
+const _mb64=b=>btoa(String.fromCharCode(...new Uint8Array(b)));
+const _mub64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+
+async function msgEnsureKeys(){
+  if(_msgPriv&&_msgPubB64)return;
+  const sp=localStorage.getItem(MSG_PRIV_KEY),pp=localStorage.getItem(MSG_PRIV_KEY+'_pub');
+  if(sp&&pp){
+    _msgPriv=await _sub().importKey('pkcs8',_mub64(sp),{name:'ECDH',namedCurve:'P-256'},true,['deriveKey']);
+    _msgPubB64=pp;
+  }else{
+    const kp=await _sub().generateKey({name:'ECDH',namedCurve:'P-256'},true,['deriveKey']);
+    _msgPriv=kp.privateKey;_msgPubB64=_mb64(await _sub().exportKey('raw',kp.publicKey));
+    try{localStorage.setItem(MSG_PRIV_KEY,_mb64(await _sub().exportKey('pkcs8',kp.privateKey)));localStorage.setItem(MSG_PRIV_KEY+'_pub',_msgPubB64);}catch(_){}
+  }
+}
+async function msgConvKey(friendId,theirPubB64){
+  if(_convKeys[friendId])return _convKeys[friendId];
+  await msgEnsureKeys();
+  const pub=await _sub().importKey('raw',_mub64(theirPubB64),{name:'ECDH',namedCurve:'P-256'},false,[]);
+  const key=await _sub().deriveKey({name:'ECDH',public:pub},_msgPriv,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+  _convKeys[friendId]=key;return key;
+}
+async function msgEncrypt(key,text){const iv=_rand(12);const ct=await _sub().encrypt({name:'AES-GCM',iv},key,_enc.encode(text));return 'm1.'+_mb64(iv)+'.'+_mb64(ct);}
+async function msgDecrypt(key,packed){try{const a=String(packed).split('.');const pt=await _sub().decrypt({name:'AES-GCM',iv:_mub64(a[1])},key,_mub64(a[2]));return _dec.decode(pt);}catch(e){return '🔒 не удалось расшифровать';}}
+
+// Publish our public directory entry (name, #number, ECDH pubkey) so others can
+// find and message us. Never includes salary data.
+async function publishProfile(){
+  if(!currentUser||!sbClient)return;
+  try{
+    await msgEnsureKeys();
+    const name=((goals&&goals.profile&&goals.profile.name)||'').trim();
+    await sbClient.from('profiles').upsert({user_id:currentUser.id,seq:userSeq||null,name,pubkey:_msgPubB64,updated_at:new Date().toISOString()},{onConflict:'user_id'});
+  }catch(e){console.warn('publishProfile',e);}
+}
+
+function _pname(id){const p=_profileCache[id];return (p&&p.name&&p.name.trim())||'Без имени';}
+function _pseq(id){const p=_profileCache[id];return p&&p.seq?('#'+p.seq):'';}
+function _avatar(id){return (_pname(id).trim().charAt(0)||'?').toUpperCase();}
+
+async function loadProfiles(ids){
+  const miss=ids.filter(id=>id&&!_profileCache[id]);
+  if(!miss.length)return;
+  try{const{data}=await sbClient.from('profiles').select('*').in('user_id',miss);
+    (data||[]).forEach(p=>{_profileCache[p.user_id]={name:p.name,seq:p.seq,pubkey:p.pubkey};});}catch(e){}
+}
+
+async function initFriendsPage(){
+  const my=document.getElementById('friendMyId');if(my)my.textContent=userSeq?('#'+userSeq):'#—';
+  const m=document.getElementById('friendAddMsg');if(m)m.textContent='';
+  publishProfile();
+  loadFriends();
+}
+async function loadFriends(){
+  if(!currentUser||!sbClient)return;
+  const list=document.getElementById('friendsList');
+  try{
+    const{data,error}=await sbClient.from('friends').select('*').or(`user_id.eq.${currentUser.id},friend_id.eq.${currentUser.id}`);
+    if(error)throw error;
+    const rows=data||[];
+    const ids=new Set();rows.forEach(r=>ids.add(r.user_id===currentUser.id?r.friend_id:r.user_id));
+    await loadProfiles([...ids]);
+    _friendsCache=rows.filter(r=>r.user_id===currentUser.id&&r.status==='accepted').map(r=>r.friend_id);
+    _reqCache=rows.filter(r=>r.friend_id===currentUser.id&&r.status==='pending'&&!_friendsCache.includes(r.user_id)).map(r=>r.user_id);
+    renderFriends();
+  }catch(e){console.warn('loadFriends',e);if(list)list.innerHTML='<div class="friend-empty">Не удалось загрузить друзей. Похоже, не выполнен social_setup.sql.</div>';}
+}
+function friendRowHtml(id,kind){
+  const action=kind==='req'
+    ?`<button class="friend-row-btn" onclick="event.stopPropagation();friendAccept('${id}')">Принять</button>`:'';
+  const click=kind==='friend'?`onclick="openChat('${id}')"`:'';
+  return `<div class="friend-row" ${click}>
+    <div class="friend-av">${esc(_avatar(id))}</div>
+    <div class="friend-info"><div class="friend-name">${esc(_pname(id))}</div><div class="friend-id">${_pseq(id)}</div></div>
+    ${action}
+  </div>`;
+}
+function renderFriends(){
+  const reqWrap=document.getElementById('friendReqWrap'),reqEl=document.getElementById('friendRequests'),list=document.getElementById('friendsList');
+  if(reqWrap&&reqEl){
+    if(_reqCache.length){reqWrap.style.display='';reqEl.innerHTML=_reqCache.map(id=>friendRowHtml(id,'req')).join('');}
+    else reqWrap.style.display='none';
+  }
+  if(list)list.innerHTML=_friendsCache.length?_friendsCache.map(id=>friendRowHtml(id,'friend')).join(''):'<div class="friend-empty">Пока нет друзей. Добавь по ID выше.</div>';
+}
+
+// Add by ID → confirmation dialog → create request.
+let _addTarget=null;
+async function friendLookup(){
+  const msg=document.getElementById('friendAddMsg');
+  const n=parseInt(document.getElementById('friendAddInput').value,10);
+  if(!n||n<1){msg.style.color='var(--danger)';msg.textContent='Введи номер';return;}
+  if(n===userSeq){msg.style.color='var(--danger)';msg.textContent='Это твой ID';return;}
+  msg.style.color='var(--muted)';msg.textContent='Ищу…';
+  try{
+    const{data,error}=await sbClient.from('profiles').select('*').eq('seq',n).maybeSingle();
+    if(error)throw error;
+    if(!data){msg.style.color='var(--danger)';msg.textContent='Пользователь #'+n+' не найден';return;}
+    msg.textContent='';
+    _profileCache[data.user_id]={name:data.name,seq:data.seq,pubkey:data.pubkey};
+    _addTarget={id:data.user_id,name:(data.name||'').trim()||'Без имени',seq:data.seq};
+    const q=document.getElementById('addFriendQ');
+    if(q)q.innerHTML='Хотите добавить <b>'+esc(_addTarget.name)+' (#'+data.seq+')</b> в друзья?';
+    const ov=document.getElementById('addFriendOverlay');if(ov)ov.style.display='flex';
+  }catch(e){msg.style.color='var(--danger)';msg.textContent='Ошибка поиска (social_setup.sql выполнен?)';}
+}
+function closeAddFriend(){const ov=document.getElementById('addFriendOverlay');if(ov)ov.style.display='none';}
+async function friendConfirmAdd(){
+  if(!_addTarget)return;const tgt=_addTarget;_addTarget=null;closeAddFriend();
+  try{
+    const mutual=_reqCache.includes(tgt.id); // they already requested me
+    await sbClient.from('friends').upsert({user_id:currentUser.id,friend_id:tgt.id,status:mutual?'accepted':'pending'},{onConflict:'user_id,friend_id'});
+    if(mutual)await sbClient.from('friends').update({status:'accepted'}).eq('user_id',tgt.id).eq('friend_id',currentUser.id);
+    toast(mutual?('Теперь вы друзья с '+tgt.name):('Заявка отправлена: '+tgt.name+' (#'+tgt.seq+')'));haptic('medium');
+    const inp=document.getElementById('friendAddInput');if(inp)inp.value='';
+    loadFriends();
+  }catch(e){toast('Не удалось добавить: '+((e&&e.message)||e));}
+}
+async function friendAccept(fid){
+  try{
+    await sbClient.from('friends').update({status:'accepted'}).eq('user_id',fid).eq('friend_id',currentUser.id);
+    await sbClient.from('friends').upsert({user_id:currentUser.id,friend_id:fid,status:'accepted'},{onConflict:'user_id,friend_id'});
+    toast('Заявка принята');haptic('medium');loadFriends();
+  }catch(e){toast('Ошибка: '+((e&&e.message)||e));}
+}
+
+// ── Chat ──
+let _chatFriend=null,_chatPoll=null,_chatMsgs=[];
+async function openChat(fid){
+  await loadProfiles([fid]);
+  _chatFriend={id:fid,pubkey:(_profileCache[fid]||{}).pubkey};
+  document.getElementById('chatTitle').textContent=_pname(fid);
+  document.getElementById('chatSub').textContent='🔒 зашифровано '+_pseq(fid);
+  document.getElementById('chatMessages').innerHTML='<div class="chat-empty">Загрузка…</div>';
+  switchPage('chat');
+  await loadChatMessages();
+  startChatPoll();
+}
+function startChatPoll(){stopChatPoll();_chatPoll=setInterval(loadChatMessages,4000);}
+function stopChatPoll(){if(_chatPoll){clearInterval(_chatPoll);_chatPoll=null;}}
+async function loadChatMessages(){
+  if(!_chatFriend||!currentUser||!sbClient)return;
+  const fid=_chatFriend.id;
+  if(!_chatFriend.pubkey){renderChat([{system:'У друга ещё нет ключа шифрования — попросите его открыть приложение.'}]);return;}
+  try{
+    const{data,error}=await sbClient.from('messages').select('*')
+      .or(`and(sender.eq.${currentUser.id},recipient.eq.${fid}),and(sender.eq.${fid},recipient.eq.${currentUser.id})`)
+      .order('created_at',{ascending:true}).limit(300);
+    if(error)throw error;
+    if(!_chatFriend||_chatFriend.id!==fid)return;
+    const key=await msgConvKey(fid,_chatFriend.pubkey);
+    const out=[];
+    for(const m of (data||[]))out.push({me:m.sender===currentUser.id,text:await msgDecrypt(key,m.body),t:m.created_at});
+    _chatMsgs=out;renderChat(out);
+  }catch(e){console.warn('loadChatMessages',e);}
+}
+async function chatSend(){
+  const inp=document.getElementById('chatInput');if(!inp||!_chatFriend)return;
+  const text=(inp.value||'').trim();if(!text)return;
+  if(!_chatFriend.pubkey){toast('У друга ещё нет ключа шифрования');return;}
+  inp.value='';
+  try{
+    const key=await msgConvKey(_chatFriend.id,_chatFriend.pubkey);
+    const body=await msgEncrypt(key,text);
+    const{error}=await sbClient.from('messages').insert({sender:currentUser.id,recipient:_chatFriend.id,body});
+    if(error)throw error;
+    _chatMsgs.push({me:true,text,t:new Date().toISOString()});renderChat(_chatMsgs);
+  }catch(e){toast('Не отправлено: '+((e&&e.message)||e));inp.value=text;}
+}
+function renderChat(list){
+  const box=document.getElementById('chatMessages');if(!box)return;
+  if(!list||!list.length){box.innerHTML='<div class="chat-empty">Сообщений пока нет.\nНапишите первым 👋</div>';return;}
+  const fmt=t=>{const d=new Date(t),p=n=>String(n).padStart(2,'0');return p(d.getHours())+':'+p(d.getMinutes());};
+  box.innerHTML=list.map(m=>m.system
+    ?'<div class="chat-day">'+esc(m.system)+'</div>'
+    :'<div class="chat-bubble '+(m.me?'me':'them')+'">'+esc(m.text)+'<span class="cb-time">'+fmt(m.t)+'</span></div>').join('');
+  box.scrollTop=box.scrollHeight;
+}
 
 function renderAll(){
   renderTotal();renderChart();renderGoals();renderExpenses();
