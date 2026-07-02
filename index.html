@@ -1164,6 +1164,8 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
 /* ── Chat ── */
 #page-chat{display:none;flex-direction:column;height:100dvh}
 #page-chat.active{display:flex}
+/* The fixed bottom nav would cover the chat input — hide it while chatting. */
+body.chat-open .bottom-nav{display:none}
 .chat-sub{font-size:11px;font-weight:600;color:var(--accent);opacity:.85}
 .chat-messages{flex:1;overflow-y:auto;padding:12px 14px calc(12px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:6px}
 .chat-bubble{max-width:78%;padding:8px 12px;border-radius:16px;font-size:14px;font-weight:500;line-height:1.35;word-break:break-word;white-space:pre-wrap}
@@ -1690,7 +1692,7 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
       <div class="calc-card-title">Добавить друга по ID</div>
       <div class="friend-add-row">
         <span class="friend-add-hash">#</span>
-        <input class="friend-add-input" id="friendAddInput" type="number" inputmode="numeric" min="1" placeholder="номер">
+        <input class="friend-add-input" id="friendAddInput" type="number" inputmode="numeric" min="1" placeholder="номер" onkeydown="if(event.key==='Enter')friendLookup()">
         <button class="friend-add-btn" onclick="friendLookup()">Найти</button>
       </div>
       <div class="friend-add-msg" id="friendAddMsg"></div>
@@ -1918,6 +1920,7 @@ function switchPage(name){
   if(name==='stats')renderStats();
   if(name==='friends')initFriendsPage();
   if(name!=='chat')stopChatPoll();   // leaving the chat view
+  document.body.classList.toggle('chat-open',name==='chat'); // frees the input bar from the fixed nav
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
@@ -1934,6 +1937,9 @@ function restorePage(){
     else if(p==='archive')switchPage('archive');
     else if(p==='calc')switchPage('calc');
     else if(p==='profile')switchPage('profile');
+    else if(p==='stats')switchPage('stats');
+    else if(p==='friends')switchPage('friends');
+    // 'chat' is deliberately not restored — it needs a selected friend.
   }catch(e){}
 }
 
@@ -5823,7 +5829,7 @@ function _periodWord(n){const a=n%10,b=n%100;return a===1&&b!==11?'период'
 const MSG_PRIV_KEY='salary_msg_priv';
 let _msgPriv=null,_msgPubB64=null;
 const _convKeys={},_profileCache={};
-let _friendsCache=[],_reqCache=[];
+let _friendsCache=[],_reqCache=[],_outCache=[];
 const _mb64=b=>btoa(String.fromCharCode(...new Uint8Array(b)));
 const _mub64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
 
@@ -5936,13 +5942,17 @@ async function loadFriends(){
     await loadProfiles([...ids]);
     _friendsCache=rows.filter(r=>r.user_id===currentUser.id&&r.status==='accepted').map(r=>r.friend_id);
     _reqCache=rows.filter(r=>r.friend_id===currentUser.id&&r.status==='pending'&&!_friendsCache.includes(r.user_id)).map(r=>r.user_id);
+    // Outgoing requests I sent that the other side hasn't accepted yet — shown
+    // so "Добавить" visibly did something instead of vanishing.
+    _outCache=rows.filter(r=>r.user_id===currentUser.id&&r.status==='pending').map(r=>r.friend_id);
     await recountUnread();   // include messages that arrived while we were away
     renderFriends();
-  }catch(e){console.warn('loadFriends',e);if(list)list.innerHTML='<div class="friend-empty">Не удалось загрузить друзей. Похоже, не выполнен social_setup.sql.</div>';}
+  }catch(e){console.warn('loadFriends',e);if(list)list.innerHTML='<div class="friend-empty">Не удалось загрузить: нет связи, либо не выполнен social_setup.sql в Supabase.</div>';}
 }
 function friendRowHtml(id,kind){
   const action=kind==='req'
-    ?`<button class="friend-row-btn" onclick="event.stopPropagation();friendAccept('${id}')">Принять</button>`:'';
+    ?`<button class="friend-row-btn" onclick="event.stopPropagation();friendAccept('${id}')">Принять</button>`
+    :kind==='out'?`<span class="friend-row-btn ghost">ожидает</span>`:'';
   const click=kind==='friend'?`onclick="openChat('${id}')"`:'';
   const un=kind==='friend'?(unreadGet()[id]||0):0;
   return `<div class="friend-row" ${click}>
@@ -5958,7 +5968,11 @@ function renderFriends(){
     if(_reqCache.length){reqWrap.style.display='';reqEl.innerHTML=_reqCache.map(id=>friendRowHtml(id,'req')).join('');}
     else reqWrap.style.display='none';
   }
-  if(list)list.innerHTML=_friendsCache.length?_friendsCache.map(id=>friendRowHtml(id,'friend')).join(''):'<div class="friend-empty">Пока нет друзей. Добавь по ID выше.</div>';
+  if(list){
+    const rows=_friendsCache.map(id=>friendRowHtml(id,'friend')).join('')
+             +_outCache.map(id=>friendRowHtml(id,'out')).join('');
+    list.innerHTML=rows||'<div class="friend-empty">Пока нет друзей. Добавь по ID выше.</div>';
+  }
 }
 
 // Add by ID → confirmation dialog → create request.
@@ -5973,6 +5987,9 @@ async function friendLookup(){
     const{data,error}=await sbClient.from('profiles').select('*').eq('seq',n).maybeSingle();
     if(error)throw error;
     if(!data){msg.style.color='var(--danger)';msg.textContent='Пользователь #'+n+' не найден';return;}
+    if(data.user_id===currentUser.id){msg.style.color='var(--danger)';msg.textContent='Это твой ID';return;}
+    if(_friendsCache.includes(data.user_id)){msg.style.color='var(--accent)';msg.textContent='Вы уже друзья 🙂';return;}
+    if(_outCache.includes(data.user_id)){msg.style.color='var(--muted)';msg.textContent='Заявка уже отправлена — ждём подтверждения';return;}
     msg.textContent='';
     _profileCache[data.user_id]={name:data.name,seq:data.seq,pubkey:data.pubkey};
     _addTarget={id:data.user_id,name:(data.name||'').trim()||'Без имени',seq:data.seq};
@@ -5984,6 +6001,7 @@ async function friendLookup(){
 function closeAddFriend(){const ov=document.getElementById('addFriendOverlay');if(ov)ov.style.display='none';}
 async function friendConfirmAdd(){
   if(!_addTarget)return;const tgt=_addTarget;_addTarget=null;closeAddFriend();
+  if(_friendsCache.includes(tgt.id)){toast('Вы уже друзья');return;} // never downgrade accepted → pending
   try{
     const mutual=_reqCache.includes(tgt.id); // they already requested me
     await sbClient.from('friends').upsert({user_id:currentUser.id,friend_id:tgt.id,status:mutual?'accepted':'pending'},{onConflict:'user_id,friend_id'});
@@ -6002,13 +6020,14 @@ async function friendAccept(fid){
 }
 
 // ── Chat ──
-let _chatFriend=null,_chatPoll=null,_chatMsgs=[];
+let _chatFriend=null,_chatPoll=null,_chatMsgs=[],_chatSig='';
 async function openChat(fid){
   await loadProfiles([fid]);
   _chatFriend={id:fid,pubkey:(_profileCache[fid]||{}).pubkey};
   document.getElementById('chatTitle').textContent=_pname(fid);
   document.getElementById('chatSub').textContent='🔒 зашифровано '+_pseq(fid);
   document.getElementById('chatMessages').innerHTML='<div class="chat-empty">Загрузка…</div>';
+  _chatSig='';_chatMsgs=[];
   markReadNow(fid);clearUnread(fid);
   switchPage('chat');
   await loadChatMessages();
@@ -6022,15 +6041,23 @@ async function loadChatMessages(){
   const fid=_chatFriend.id;
   if(!_chatFriend.pubkey){renderChat([{system:'У друга ещё нет ключа шифрования — попросите его открыть приложение.'}]);return;}
   try{
+    // Newest 300, then reverse — a long history must not cut off recent messages.
     const{data,error}=await sbClient.from('messages').select('*')
       .or(`and(sender.eq.${currentUser.id},recipient.eq.${fid}),and(sender.eq.${fid},recipient.eq.${currentUser.id})`)
-      .order('created_at',{ascending:true}).limit(300);
+      .order('created_at',{ascending:false}).limit(300);
     if(error)throw error;
     if(!_chatFriend||_chatFriend.id!==fid)return;
+    const rows=(data||[]).slice().reverse();
+    // Skip decrypt + re-render when nothing changed — a 4s poll that rebuilds
+    // the DOM would yank the reader's scroll position.
+    const sig=rows.length+':'+(rows.length?rows[rows.length-1].id:'');
+    if(sig===_chatSig)return;
+    _chatSig=sig;
     const key=await msgConvKey(fid,_chatFriend.pubkey);
     const out=[];
-    for(const m of (data||[]))out.push({me:m.sender===currentUser.id,text:await msgDecrypt(key,m.body),t:m.created_at});
+    for(const m of rows)out.push({me:m.sender===currentUser.id,text:await msgDecrypt(key,m.body),t:m.created_at});
     _chatMsgs=out;renderChat(out);
+    markReadNow(fid);clearUnread(fid);   // everything now on screen is read
   }catch(e){console.warn('loadChatMessages',e);}
 }
 async function chatSend(){
@@ -6044,17 +6071,22 @@ async function chatSend(){
     const{error}=await sbClient.from('messages').insert({sender:currentUser.id,recipient:_chatFriend.id,body});
     if(error)throw error;
     _chatMsgs.push({me:true,text,t:new Date().toISOString()});renderChat(_chatMsgs);
+    const box=document.getElementById('chatMessages');if(box)box.scrollTop=box.scrollHeight; // always show my own send
+    inp.focus();                 // keep the keyboard up for the next message
     pingFriend(_chatFriend.id);  // instant delivery: nudge the recipient to pull
   }catch(e){toast('Не отправлено: '+((e&&e.message)||e));inp.value=text;}
 }
 function renderChat(list){
   const box=document.getElementById('chatMessages');if(!box)return;
   if(!list||!list.length){box.innerHTML='<div class="chat-empty">Сообщений пока нет.\nНапишите первым 👋</div>';return;}
+  // Autoscroll only when the reader is already near the bottom — never yank
+  // someone who scrolled up to read history.
+  const nearBottom=box.scrollHeight-box.scrollTop-box.clientHeight<90||!box.childElementCount;
   const fmt=t=>{const d=new Date(t),p=n=>String(n).padStart(2,'0');return p(d.getHours())+':'+p(d.getMinutes());};
   box.innerHTML=list.map(m=>m.system
     ?'<div class="chat-day">'+esc(m.system)+'</div>'
     :'<div class="chat-bubble '+(m.me?'me':'them')+'">'+esc(m.text)+'<span class="cb-time">'+fmt(m.t)+'</span></div>').join('');
-  box.scrollTop=box.scrollHeight;
+  if(nearBottom)box.scrollTop=box.scrollHeight;
 }
 
 function renderAll(){
