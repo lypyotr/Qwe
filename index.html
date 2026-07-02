@@ -1940,20 +1940,22 @@ function switchPage(name){
 }
 function restorePage(){
   try{
-    const p=localStorage.getItem('salary_page');
-    if(p==='period')switchPage('period');
-    else if(p==='archive')switchPage('archive');
-    else if(p==='calc')switchPage('calc');
-    else if(p==='profile')switchPage('profile');
-    else if(p==='stats')switchPage('stats');
-        else if(p==='friends'){
-      switchPage('friends');
-      // Fix: friends not loading after page refresh
-      setTimeout(() => {
-        if (typeof initFriendsPage === 'function') initFriendsPage();
-      }, 350);
-    }
-    // 'chat' is deliberately not restored — it needs a selected friend.
+    const p = localStorage.getItem('salary_page') || 'work';
+
+    // Небольшая задержка, чтобы всё успело инициализироваться (особенно после авторизации)
+    setTimeout(() => {
+      if (p === 'chat') {
+        // Чат требует выбранного друга — переходим в друзья
+        switchPage('friends');
+      } else if (p === 'friends') {
+        switchPage('friends');
+        setTimeout(() => {
+          if (typeof initFriendsPage === 'function') initFriendsPage();
+        }, 300);
+      } else {
+        switchPage(p);
+      }
+    }, 180);
   }catch(e){}
 }
 
