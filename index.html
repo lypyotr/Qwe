@@ -4982,7 +4982,51 @@ async function fetchWithRetry(input,init){
   throw lastErr;
 }
 
+// Auth lock: take the Web Locks API lock so token refresh stays consistent
+// across tabs, but never wait on it forever — in some browsers / private
+// modes the lock never resolves, which froze every DB query behind an
+// eternal await (the old `fn()` bypass traded that hang for multi-tab
+// session desync and random logouts). Bounded wait + fallback avoids both.
+async function authLock(name,acquireTimeout,fn){
+  if(!(navigator.locks&&navigator.locks.request))return await fn();
+  const ctrl=new AbortController();
+  // supabase passes acquireTimeout=-1 (wait indefinitely); cap that wait.
+  const waitMs=acquireTimeout>=0?acquireTimeout:10000;
+  let granted=false;
+  const timer=setTimeout(()=>ctrl.abort(),waitMs);
+  try{
+    return await navigator.locks.request(name,{signal:ctrl.signal},async()=>{
+      granted=true;clearTimeout(timer);
+      return await fn();
+    });
+  }catch(e){
+    // Only fall back when OUR timeout aborted the pending request — a stuck
+    // lock. Errors thrown by fn() itself must propagate untouched.
+    if(!granted&&ctrl.signal.aborted)return await fn();
+    throw e;
+  }finally{clearTimeout(timer);}
+}
+
+let _sbCdnRetried=false;
 function initSupabase(){
+  if(typeof supabase==='undefined'){
+    // The supabase-js <script> from cdn.jsdelivr.net didn't load (offline, or
+    // the CDN is blocked by the ISP). Without it the app renders but every
+    // network feature silently hangs. Try one fallback CDN, then say so.
+    if(!_sbCdnRetried){
+      _sbCdnRetried=true;
+      const alt=document.createElement('script');
+      alt.src='https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js';
+      alt.onload=()=>initSupabase();
+      alt.onerror=()=>initSupabase();
+      document.head.appendChild(alt);
+      return;
+    }
+    hideLoader();
+    showAuthOverlay(true);showAuthLogin();
+    authDiag('Не удалось загрузить supabase-js (CDN недоступен). Проверь соединение и перезагрузи страницу.');
+    return;
+  }
   try{
     sbClient=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{
       auth:{
@@ -4990,11 +5034,8 @@ function initSupabase(){
         autoRefreshToken:true,
         detectSessionInUrl:true,
         storage:window.localStorage,
-        storageKey:'salary-auth-token'
-        // No custom `lock` override: supabase-js serialises auth via the Web
-        // Locks API by default, which keeps token refresh consistent across
-        // tabs (a bypass caused session desync and random logouts). Where
-        // navigator.locks is unavailable, supabase-js falls back on its own.
+        storageKey:'salary-auth-token',
+        lock:authLock
       },
       global:{fetch:fetchWithRetry}
     });
