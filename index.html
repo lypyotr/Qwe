@@ -5051,6 +5051,10 @@ function initSupabase(){
         setTimeout(()=>enterApp(session.user),0);
       }else if(event==='SIGNED_OUT'){
         currentUser=null;
+        // Drop the messaging identity so the next account on this browser
+        // doesn't inherit it.
+        _msgPriv=null;_msgPubB64=null;_msgPrivB64=null;_msgKeysSynced=false;
+        for(const k in _convKeys)delete _convKeys[k];
         if(realtimeChannel){sbClient.removeChannel(realtimeChannel);realtimeChannel=null;}
         if(appConfigChannel){sbClient.removeChannel(appConfigChannel);appConfigChannel=null;}
         refreshAdminUI();   // hide admin tab + leave maintenance lock to owner check
@@ -5600,6 +5604,8 @@ async function e2eeEnable(password){
   const kekPw=await _deriveKEK(password,salt);
   const kekRec=await _deriveKEK(recovery,rsalt);
   const blob={v:1,salt:_b64(salt),rsalt:_b64(rsalt),wrapPw:await _wrapDEK(dek,kekPw),wrapRec:await _wrapDEK(dek,kekRec)};
+  // The same user_keys row also carries the messaging key — don't clobber it.
+  try{const prev=await fetchKeyBlob();if(prev&&prev.msg)blob.msg=prev.msg;}catch(_){}
   // Self-check: make sure we can decrypt what we encrypt before touching data.
   e2eeDEK=dek;
   const probe=await encField({t:'probe'});
@@ -5638,9 +5644,11 @@ async function e2eeInit(){
   // can't falsely disable us and clobber ciphertext). Queried only when the flag
   // is set, so non-E2EE accounts never touch user_keys.
   try{
-    const{data,error}=await sbClient.from('user_keys').select('user_id').eq('user_id',currentUser.id).maybeSingle();
+    const{data,error}=await sbClient.from('user_keys').select('blob').eq('user_id',currentUser.id).maybeSingle();
     if(error)throw error;
-    if(!data){
+    // The row may now hold only the messaging key (blob.msg) — data-E2EE is on
+    // only while the wrapped DEK is present.
+    if(!data||!(data.blob&&data.blob.wrapPw)){
       e2eeOn=false;e2eeDEK=null;e2eeLocked=false;
       localStorage.removeItem(E2EE_FLAG_KEY);clearDEKLocal();
       renderSyncStatus();return;
@@ -5677,7 +5685,16 @@ async function e2eeDisable(){
     const{error:se}=await sbClient.from('user_settings').upsert({user_id:currentUser.id,templates,goals:goalsOut,theme:lightTheme?'light':'dark',expenses:[],cipher:null,updated_at:new Date(ts).toISOString()},{onConflict:'user_id'});
     if(se)throw se;
     localStorage.setItem(SETTINGS_REV_KEY,String(ts));
-    try{await sbClient.from('user_keys').delete().eq('user_id',currentUser.id);}catch(_){}
+    // Drop only the salary-data DEK; the messaging key (blob.msg) lives in the
+    // same row and must survive turning data-E2EE off.
+    try{
+      const prev=await fetchKeyBlob();
+      if(prev&&prev.msg){
+        await sbClient.from('user_keys').upsert({user_id:currentUser.id,blob:{msg:prev.msg},updated_at:new Date().toISOString()},{onConflict:'user_id'});
+      }else{
+        await sbClient.from('user_keys').delete().eq('user_id',currentUser.id);
+      }
+    }catch(_){}
     e2eeOn=false;e2eeDEK=null;e2eeLocked=false;
     localStorage.removeItem(E2EE_FLAG_KEY);clearDEKLocal();
     toast('✓ Шифрование отключено');haptic('medium');
@@ -5956,23 +5973,59 @@ function _periodWord(n){const a=n%10,b=n%100;return a===1&&b!==11?'период'
 // shared secret between the two users, so the server only ever stores ciphertext.
 // (Crypto core verified in scratchpad msg_crypto.js.)
 const MSG_PRIV_KEY='salary_msg_priv';
-let _msgPriv=null,_msgPubB64=null;
+let _msgPriv=null,_msgPubB64=null,_msgPrivB64=null,_msgKeysSynced=false;
 const _convKeys={},_profileCache={};
 let _friendsCache=[],_reqCache=[],_outCache=[];
 const _mb64=b=>btoa(String.fromCharCode(...new Uint8Array(b)));
 const _mub64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
 
+// Per-account localStorage cache key (a shared device key would leak one
+// account's messaging identity into another on the same browser).
+function _msgLsKey(){return MSG_PRIV_KEY+'_'+(currentUser?currentUser.id:'x');}
+async function _msgImport(privB64,pubB64){
+  _msgPriv=await _sub().importKey('pkcs8',_mub64(privB64),{name:'ECDH',namedCurve:'P-256'},true,['deriveKey']);
+  _msgPrivB64=privB64;_msgPubB64=pubB64;
+  try{localStorage.setItem(_msgLsKey(),privB64);localStorage.setItem(_msgLsKey()+'_pub',pubB64);}catch(_){}
+}
+async function _msgGenerate(){
+  const kp=await _sub().generateKey({name:'ECDH',namedCurve:'P-256'},true,['deriveKey']);
+  await _msgImport(_mb64(await _sub().exportKey('pkcs8',kp.privateKey)),_mb64(await _sub().exportKey('raw',kp.publicKey)));
+}
 async function msgEnsureKeys(){
-  if(_msgPriv&&_msgPubB64)return;
-  const sp=localStorage.getItem(MSG_PRIV_KEY),pp=localStorage.getItem(MSG_PRIV_KEY+'_pub');
-  if(sp&&pp){
-    _msgPriv=await _sub().importKey('pkcs8',_mub64(sp),{name:'ECDH',namedCurve:'P-256'},true,['deriveKey']);
-    _msgPubB64=pp;
-  }else{
-    const kp=await _sub().generateKey({name:'ECDH',namedCurve:'P-256'},true,['deriveKey']);
-    _msgPriv=kp.privateKey;_msgPubB64=_mb64(await _sub().exportKey('raw',kp.publicKey));
-    try{localStorage.setItem(MSG_PRIV_KEY,_mb64(await _sub().exportKey('pkcs8',kp.privateKey)));localStorage.setItem(MSG_PRIV_KEY+'_pub',_msgPubB64);}catch(_){}
+  if(!_msgPriv){
+    // Local cache first (works offline). Fall back to the legacy shared key so
+    // existing installs keep their identity until the account copy takes over.
+    const sp=localStorage.getItem(_msgLsKey())||localStorage.getItem(MSG_PRIV_KEY);
+    const pp=localStorage.getItem(_msgLsKey()+'_pub')||localStorage.getItem(MSG_PRIV_KEY+'_pub');
+    if(sp&&pp){try{await _msgImport(sp,pp);}catch(_){}}
   }
+  // One messaging identity per ACCOUNT, stored in user_keys.blob.msg (RLS:
+  // only the user himself can read that row). With per-device keys every
+  // device overwrote profiles.pubkey with its own on startup, so a second
+  // device — or a cleared localStorage — flip-flopped the published key and
+  // every chat turned into «не удалось расшифровать» on the other side.
+  if(!_msgKeysSynced&&currentUser&&sbClient){
+    try{
+      const{data,error}=await sbClient.from('user_keys').select('blob').eq('user_id',currentUser.id).maybeSingle();
+      if(error)throw error;
+      const blob=(data&&data.blob)||null;
+      if(blob&&blob.msg&&blob.msg.priv&&blob.msg.pub){
+        if(blob.msg.pub!==_msgPubB64){
+          await _msgImport(blob.msg.priv,blob.msg.pub);  // adopt the account key
+          for(const k in _convKeys)delete _convKeys[k];  // re-derive with it
+        }
+        _msgKeysSynced=true;
+      }else{
+        // First device to sync claims the account identity with its key.
+        if(!_msgPriv)await _msgGenerate();
+        const{error:e2}=await sbClient.from('user_keys').upsert(
+          {user_id:currentUser.id,blob:{...(blob||{}),msg:{priv:_msgPrivB64,pub:_msgPubB64}},updated_at:new Date().toISOString()},
+          {onConflict:'user_id'});
+        if(!e2)_msgKeysSynced=true;
+      }
+    }catch(e){/* offline or user_keys table absent — device-local key still works */}
+  }
+  if(!_msgPriv)await _msgGenerate();
 }
 async function msgConvKey(friendId,theirPubB64){
   if(_convKeys[friendId])return _convKeys[friendId];
@@ -5982,7 +6035,8 @@ async function msgConvKey(friendId,theirPubB64){
   _convKeys[friendId]=key;return key;
 }
 async function msgEncrypt(key,text){const iv=_rand(12);const ct=await _sub().encrypt({name:'AES-GCM',iv},key,_enc.encode(text));return 'm1.'+_mb64(iv)+'.'+_mb64(ct);}
-async function msgDecrypt(key,packed){try{const a=String(packed).split('.');const pt=await _sub().decrypt({name:'AES-GCM',iv:_mub64(a[1])},key,_mub64(a[2]));return _dec.decode(pt);}catch(e){return '🔒 не удалось расшифровать';}}
+const MSG_DECRYPT_FAIL='🔒 не удалось расшифровать';
+async function msgDecrypt(key,packed){try{const a=String(packed).split('.');const pt=await _sub().decrypt({name:'AES-GCM',iv:_mub64(a[1])},key,_mub64(a[2]));return _dec.decode(pt);}catch(e){return MSG_DECRYPT_FAIL;}}
 
 // ── Unread tracking ──
 // Source of truth is a per-friend "last read" timestamp; counts are recomputed
@@ -6271,6 +6325,9 @@ async function removeFriend(id){
 // ── Chat ──
 let _chatFriend=null,_chatPoll=null,_chatMsgs=[],_chatSig='';
 async function openChat(fid){
+  // Re-fetch the peer's profile: a pubkey cached earlier in the session goes
+  // stale if they rotated their key, and every message would silently fail.
+  delete _profileCache[fid];delete _convKeys[fid];
   await loadProfiles([fid]);
   _chatFriend={id:fid,pubkey:(_profileCache[fid]||{}).pubkey};
   document.getElementById('chatTitle').textContent=_pname(fid);
@@ -6302,9 +6359,19 @@ async function loadChatMessages(){
     const sig=rows.length+':'+(rows.length?rows[rows.length-1].id:'');
     if(sig===_chatSig)return;
     _chatSig=sig;
-    const key=await msgConvKey(fid,_chatFriend.pubkey);
-    const out=[];
-    for(const m of rows)out.push({me:m.sender===currentUser.id,text:await msgDecrypt(key,m.body),t:m.created_at});
+    const dec=async k=>{const o=[];for(const m of rows)o.push({me:m.sender===currentUser.id,text:await msgDecrypt(k,m.body),t:m.created_at});return o;};
+    let out=await dec(await msgConvKey(fid,_chatFriend.pubkey));
+    if(out.some(m=>m.text===MSG_DECRYPT_FAIL)){
+      // The peer may have republished a new key since we cached theirs —
+      // refresh the profile once and retry with the fresh key.
+      delete _profileCache[fid];await loadProfiles([fid]);
+      if(!_chatFriend||_chatFriend.id!==fid)return;
+      const np=(_profileCache[fid]||{}).pubkey;
+      if(np&&np!==_chatFriend.pubkey){
+        _chatFriend.pubkey=np;delete _convKeys[fid];
+        out=await dec(await msgConvKey(fid,np));
+      }
+    }
     _chatMsgs=out;renderChat(out);
     markReadNow(fid);clearUnread(fid);   // everything now on screen is read
   }catch(e){console.warn('loadChatMessages',e);}
