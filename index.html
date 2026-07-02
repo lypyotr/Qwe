@@ -1940,20 +1940,32 @@ function switchPage(name){
 }
 function restorePage(){
   try{
-    const p=localStorage.getItem('salary_page');
-    if(p==='period')switchPage('period');
-    else if(p==='archive')switchPage('archive');
-    else if(p==='calc')switchPage('calc');
-    else if(p==='profile')switchPage('profile');
-    else if(p==='stats')switchPage('stats');
-        else if(p==='friends'){
-      switchPage('friends');
-      // Fix: friends not loading after page refresh
-      setTimeout(() => {
-        if (typeof initFriendsPage === 'function') initFriendsPage();
-      }, 350);
-    }
-    // 'chat' is deliberately not restored — it needs a selected friend.
+    const p = localStorage.getItem('salary_page') || 'work';
+
+    setTimeout(() => {
+      if (p === 'chat') {
+        // Пытаемся восстановить именно чат с последним другом
+        const lastChatFriend = localStorage.getItem('salary_last_chat');
+        if (lastChatFriend) {
+          setTimeout(() => {
+            if (typeof openChat === 'function') {
+              openChat(lastChatFriend);
+            } else {
+              switchPage('friends');
+            }
+          }, 400);
+        } else {
+          switchPage('friends');
+        }
+      } else if (p === 'friends') {
+        switchPage('friends');
+        setTimeout(() => {
+          if (typeof initFriendsPage === 'function') initFriendsPage();
+        }, 300);
+      } else {
+        switchPage(p);
+      }
+    }, 220);
   }catch(e){}
 }
 
@@ -5064,17 +5076,15 @@ async function doForgotPassword(){
 }
 async function doFirebaseLogout(){
   if(!confirm('Выйти из аккаунта?'))return;
-
-  // === Очищаем данные предыдущего пользователя, НО НЕ трогаем ключ шифрования сообщений ===
-  // Ключ сообщений (MSG_PRIV_KEY) — device-bound, он должен остаться, иначе старые сообщения
-  // перестанут расшифровываться после повторного входа.
-  clearUserContentOnly();
-
-  // Local scope clears the session
+  // Local scope clears the session on THIS device without the server-side revoke
+  // call that was returning 403 (stale session) and aborting the logout.
   try{await sbClient.auth.signOut({scope:'local'});}
   catch(e){console.warn('signOut',e);}
-
-  // Clear auth tokens
+  // Hard-clear the persisted auth token ourselves. If signOut threw, or the
+  // autoRefreshToken timer rewrote storage after it ran, the session would be
+  // restored by getSession() on the next load and the user would look "still
+  // logged in" — i.e. logout silently fails. Remove the known key plus any
+  // supabase auth token left behind.
   try{
     localStorage.removeItem('salary-auth-token');
     for(let i=localStorage.length-1;i>=0;i--){
@@ -5082,56 +5092,16 @@ async function doFirebaseLogout(){
       if(k&&(k.startsWith('sb-')||k.indexOf('auth-token')!==-1))localStorage.removeItem(k);
     }
   }catch(_){}
-
-  // Сбрасываем только app-level E2EE (данные зарплаты), но не messaging keys
+  // Drop E2EE key material so the next account on this device can't read it.
   try{e2eeDEK=null;e2eeLocked=false;clearDEKLocal();}catch(_){}
-
+  // Tear down in-memory state and reload for a guaranteed-clean client: this
+  // stops the realtime channels and the token auto-refresh timer that could
+  // otherwise re-persist the session we just deleted.
   currentUser=null;
   try{if(realtimeChannel)sbClient.removeChannel(realtimeChannel);}catch(_){}
   try{if(appConfigChannel)sbClient.removeChannel(appConfigChannel);}catch(_){}
   realtimeChannel=null;appConfigChannel=null;
-
   location.reload();
-}
-
-// Очищает только контент пользователя (периоды, шаблоны, цели и т.д.),
-// но НЕ удаляет ключ шифрования сообщений (MSG_PRIV_KEY).
-function clearUserContentOnly(){
-  try{
-    // Удаляем все периоды и связанные данные
-    for(let i=localStorage.length-1; i>=0; i--){
-      const k = localStorage.key(i);
-      if(k && /^salary_/.test(k) && 
-         !k.includes('msg_priv') &&           // не трогаем ключ сообщений
-         !k.includes(MSG_PRIV_KEY)) {
-        localStorage.removeItem(k);
-      }
-    }
-
-    const keysToClear = [
-      'salary_templates',
-      'salary_goals',
-      'salary_counter',
-      'salary_expenses',
-      'salary_plan_target',
-      'salary_plan_tpl',
-      'salary_plan_first',
-      PENDING_KEY,
-      SETTINGS_TS_KEY,
-      SETTINGS_REV_KEY,
-      MSG_READ_KEY,
-      UNREAD_KEY,
-      E2EE_FLAG_KEY
-    ];
-    keysToClear.forEach(k => { try { localStorage.removeItem(k); } catch(_) {} });
-
-    // Сбрасываем состояние app E2EE
-    e2eeOn = false;
-    e2eeDEK = null;
-    e2eeLocked = false;
-  }catch(e){
-    console.warn('clearUserContentOnly', e);
-  }
 }
 
 // Pull cloud state and merge it into localStorage by timestamp (last-writer-
@@ -6120,9 +6090,13 @@ async function openChat(fid){
   document.getElementById('chatMessages').innerHTML='<div class="chat-empty">Загрузка…</div>';
   _chatSig='';_chatMsgs=[];
   markReadNow(fid);clearUnread(fid);
+
+  // Запоминаем последнего открытого друга в чате (чтобы можно было восстановить после F5)
+  try { localStorage.setItem('salary_last_chat', fid); } catch(_) {}
+
   switchPage('chat');
   await loadChatMessages();
-  markReadNow(fid);   // everything shown is now read
+  markReadNow(fid);
   startChatPoll();
 }
 function startChatPoll(){stopChatPoll();_chatPoll=setInterval(loadChatMessages,4000);}
