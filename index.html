@@ -1961,6 +1961,9 @@ function switchPage(name){
   if(name==='friends')initFriendsPage();
   if(name!=='chat')stopChatPoll();   // leaving the chat view
   document.body.classList.toggle('chat-open',name==='chat'); // frees the input bar from the fixed nav
+  // Unknown page (corrupted salary_page, future rename) must not strip
+  // 'active' from everything and throw — that leaves a blank screen.
+  if(!document.getElementById('page-'+name))name='work';
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
@@ -2301,7 +2304,7 @@ function openGoalsModal(){
   document.getElementById('goalMonthIn').value=goals.month||'';
   document.getElementById('goalsModal').classList.add('open');
 }
-function closeGoalsModal(e){if(e.target===document.getElementById('goalsModal'))document.getElementById('goalsModal').classList.remove('open')}
+function closeGoalsModal(e){if(!e||e.target===document.getElementById('goalsModal'))document.getElementById('goalsModal').classList.remove('open')}
 
 function renderGoals(){
   const card=document.getElementById('goalsCard');
@@ -2751,7 +2754,7 @@ function openTplModal(){
   document.getElementById('tplModal').classList.add('open');
   renderTplModal();
 }
-function closeTplModal(e){if(e.target===document.getElementById('tplModal'))document.getElementById('tplModal').classList.remove('open')}
+function closeTplModal(e){if(!e||e.target===document.getElementById('tplModal'))document.getElementById('tplModal').classList.remove('open')}
 
 function renderTplModal(){
   const list=document.getElementById('tplModalList');
@@ -2822,7 +2825,7 @@ function openCopyModal(){
   }
   document.getElementById('copyModal').classList.add('open');
 }
-function closeCopyModal(e){if(e.target===document.getElementById('copyModal'))document.getElementById('copyModal').classList.remove('open')}
+function closeCopyModal(e){if(!e||e.target===document.getElementById('copyModal'))document.getElementById('copyModal').classList.remove('open')}
 function copyFromDay(fromDay){
   if(selectedDay===null)return;
   const srcWorks=days[fromDay]||[];
@@ -2868,7 +2871,7 @@ function openCopyExpModal(){
   }
   document.getElementById('copyExpModal').classList.add('open');
 }
-function closeCopyExpModal(e){if(e.target===document.getElementById('copyExpModal'))document.getElementById('copyExpModal').classList.remove('open')}
+function closeCopyExpModal(e){if(!e||e.target===document.getElementById('copyExpModal'))document.getElementById('copyExpModal').classList.remove('open')}
 function copyExpensesFrom(key){
   let data;try{data=JSON.parse(localStorage.getItem(key)||'{}');}catch(_){return;}
   const src=Array.isArray(data.expenses)?data.expenses:[];
@@ -3727,6 +3730,7 @@ function renderBreakdown(){
   const base=calcBase(),bonus=calcBonus(),total=calcTotal();
   const tax=taxEnabled?(base+bonus)*0.13:0;
   const bd=document.getElementById('breakdown');
+  if(!bd)return; // элемент разметки удалён — функция оставлена на будущее
   if(base===0&&bonus===0){bd.innerHTML='<div class="empty">Добавьте работы по дням</div>';return}
   const{month}=getPeriod();
   let rows='';
@@ -4050,7 +4054,7 @@ function openDataModal(){
   renderBioSection();
   document.getElementById('dataModal').classList.add('open');
 }
-function closeDataModal(e){if(e.target===document.getElementById('dataModal'))document.getElementById('dataModal').classList.remove('open')}
+function closeDataModal(e){if(!e||e.target===document.getElementById('dataModal'))document.getElementById('dataModal').classList.remove('open')}
 
 function showDataMsg(text,kind){
   const color=kind==='err'?'var(--danger)':kind==='warn'?'var(--warn)':'var(--accent)';
@@ -4343,12 +4347,20 @@ function initPWA(){
 
 function checkDailyReminder(){
   const today=new Date();
+  const todayKey='salary_notif_'+today.toDateString();
+  // GC до всех ранних return: одноразовые ключи напоминаний прошлых дней
+  // иначе копятся в localStorage вечно.
+  try{
+    for(let i=localStorage.length-1;i>=0;i--){
+      const k=localStorage.key(i);
+      if(k&&k.startsWith('salary_notif_')&&k!==todayKey)localStorage.removeItem(k);
+    }
+  }catch(_){}
   const hour=today.getHours();
   if(hour<18||hour>=22)return;
   const{year,month,startDay,endDay}=getPeriod();
   const d=today.getDate();
   if(today.getFullYear()!==year||today.getMonth()!==month||d<startDay||d>endDay)return;
-  const todayKey='salary_notif_'+today.toDateString();
   if(localStorage.getItem(todayKey))return;
   try{
     const data=JSON.parse(localStorage.getItem(saveKey())||'{}');
@@ -5217,14 +5229,20 @@ async function doLogin(){
   const email=document.getElementById('authEmail').value.trim(),pass=document.getElementById('authPassword').value,errEl=document.getElementById('authError');
   errEl.textContent='';if(!email||!pass){errEl.textContent='Введи email и пароль';return;}
   document.getElementById('authLoading').style.display='';
-  const{data,error}=await sbClient.auth.signInWithPassword({email,password:pass});
-  document.getElementById('authLoading').style.display='none';
-  if(error){errEl.textContent=supabaseErrMsg(error);return;}
-  _loginPassword=pass; // kept briefly so E2EE can unlock on this device
-  // Enter directly from the awaited result instead of waiting on the async
-  // onAuthStateChange event — that event sometimes doesn't fire (race), which
-  // left the user stuck on the login screen until a 2nd/3rd attempt.
-  if(data&&data.user)enterApp(data.user);
+  // try/finally: a thrown exception (as opposed to a returned error) must
+  // not leave the «Входим…» spinner up forever with no message.
+  try{
+    const{data,error}=await sbClient.auth.signInWithPassword({email,password:pass});
+    if(error){errEl.textContent=supabaseErrMsg(error);return;}
+    _loginPassword=pass; // kept briefly so E2EE can unlock on this device
+    // Enter directly from the awaited result instead of waiting on the async
+    // onAuthStateChange event — that event sometimes doesn't fire (race), which
+    // left the user stuck on the login screen until a 2nd/3rd attempt.
+    if(data&&data.user)enterApp(data.user);
+  }catch(e){
+    errEl.textContent='Нет связи с сервером. Проверь интернет и попробуй ещё раз.';
+    errlogAdd('auth','login threw: '+((e&&e.message)||e));
+  }finally{document.getElementById('authLoading').style.display='none';}
 }
 async function doRegister(){
   const email=document.getElementById('regEmail').value.trim(),pass=document.getElementById('regPassword').value,pass2=document.getElementById('regPassword2').value,errEl=document.getElementById('regError');
@@ -5232,17 +5250,26 @@ async function doRegister(){
   if(pass!==pass2){errEl.textContent='Пароли не совпадают';return;}
   if(pass.length<6){errEl.textContent='Минимум 6 символов';return;}
   document.getElementById('authLoading').style.display='';
-  const{error}=await sbClient.auth.signUp({email,password:pass});
-  document.getElementById('authLoading').style.display='none';
-  if(error)errEl.textContent=supabaseErrMsg(error);
-  else errEl.style.color='var(--accent)',errEl.textContent='Проверь почту — нужно подтвердить email';
+  try{
+    const{error}=await sbClient.auth.signUp({email,password:pass});
+    if(error)errEl.textContent=supabaseErrMsg(error);
+    else errEl.style.color='var(--accent)',errEl.textContent='Проверь почту — нужно подтвердить email';
+  }catch(e){
+    errEl.textContent='Нет связи с сервером. Проверь интернет и попробуй ещё раз.';
+    errlogAdd('auth','register threw: '+((e&&e.message)||e));
+  }finally{document.getElementById('authLoading').style.display='none';}
 }
 async function doForgotPassword(){
   const email=document.getElementById('forgotEmail').value.trim(),msgEl=document.getElementById('forgotMsg');
   if(!email){msgEl.textContent='Введи email';return;}
-  const{error}=await sbClient.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname});
-  if(error){msgEl.style.color='var(--danger)';msgEl.textContent=supabaseErrMsg(error);}
-  else{msgEl.style.color='var(--accent)';msgEl.textContent='Письмо отправлено! Проверь почту.';}
+  try{
+    const{error}=await sbClient.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname});
+    if(error){msgEl.style.color='var(--danger)';msgEl.textContent=supabaseErrMsg(error);}
+    else{msgEl.style.color='var(--accent)';msgEl.textContent='Письмо отправлено! Проверь почту.';}
+  }catch(e){
+    msgEl.style.color='var(--danger)';
+    msgEl.textContent='Нет связи с сервером. Попробуй ещё раз.';
+  }
 }
 let _loggingOut=false;
 async function doLogout(){
