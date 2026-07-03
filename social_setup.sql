@@ -57,7 +57,11 @@ create index if not exists messages_pair_idx on public.messages(sender, recipien
 alter table public.messages enable row level security;
 drop policy if exists "messages_select" on public.messages;
 drop policy if exists "messages_insert" on public.messages;
+drop policy if exists "messages_delete" on public.messages;
 create policy "messages_select" on public.messages for select using (auth.uid() = sender or auth.uid() = recipient);
 create policy "messages_insert" on public.messages for insert with check (auth.uid() = sender);
+-- «Удалить у всех» — только автор может удалить своё сообщение с сервера.
+-- («Удалить у себя» серверу не нужно: это локальный скрытый список устройства.)
+create policy "messages_delete" on public.messages for delete using (auth.uid() = sender);
 
 notify pgrst, 'reload schema';
