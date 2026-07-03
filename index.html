@@ -1185,7 +1185,8 @@ body.light .modal-handle{background:rgba(17,24,39,.15)}
 body.chat-open .bottom-nav{display:none}
 .chat-sub{font-size:11px;font-weight:600;color:var(--accent);opacity:.85}
 .chat-messages{flex:1;overflow-y:auto;padding:12px 14px calc(12px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:6px}
-.chat-bubble{max-width:78%;padding:8px 12px;border-radius:16px;font-size:14px;font-weight:500;line-height:1.35;word-break:break-word;white-space:pre-wrap}
+.chat-bubble{max-width:78%;padding:8px 12px;border-radius:16px;font-size:14px;font-weight:500;line-height:1.35;word-break:break-word;white-space:pre-wrap;
+  -webkit-touch-callout:none;-webkit-user-select:none;user-select:none} /* long-press = меню действий, не выделение */
 .chat-bubble .cb-time{display:block;font-size:9px;font-weight:600;opacity:.6;margin-top:3px}
 .chat-bubble.me{align-self:flex-end;background:var(--accent);color:#06281e;border-bottom-right-radius:5px}
 .chat-bubble.them{align-self:flex-start;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-bottom-left-radius:5px}
@@ -1857,6 +1858,16 @@ body.chat-open .bottom-nav{display:none}
       <button class="modal-btn" id="bioToggleBtn" style="width:100%;padding:12px" onclick="toggleBio()"></button>
     </div>
     <div id="dataMsg" style="margin-top:12px;font-size:13px;text-align:center;font-weight:600;min-height:18px"></div>
+  </div>
+</div>
+
+<!-- MESSAGE ACTIONS (long-press on a chat bubble) -->
+<div class="modal-overlay" id="msgActModal" onclick="closeMsgActions(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Сообщение</div>
+    <button class="modal-btn" style="width:100%;padding:13px;margin-bottom:8px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="msgDeleteForMe()">🗑 Удалить у себя</button>
+    <button class="modal-btn" id="msgDelAllBtn" style="width:100%;padding:13px;background:rgba(248,113,113,.12);color:var(--danger);border:1px solid rgba(248,113,113,.3)" onclick="msgDeleteForAll()">🗑 Удалить у всех</button>
   </div>
 </div>
 
@@ -5422,7 +5433,7 @@ function startRealtimeSync(){
       // 3s throttle or an in-flight cycle (it queues a follow-up instead).
       refreshFromCloud(true);
     })
-    .on('broadcast',{event:'msg'},({payload})=>{onIncomingMsgPing(payload&&payload.from);})
+    .on('broadcast',{event:'msg'},({payload})=>{onIncomingMsgPing(payload&&payload.from,payload&&payload.kind);})
     .subscribe(status=>{
       if(realtimeChannel!==ch)return; // stale channel — ignore
       if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED'){
@@ -6234,22 +6245,25 @@ async function recountUnread(){
 
 // ── Instant delivery: broadcast a ping into the RECIPIENT's user channel ──
 const _pingCh={};
-function pingFriend(fid){
+// kind: 'new' (default) — a fresh message; 'del' — the sender deleted one,
+// the peer should just refresh without an unread bump or a notification.
+function pingFriend(fid,kind){
   if(!sbClient)return;
+  const payload={from:currentUser.id,kind:kind||'new'};
   try{
     let ch=_pingCh[fid];
-    if(ch&&ch.state==='joined'){ch.send({type:'broadcast',event:'msg',payload:{from:currentUser.id}});return;}
+    if(ch&&ch.state==='joined'){ch.send({type:'broadcast',event:'msg',payload});return;}
     if(ch){try{sbClient.removeChannel(ch);}catch(_){}delete _pingCh[fid];}
     ch=sbClient.channel('user-sync-'+fid);
     _pingCh[fid]=ch;
-    ch.subscribe(st=>{if(st==='SUBSCRIBED')try{ch.send({type:'broadcast',event:'msg',payload:{from:currentUser.id}});}catch(_){}});
+    ch.subscribe(st=>{if(st==='SUBSCRIBED')try{ch.send({type:'broadcast',event:'msg',payload});}catch(_){}});
   }catch(e){}
 }
 // Incoming ping: refresh the open chat, or bump unread + notify.
-function onIncomingMsgPing(from){
+function onIncomingMsgPing(from,kind){
   if(!from || from === currentUser?.id) return;
 
-  const chatOpen = _chatFriend && _chatFriend.id === from && 
+  const chatOpen = _chatFriend && _chatFriend.id === from &&
                    document.getElementById('page-chat').classList.contains('active');
 
   if (chatOpen) {
@@ -6257,6 +6271,8 @@ function onIncomingMsgPing(from){
     markReadNow(from);
     return;
   }
+
+  if(kind==='del'){recountUnread();return;}   // deletion: no bump, no sound
 
   bumpUnread(from);
   loadProfiles([from]).then(() => {
@@ -6545,13 +6561,14 @@ async function loadChatMessages(){
       .order('created_at',{ascending:false}).limit(300);
     if(error)throw error;
     if(!_chatFriend||_chatFriend.id!==fid)return;
-    const rows=(data||[]).slice().reverse();
+    const hidden=hiddenMsgsGet();
+    const rows=(data||[]).slice().reverse().filter(m=>!hidden[m.id]); // «удалено у себя»
     // Skip decrypt + re-render when nothing changed — a 4s poll that rebuilds
     // the DOM would yank the reader's scroll position.
     const sig=rows.length+':'+(rows.length?rows[rows.length-1].id:'');
     if(sig===_chatSig)return;
     _chatSig=sig;
-    const dec=async k=>{const o=[];for(const m of rows)o.push({me:m.sender===currentUser.id,text:await msgDecrypt(k,m.body),t:m.created_at});return o;};
+    const dec=async k=>{const o=[];for(const m of rows)o.push({id:m.id,me:m.sender===currentUser.id,text:await msgDecrypt(k,m.body),t:m.created_at});return o;};
     let out=await dec(await msgConvKey(fid,_chatFriend.pubkey));
     if(out.some(m=>m.text===MSG_DECRYPT_FAIL)){
       // The peer may have republished a new key since we cached theirs —
@@ -6585,9 +6602,11 @@ async function chatSend(){
   try{
     const key=await msgConvKey(_chatFriend.id,_chatFriend.pubkey);
     const body=await msgEncrypt(key,text);
-    const{error}=await sbClient.from('messages').insert({sender:currentUser.id,recipient:_chatFriend.id,body});
+    // .select() returns the row so the bubble knows its id right away — the
+    // «удалить» menu needs it before the next poll happens.
+    const{data:ins,error}=await sbClient.from('messages').insert({sender:currentUser.id,recipient:_chatFriend.id,body}).select('id,created_at').single();
     if(error)throw error;
-    _chatMsgs.push({me:true,text,t:new Date().toISOString()});renderChat(_chatMsgs);
+    _chatMsgs.push({id:ins&&ins.id,me:true,text,t:(ins&&ins.created_at)||new Date().toISOString()});renderChat(_chatMsgs);
     const box=document.getElementById('chatMessages');if(box)box.scrollTop=box.scrollHeight; // always show my own send
     inp.focus();                 // keep the keyboard up for the next message
     pingFriend(_chatFriend.id);  // instant delivery: nudge the recipient to pull
@@ -6602,9 +6621,78 @@ function renderChat(list){
   const fmt=t=>{const d=new Date(t),p=n=>String(n).padStart(2,'0');return p(d.getHours())+':'+p(d.getMinutes());};
   box.innerHTML=list.map(m=>m.system
     ?'<div class="chat-day">'+esc(m.system)+'</div>'
-    :'<div class="chat-bubble '+(m.me?'me':'them')+'">'+esc(m.text)+'<span class="cb-time">'+fmt(m.t)+'</span></div>').join('');
+    :'<div class="chat-bubble '+(m.me?'me':'them')+'" data-id="'+(m.id||'')+'">'+esc(m.text)+'<span class="cb-time">'+fmt(m.t)+'</span></div>').join('');
   if(nearBottom)box.scrollTop=box.scrollHeight;
 }
+
+// ── Deleting messages ──
+// «У себя» — local hidden list only (the peer keeps their copy; nothing to
+// delete server-side). «У всех» — the author deletes the row from the server
+// (RLS messages_delete allows only own messages) and pings the peer to refresh.
+const MSG_HIDDEN_KEY='salary_msg_hidden';
+function hiddenMsgsGet(){try{const m=JSON.parse(localStorage.getItem(MSG_HIDDEN_KEY)||'{}');return m&&typeof m==='object'?m:{};}catch(_){return{};}}
+function hiddenMsgsAdd(id){
+  try{
+    const m=hiddenMsgsGet();m[id]=1;
+    const ks=Object.keys(m);                      // cap so it can't grow forever
+    if(ks.length>3000)ks.slice(0,ks.length-3000).forEach(k=>delete m[k]);
+    localStorage.setItem(MSG_HIDDEN_KEY,JSON.stringify(m));
+  }catch(_){}
+}
+let _msgActTarget=null;
+function openMsgActions(id,isMine){
+  if(!id)return;                                  // optimistic bubble without an id yet
+  _msgActTarget={id,isMine};
+  const btn=document.getElementById('msgDelAllBtn');
+  if(btn)btn.style.display=isMine?'':'none';      // «у всех» — only for own messages
+  document.getElementById('msgActModal').classList.add('open');
+}
+function closeMsgActions(e){if(!e||e.target===document.getElementById('msgActModal'))document.getElementById('msgActModal').classList.remove('open');}
+function msgDeleteForMe(){
+  const t=_msgActTarget;_msgActTarget=null;closeMsgActions();
+  if(!t)return;
+  hiddenMsgsAdd(t.id);
+  _chatMsgs=_chatMsgs.filter(m=>String(m.id)!==String(t.id));
+  _chatSig='';renderChat(_chatMsgs);
+  haptic('light');
+}
+async function msgDeleteForAll(){
+  const t=_msgActTarget;_msgActTarget=null;closeMsgActions();
+  if(!t||!t.isMine||!sbClient)return;
+  if(!confirm('Удалить сообщение у всех? Оно исчезнет и у собеседника.'))return;
+  try{
+    // .select() reports what was actually deleted: RLS silently deletes
+    // nothing when the policy is missing — that must not look like success.
+    const{data,error}=await sbClient.from('messages').delete().eq('id',t.id).eq('sender',currentUser.id).select('id');
+    if(error)throw error;
+    if(!data||!data.length)throw new Error('сервер не удалил — обновите social_setup.sql в Supabase');
+    _chatMsgs=_chatMsgs.filter(m=>String(m.id)!==String(t.id));
+    _chatSig='';renderChat(_chatMsgs);
+    if(_chatFriend)pingFriend(_chatFriend.id,'del');  // peer refreshes, no unread bump
+    haptic('light');toast('Удалено у всех');
+  }catch(e){toast('Не удалось удалить: '+((e&&e.message)||e));}
+}
+// Long-press (or right-click) on a bubble opens the actions menu.
+(function(){
+  const box=document.getElementById('chatMessages');
+  if(!box)return;
+  let t=null,sx=0,sy=0;
+  const clear=()=>{if(t){clearTimeout(t);t=null;}};
+  box.addEventListener('pointerdown',e=>{
+    const b=e.target.closest('.chat-bubble');
+    if(!b||!b.dataset.id)return;
+    sx=e.clientX;sy=e.clientY;
+    clear();
+    t=setTimeout(()=>{t=null;haptic('light');openMsgActions(b.dataset.id,b.classList.contains('me'));},500);
+  });
+  box.addEventListener('pointermove',e=>{if(t&&(Math.abs(e.clientX-sx)>12||Math.abs(e.clientY-sy)>12))clear();}); // скролл — не long-press
+  box.addEventListener('pointerup',clear);
+  box.addEventListener('pointercancel',clear);
+  box.addEventListener('contextmenu',e=>{
+    const b=e.target.closest('.chat-bubble');
+    if(b&&b.dataset.id){e.preventDefault();openMsgActions(b.dataset.id,b.classList.contains('me'));}
+  });
+})();
 
 function renderAll(){
   renderTotal();renderChart();renderGoals();renderExpenses();
