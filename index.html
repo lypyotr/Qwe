@@ -1605,7 +1605,7 @@ body.chat-open .bottom-nav{display:none}
     <div class="calc-card">
       <div class="calc-card-title">Аккаунт</div>
       <div class="prof-email" id="profileEmail">—</div>
-      <button class="modal-btn" style="width:100%;padding:13px;background:rgba(248,113,113,.12);color:var(--danger);border:1px solid rgba(248,113,113,.3)" onclick="doLogout()">Выйти из аккаунта</button>
+      <button class="modal-btn" id="logoutBtn" style="width:100%;padding:13px;background:rgba(248,113,113,.12);color:var(--danger);border:1px solid rgba(248,113,113,.3)" onclick="doLogout()">Выйти из аккаунта</button>
     </div>
 
     <!-- Admin (owner only) -->
@@ -5244,12 +5244,27 @@ async function doForgotPassword(){
   if(error){msgEl.style.color='var(--danger)';msgEl.textContent=supabaseErrMsg(error);}
   else{msgEl.style.color='var(--accent)';msgEl.textContent='Письмо отправлено! Проверь почту.';}
 }
+let _loggingOut=false;
 async function doLogout(){
-  if(!confirm('Выйти из аккаунта?'))return;
-  // Local scope clears the session on THIS device without the server-side revoke
-  // call that was returning 403 (stale session) and aborting the logout.
-  try{await sbClient.auth.signOut({scope:'local'});}
-  catch(e){console.warn('signOut',e);}
+  // No confirm(): in iOS standalone/PWA contexts confirm can silently return
+  // false — the button then "does nothing". Logging out is safe to do
+  // directly (data is synced; local data survives the logout).
+  if(_loggingOut)return;
+  _loggingOut=true;
+  // Instant visual feedback so a slow network can never look like a dead button.
+  const btn=document.getElementById('logoutBtn');
+  if(btn){btn.disabled=true;btn.textContent='Выхожу…';}
+  errlogAdd('logout','выход начат');
+  // Polite server sign-out, but NEVER block on it: a hung request (DPI,
+  // flaky network) or a stuck web-lock used to keep the user logged in for
+  // ~45s of silence. 2.5s and we hard-clear regardless — the reload plus
+  // token removal below is what actually logs out.
+  try{
+    await Promise.race([
+      sbClient.auth.signOut({scope:'local'}),
+      new Promise(r=>setTimeout(r,2500))
+    ]);
+  }catch(e){console.warn('signOut',e);}
   // Hard-clear the persisted auth token ourselves. If signOut threw, or the
   // autoRefreshToken timer rewrote storage after it ran, the session would be
   // restored by getSession() on the next load and the user would look "still
@@ -5271,6 +5286,7 @@ async function doLogout(){
   try{if(realtimeChannel)sbClient.removeChannel(realtimeChannel);}catch(_){}
   try{if(appConfigChannel)sbClient.removeChannel(appConfigChannel);}catch(_){}
   realtimeChannel=null;appConfigChannel=null;
+  errlogAdd('logout','токены очищены, перезагрузка');
   location.reload();
 }
 
