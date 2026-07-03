@@ -5126,7 +5126,7 @@ function initSupabase(){
         currentUser=null;
         // Drop the messaging identity so the next account on this browser
         // doesn't inherit it.
-        _msgPriv=null;_msgPubB64=null;_msgPrivB64=null;_msgKeysSynced=false;
+        _msgPriv=null;_msgPubB64=null;_msgPrivB64=null;_msgKeysSynced=false;_msgIdentityForeign=false;
         for(const k in _convKeys)delete _convKeys[k];
         if(realtimeChannel){sbClient.removeChannel(realtimeChannel);realtimeChannel=null;}
         if(appConfigChannel){sbClient.removeChannel(appConfigChannel);appConfigChannel=null;}
@@ -6081,41 +6081,98 @@ async function _msgGenerate(){
   const kp=await _sub().generateKey({name:'ECDH',namedCurve:'P-256'},true,['deriveKey']);
   await _msgImport(_mb64(await _sub().exportKey('pkcs8',kp.privateKey)),_mb64(await _sub().exportKey('raw',kp.publicKey)));
 }
+// True while this device does NOT hold the account's live messaging identity
+// (the key whose pubkey friends actually encrypt to). Sending in that state
+// would produce messages nobody can read, so the chat blocks it and explains.
+let _msgIdentityForeign=false,_msgSyncWarned=false;
+
 async function msgEnsureKeys(){
   if(!_msgPriv){
-    // Local cache first (works offline). Fall back to the legacy shared key so
-    // existing installs keep their identity until the account copy takes over.
-    const sp=localStorage.getItem(_msgLsKey())||localStorage.getItem(MSG_PRIV_KEY);
-    const pp=localStorage.getItem(_msgLsKey()+'_pub')||localStorage.getItem(MSG_PRIV_KEY+'_pub');
+    // Local cache first (works offline). Read each PAIR atomically — mixing
+    // the priv of one pair with the pub of another breaks everything quietly.
+    const sp1=localStorage.getItem(_msgLsKey()),pp1=localStorage.getItem(_msgLsKey()+'_pub');
+    const sp0=localStorage.getItem(MSG_PRIV_KEY),pp0=localStorage.getItem(MSG_PRIV_KEY+'_pub');
+    const sp=(sp1&&pp1)?sp1:(sp0&&pp0)?sp0:null;
+    const pp=(sp1&&pp1)?pp1:(sp0&&pp0)?pp0:null;
     if(sp&&pp){try{await _msgImport(sp,pp);}catch(_){}}
   }
   // One messaging identity per ACCOUNT, stored in user_keys.blob.msg (RLS:
-  // only the user himself can read that row). With per-device keys every
-  // device overwrote profiles.pubkey with its own on startup, so a second
-  // device — or a cleared localStorage — flip-flopped the published key and
-  // every chat turned into «не удалось расшифровать» on the other side.
+  // only the user himself can read that row). The CANONICAL key is the one
+  // matching profiles.pubkey — that is what friends encrypt to. Any other
+  // copy (a fresh device that raced the first claim, a stale cache) must
+  // lose, otherwise a logout/login can adopt a wrong key and every message
+  // turns into «не удалось расшифровать».
   if(!_msgKeysSynced&&currentUser&&sbClient){
     try{
+      let published=null;
+      try{
+        const{data:pr}=await sbClient.from('profiles').select('pubkey').eq('user_id',currentUser.id).maybeSingle();
+        published=(pr&&pr.pubkey)||null;
+      }catch(_){/* profile row may not exist yet */}
       const{data,error}=await sbClient.from('user_keys').select('blob').eq('user_id',currentUser.id).maybeSingle();
       if(error)throw error;
       const blob=(data&&data.blob)||null;
-      if(blob&&blob.msg&&blob.msg.priv&&blob.msg.pub){
-        if(blob.msg.pub!==_msgPubB64){
-          await _msgImport(blob.msg.priv,blob.msg.pub);  // adopt the account key
-          for(const k in _convKeys)delete _convKeys[k];  // re-derive with it
-        }
-        _msgKeysSynced=true;
+      const M=(blob&&blob.msg&&blob.msg.priv&&blob.msg.pub)?blob.msg:null;
+      const local=(_msgPriv&&_msgPrivB64&&_msgPubB64)?{priv:_msgPrivB64,pub:_msgPubB64}:null;
+      // Pick the key to live with. The published pubkey is never rotated
+      // implicitly — only msgForceRekey may change it.
+      let use=null;
+      if(published){
+        if(local&&local.pub===published)use=local;        // we ARE the identity
+        else if(M&&M.pub===published)use=M;               // identity is in the cloud
+        // else: the identity exists but neither copy here matches → foreign
       }else{
-        // First device to sync claims the account identity with its key.
-        if(!_msgPriv)await _msgGenerate();
-        const{error:e2}=await sbClient.from('user_keys').upsert(
-          {user_id:currentUser.id,blob:{...(blob||{}),msg:{priv:_msgPrivB64,pub:_msgPubB64}},updated_at:new Date().toISOString()},
-          {onConflict:'user_id'});
-        if(!e2)_msgKeysSynced=true;
+        use=M||local;                                     // no live identity yet
+        if(!use){await _msgGenerate();use={priv:_msgPrivB64,pub:_msgPubB64};}
       }
-    }catch(e){/* offline or user_keys table absent — device-local key still works */}
+      if(use){
+        if(use.pub!==_msgPubB64){
+          await _msgImport(use.priv,use.pub);
+          for(const k in _convKeys)delete _convKeys[k];
+        }
+        if(!M||M.pub!==use.pub){
+          const{error:e2}=await sbClient.from('user_keys').upsert(
+            {user_id:currentUser.id,blob:{...(blob||{}),msg:{priv:use.priv,pub:use.pub}},updated_at:new Date().toISOString()},
+            {onConflict:'user_id'});
+          if(e2)throw e2;
+        }
+        _msgKeysSynced=true;_msgIdentityForeign=false;
+        // The account copy is safely in the cloud; retire the legacy shared
+        // pair so another account on this browser can't inherit the identity.
+        try{localStorage.removeItem(MSG_PRIV_KEY);localStorage.removeItem(MSG_PRIV_KEY+'_pub');}catch(_){}
+      }else{
+        // The live identity is on ANOTHER device (published pubkey we don't
+        // own, no matching account copy). Minting a fresh key here would
+        // orphan the whole history — wait: as soon as that device opens the
+        // app, it uploads its key and we adopt it automatically.
+        if(!_msgIdentityForeign)errlogAdd('msg-keys','ключ переписки на другом устройстве — откройте приложение там, чтобы синхронизировать');
+        _msgIdentityForeign=true;
+      }
+    }catch(e){
+      // user_keys unreachable (offline — or the table is missing: run
+      // e2ee_setup.sql). Keep the device key, but make the failure visible.
+      if(!_msgSyncWarned){_msgSyncWarned=true;errlogAdd('msg-keys','user_keys недоступна ('+((e&&e.message)||e)+') — если ошибка повторяется, выполните e2ee_setup.sql в Supabase');}
+    }
   }
-  if(!_msgPriv)await _msgGenerate();
+  if(!_msgPriv&&!_msgIdentityForeign)await _msgGenerate();
+}
+
+// Deliberately lose the old identity: mint a new key, claim the account slot
+// and publish it. Old messages stay unreadable for everyone — last resort for
+// a lost device.
+async function msgForceRekey(){
+  await _msgGenerate();
+  _msgIdentityForeign=false;_msgKeysSynced=false;
+  for(const k in _convKeys)delete _convKeys[k];
+  try{
+    const{data}=await sbClient.from('user_keys').select('blob').eq('user_id',currentUser.id).maybeSingle();
+    const blob=(data&&data.blob)||null;
+    await sbClient.from('user_keys').upsert(
+      {user_id:currentUser.id,blob:{...(blob||{}),msg:{priv:_msgPrivB64,pub:_msgPubB64}},updated_at:new Date().toISOString()},
+      {onConflict:'user_id'});
+    _msgKeysSynced=true;
+    await sbClient.from('profiles').upsert({user_id:currentUser.id,pubkey:_msgPubB64,updated_at:new Date().toISOString()},{onConflict:'user_id'});
+  }catch(e){toast('Не удалось пересоздать ключ: '+((e&&e.message)||e));}
 }
 async function msgConvKey(friendId,theirPubB64){
   if(_convKeys[friendId])return _convKeys[friendId];
@@ -6132,6 +6189,7 @@ const MSG_DECRYPT_FAIL='🔒 не удалось расшифровать';
 // голосом или при встрече.
 async function msgSafetyCode(fid){
   await msgEnsureKeys();
+  if(!_msgPubB64)throw new Error('ключ этого устройства ещё не синхронизирован');
   const theirs=(_profileCache[fid]||{}).pubkey;
   if(!theirs)throw new Error('нет ключа собеседника');
   const pair=[_msgPubB64,theirs].sort().join('|');
@@ -6274,7 +6332,21 @@ async function publishProfile(){
   try{
     await msgEnsureKeys();
     const name=((goals&&goals.profile&&goals.profile.name)||'').trim();
-    await sbClient.from('profiles').upsert({user_id:currentUser.id,seq:userSeq||null,name,pubkey:_msgPubB64,updated_at:new Date().toISOString()},{onConflict:'user_id'});
+    const row={user_id:currentUser.id,seq:userSeq||null,name,updated_at:new Date().toISOString()};
+    // Publish our pubkey only when we legitimately own the account identity
+    // (synced with user_keys). An unsynced device overwriting a живой ключ is
+    // exactly the flip-flop that used to break every chat.
+    if(_msgPubB64&&!_msgIdentityForeign&&_msgKeysSynced){
+      row.pubkey=_msgPubB64;
+    }else if(_msgPubB64&&!_msgIdentityForeign){
+      // Sync unavailable (offline / user_keys missing): publish only if the
+      // profile has no different key already — never steal the identity.
+      try{
+        const{data:pr}=await sbClient.from('profiles').select('pubkey').eq('user_id',currentUser.id).maybeSingle();
+        if(!pr||!pr.pubkey||pr.pubkey===_msgPubB64)row.pubkey=_msgPubB64;
+      }catch(_){/* can't check — leave pubkey untouched */}
+    }
+    await sbClient.from('profiles').upsert(row,{onConflict:'user_id'});
   }catch(e){console.warn('publishProfile',e);}
 }
 
@@ -6461,6 +6533,11 @@ async function loadChatMessages(){
   if(!_chatFriend||!currentUser||!sbClient)return;
   const fid=_chatFriend.id;
   if(!_chatFriend.pubkey){renderChat([{system:'У друга ещё нет ключа шифрования — попросите его открыть приложение.'}]);return;}
+  await msgEnsureKeys();
+  if(_msgIdentityForeign){
+    renderChat([{system:'🔑 Ключ переписки этого аккаунта — на другом устройстве. Откройте приложение там, и ключ синхронизируется сюда автоматически. Писать отсюда пока нельзя (собеседник не смог бы расшифровать).'}]);
+    return;
+  }
   try{
     // Newest 300, then reverse — a long history must not cut off recent messages.
     const{data,error}=await sbClient.from('messages').select('*')
@@ -6495,6 +6572,15 @@ async function chatSend(){
   const inp=document.getElementById('chatInput');if(!inp||!_chatFriend)return;
   const text=(inp.value||'').trim();if(!text)return;
   if(!_chatFriend.pubkey){toast('У друга ещё нет ключа шифрования');return;}
+  await msgEnsureKeys();
+  if(_msgIdentityForeign){
+    // Sending with a non-published key would produce messages the friend can
+    // never decrypt — block, explain, and offer the destructive way out.
+    if(confirm('Ключ переписки этого аккаунта находится на другом устройстве.\n\nЛучший вариант: открыть приложение там — ключ синхронизируется сюда сам.\n\nПересоздать ключ ЗДЕСЬ? Вся старая переписка станет нечитаемой у всех собеседников.')){
+      await msgForceRekey();
+      if(_msgIdentityForeign)return;
+    }else return;
+  }
   inp.value='';
   try{
     const key=await msgConvKey(_chatFriend.id,_chatFriend.pubkey);
