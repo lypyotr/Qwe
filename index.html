@@ -1264,6 +1264,16 @@ body.chat-open .bottom-nav{display:none}
       <div class="auth-link" onclick="showAuthLogin()">← Назад</div>
     </div>
 
+    <!-- New password form (opened from the e-mail recovery link) -->
+    <div id="authRecoverForm" style="display:none">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:12px;text-align:center">Придумай новый пароль для аккаунта</div>
+      <input class="auth-input" id="recPass1" type="password" placeholder="Новый пароль" autocomplete="new-password">
+      <input class="auth-input" id="recPass2" type="password" placeholder="Ещё раз" autocomplete="new-password"
+        onkeydown="if(event.key==='Enter')doSetNewPassword()">
+      <div class="auth-error" id="recError"></div>
+      <button class="auth-btn" onclick="doSetNewPassword()">Сохранить пароль</button>
+    </div>
+
     <div class="auth-loading" id="authLoading" style="display:none">Входим…</div>
     <div id="authDiag" style="margin-top:14px;font-size:11px;line-height:1.5;color:var(--muted);font-family:monospace;white-space:pre-wrap;word-break:break-all"></div>
   </div>
@@ -5138,7 +5148,11 @@ function initSupabase(){
 
     // On every auth change AFTER initial load (login, logout, token refresh)
     sbClient.auth.onAuthStateChange((event,session)=>{
-      if(event==='SIGNED_IN'&&session?.user){
+      if(event==='PASSWORD_RECOVERY'||(_recoveryFlow&&event==='SIGNED_IN')){
+        // Recovery link: a session exists, but ask for the new password
+        // instead of silently entering the app.
+        hideLoader();showAuthOverlay(true);showAuthRecover();
+      }else if(event==='SIGNED_IN'&&session?.user){
         // Defer DB work out of the auth callback. supabase-js holds the auth
         // navigator-lock while running this callback; calling sbClient.from()
         // here would wait for the access token, which waits for that same lock
@@ -5164,6 +5178,7 @@ function initSupabase(){
     // Initial session check — restore existing session on page load
     sbClient.auth.getSession().then(({data:{session}})=>{
       if(session?.user){
+        if(_recoveryFlow){hideLoader();showAuthOverlay(true);showAuthRecover();return;}
         enterApp(session.user);
       }else{
         showAuthOverlay(true);showAuthLogin();hideLoader();
@@ -5210,9 +5225,51 @@ function showAuthOverlay(show){
   if(show){el.classList.remove('hidden');el.style.display='';}
   else{el.classList.add('hidden');el.style.display='none';}
 }
-function showAuthLogin(){document.getElementById('authLoginForm').style.display='';document.getElementById('authRegisterForm').style.display='none';document.getElementById('authForgotForm').style.display='none';document.getElementById('authError').textContent='';}
-function showAuthRegister(){document.getElementById('authLoginForm').style.display='none';document.getElementById('authRegisterForm').style.display='';document.getElementById('authForgotForm').style.display='none';document.getElementById('regError').textContent='';}
-function showAuthForgot(){document.getElementById('authLoginForm').style.display='none';document.getElementById('authRegisterForm').style.display='none';document.getElementById('authForgotForm').style.display='';document.getElementById('forgotMsg').textContent='';}
+function _authForms(show){
+  for(const id of ['authLoginForm','authRegisterForm','authForgotForm','authRecoverForm']){
+    const el=document.getElementById(id);
+    if(el)el.style.display=id===show?'':'none';
+  }
+}
+function showAuthLogin(){_authForms('authLoginForm');document.getElementById('authError').textContent='';}
+function showAuthRegister(){_authForms('authRegisterForm');document.getElementById('regError').textContent='';}
+function showAuthForgot(){_authForms('authForgotForm');document.getElementById('forgotMsg').textContent='';}
+function showAuthRecover(){_authForms('authRecoverForm');document.getElementById('recError').textContent='';}
+
+// ── Password recovery ──
+// The e-mail link lands here with #access_token=…&type=recovery. supabase-js
+// (detectSessionInUrl) turns that into a live session — but without this flow
+// the user was just silently logged in and never asked for a new password.
+// The flag is read BEFORE supabase-js strips the hash.
+let _recoveryFlow=/type=recovery/.test(location.hash);
+async function doSetNewPassword(){
+  const p1=document.getElementById('recPass1').value,p2=document.getElementById('recPass2').value,errEl=document.getElementById('recError');
+  errEl.textContent='';
+  if(!p1){errEl.textContent='Введи новый пароль';return;}
+  if(p1.length<6){errEl.textContent='Минимум 6 символов';return;}
+  if(p1!==p2){errEl.textContent='Пароли не совпадают';return;}
+  document.getElementById('authLoading').style.display='';
+  try{
+    const{data,error}=await sbClient.auth.updateUser({password:p1});
+    if(error){errEl.textContent=supabaseErrMsg(error);return;}
+    _recoveryFlow=false;
+    try{history.replaceState(null,'',location.pathname+location.search);}catch(_){}
+    _loginPassword=p1;
+    toast('Пароль обновлён ✓');haptic('medium');
+    if(data&&data.user){
+      enterApp(data.user);
+      // Data-E2EE is wrapped with the OLD password — tell the user how to
+      // re-attach it before they hit an opaque «заблокировано».
+      try{
+        const{data:k}=await sbClient.from('user_keys').select('blob').eq('user_id',data.user.id).maybeSingle();
+        if(k&&k.blob&&k.blob.wrapPw)toast('Данные зашифрованы старым паролем — разблокируйте их recovery-кодом (Профиль → Шифрование)',null,9000);
+      }catch(_){}
+    }
+  }catch(e){
+    errEl.textContent='Нет связи с сервером. Попробуй ещё раз.';
+    errlogAdd('auth','set-new-password threw: '+((e&&e.message)||e));
+  }finally{document.getElementById('authLoading').style.display='none';}
+}
 
 function supabaseErrMsg(err){
   const msg=(err&&(err.message||err.msg||''))||'';
