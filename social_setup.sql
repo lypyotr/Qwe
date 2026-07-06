@@ -14,6 +14,16 @@ create table if not exists public.profiles (
   pubkey     text,                      -- ECDH P-256 public key (base64 raw)
   updated_at timestamptz default now()
 );
+-- Bound the client-writable text fields so a crafted client can't store a huge
+-- name/pubkey (storage abuse). NOT VALID: enforce on new writes without failing
+-- the migration on any pre-existing oversized row.
+alter table public.profiles drop constraint if exists profiles_name_len;
+alter table public.profiles add constraint profiles_name_len
+  check (char_length(coalesce(name,'')) <= 80) not valid;
+alter table public.profiles drop constraint if exists profiles_pubkey_len;
+alter table public.profiles add constraint profiles_pubkey_len
+  check (pubkey is null or char_length(pubkey) <= 256) not valid;
+
 alter table public.profiles enable row level security;
 drop policy if exists "profiles_read_all"  on public.profiles;
 drop policy if exists "profiles_upsert_own" on public.profiles;
@@ -79,6 +89,12 @@ create table if not exists public.messages (
   created_at timestamptz default now()
 );
 create index if not exists messages_pair_idx on public.messages(sender, recipient, created_at);
+-- Cap the ciphertext size (a 4000-char message encrypts to ~5.5 KB of base64);
+-- 16 KB leaves headroom while blocking multi-MB junk rows. NOT VALID so the
+-- migration never fails on an existing row.
+alter table public.messages drop constraint if exists messages_body_len;
+alter table public.messages add constraint messages_body_len
+  check (char_length(body) <= 16000) not valid;
 alter table public.messages enable row level security;
 drop policy if exists "messages_select" on public.messages;
 drop policy if exists "messages_insert" on public.messages;
