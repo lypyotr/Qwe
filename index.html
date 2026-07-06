@@ -5103,6 +5103,18 @@ async function authLock(name,acquireTimeout,fn){
   }finally{clearTimeout(timer);}
 }
 
+// Give the Realtime socket the user's JWT so PRIVATE channels
+// (config:{private:true}) authorize against the realtime.messages RLS policies
+// from realtime_setup.sql. Without a token on the socket the private subscribe
+// is denied and live sync silently falls back to polling. Safe no-op if realtime
+// isn't ready; re-called on login, session restore and token refresh.
+function setRealtimeAuth(session){
+  try{
+    const tok=session&&session.access_token;
+    if(tok&&sbClient&&sbClient.realtime&&sbClient.realtime.setAuth)sbClient.realtime.setAuth(tok);
+  }catch(e){}
+}
+
 let _sbCdnRetried=false;
 function initSupabase(){
   if(typeof supabase==='undefined'){
@@ -5139,6 +5151,10 @@ function initSupabase(){
     // On every auth change AFTER initial load (login, logout, token refresh)
     sbClient.auth.onAuthStateChange((event,session)=>{
       if(event==='SIGNED_IN'&&session?.user){
+        // Hand the Realtime socket the fresh JWT so PRIVATE channels authorize
+        // (see setRealtimeAuth). Done synchronously here, before the deferred
+        // enterApp, so the token is on the socket well before startRealtimeSync.
+        setRealtimeAuth(session);
         // Defer DB work out of the auth callback. supabase-js holds the auth
         // navigator-lock while running this callback; calling sbClient.from()
         // here would wait for the access token, which waits for that same lock
@@ -5153,17 +5169,20 @@ function initSupabase(){
         for(const k in _convKeys)delete _convKeys[k];
         if(realtimeChannel){sbClient.removeChannel(realtimeChannel);realtimeChannel=null;}
         if(appConfigChannel){sbClient.removeChannel(appConfigChannel);appConfigChannel=null;}
+        try{if(sbClient.realtime&&sbClient.realtime.setAuth)sbClient.realtime.setAuth(null);}catch(e){} // drop the token from the socket
         refreshAdminUI();   // hide admin tab + leave maintenance lock to owner check
         renderMaintenance();
         showAuthOverlay(true);showAuthLogin();
       }else if(event==='TOKEN_REFRESHED'&&session?.user){
         currentUser=session.user;
+        setRealtimeAuth(session);   // keep private channels authorized after a refresh
       }
     });
 
     // Initial session check — restore existing session on page load
     sbClient.auth.getSession().then(({data:{session}})=>{
       if(session?.user){
+        setRealtimeAuth(session);   // token on the socket before realtime starts
         enterApp(session.user);
       }else{
         showAuthOverlay(true);showAuthLogin();hideLoader();
@@ -5235,6 +5254,7 @@ async function doLogin(){
     const{data,error}=await sbClient.auth.signInWithPassword({email,password:pass});
     if(error){errEl.textContent=supabaseErrMsg(error);return;}
     _loginPassword=pass; // kept briefly so E2EE can unlock on this device
+    setRealtimeAuth(data&&data.session);   // authorize private realtime channels
     // Enter directly from the awaited result instead of waiting on the async
     // onAuthStateChange event — that event sometimes doesn't fire (race), which
     // left the user stuck on the login screen until a 2nd/3rd attempt.
