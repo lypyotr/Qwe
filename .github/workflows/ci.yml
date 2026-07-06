@@ -27,3 +27,6 @@ jobs:
 
       - name: Boot smoke test (headless Chromium)
         run: node scripts/smoke.mjs
+
+      - name: Crypto-core tests (headless Chromium)
+        run: node scripts/crypto-test.mjs

@@ -21,6 +21,31 @@ insert into public.user_numbers(user_id, seq)
   values ('4e0678c2-277d-4de7-afb7-988714e41d0f', 1)
   on conflict (user_id) do nothing;
 
+-- ── Anti-spoofing: seq must come from the server sequence, never the client.
+-- The insert policy below only checks user_id, so a client could otherwise post
+-- {user_id: self, seq: 1} to grab the owner's number (or any free number). This
+-- trigger forces seq from nextval() for every CLIENT insert (auth.uid() set),
+-- while leaving server/SQL-editor inserts — like the owner pin above, where
+-- auth.uid() is null — untouched.
+create or replace function public.user_numbers_force_seq()
+  returns trigger
+  language plpgsql
+  security definer
+  set search_path = public
+as $$
+begin
+  if auth.uid() is not null then
+    new.seq := nextval('public.user_seq');
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists user_numbers_force_seq_trg on public.user_numbers;
+create trigger user_numbers_force_seq_trg
+  before insert on public.user_numbers
+  for each row execute function public.user_numbers_force_seq();
+
 alter table public.user_numbers enable row level security;
 
 drop policy if exists "user_numbers_select_own" on public.user_numbers;

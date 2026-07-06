@@ -1246,7 +1246,7 @@ body.chat-open .bottom-nav{display:none}
     <!-- Register form -->
     <div id="authRegisterForm" style="display:none">
       <input class="auth-input" id="regEmail" type="email" placeholder="Email" autocomplete="email">
-      <input class="auth-input" id="regPassword" type="password" placeholder="Пароль (минимум 6 символов)" autocomplete="new-password">
+      <input class="auth-input" id="regPassword" type="password" placeholder="Пароль (минимум 10 символов)" autocomplete="new-password">
       <input class="auth-input" id="regPassword2" type="password" placeholder="Повтори пароль" autocomplete="new-password"
         onkeydown="if(event.key==='Enter')doRegister()">
       <div class="auth-error" id="regError"></div>
@@ -1734,7 +1734,7 @@ body.chat-open .bottom-nav{display:none}
   </div>
   <div class="chat-messages" id="chatMessages"></div>
   <div class="chat-input-bar">
-    <input class="chat-input" id="chatInput" type="text" placeholder="Сообщение…" onkeydown="if(event.key==='Enter')chatSend()">
+    <input class="chat-input" id="chatInput" type="text" maxlength="4000" placeholder="Сообщение…" onkeydown="if(event.key==='Enter')chatSend()">
     <button class="chat-send" onclick="chatSend()">➤</button>
   </div>
 </div><!-- /page-chat -->
@@ -5219,7 +5219,7 @@ function supabaseErrMsg(err){
   if(msg.includes('Invalid login'))return'Неверный email или пароль';
   if(msg.includes('Email not confirmed'))return'Подтверди email перед входом';
   if(msg.includes('already registered'))return'Email уже используется';
-  if(msg.includes('Password should be'))return'Пароль слишком простой (мин. 6 символов)';
+  if(msg.includes('Password should be'))return'Пароль слишком простой (мин. 10 символов)';
   if(msg.includes('rate limit')||msg.includes('too many'))return'Слишком много попыток, подожди';
   if(msg.includes('fetch')||msg.includes('network')||msg.includes('Failed'))return'Ошибка сети';
   return msg||'Неизвестная ошибка';
@@ -5248,7 +5248,7 @@ async function doRegister(){
   const email=document.getElementById('regEmail').value.trim(),pass=document.getElementById('regPassword').value,pass2=document.getElementById('regPassword2').value,errEl=document.getElementById('regError');
   errEl.textContent='';if(!email||!pass){errEl.textContent='Заполни все поля';return;}
   if(pass!==pass2){errEl.textContent='Пароли не совпадают';return;}
-  if(pass.length<6){errEl.textContent='Минимум 6 символов';return;}
+  if(pass.length<10){errEl.textContent='Минимум 10 символов';return;}
   document.getElementById('authLoading').style.display='';
   try{
     const{error}=await sbClient.auth.signUp({email,password:pass});
@@ -5468,7 +5468,12 @@ function startRealtimeSync(){
   // Tear down any previous channel without letting its async status callback
   // (which may fire CLOSED) trigger a reconnect of the new one.
   if(realtimeChannel){const old=realtimeChannel;realtimeChannel=null;sbClient.removeChannel(old);}
-  const ch=sbClient.channel('user-sync-'+currentUser.id,{config:{broadcast:{self:false}}});
+  // private:true → the channel is gated by the realtime.messages RLS policies in
+  // realtime_setup.sql, so nobody but the owner can subscribe to (or forge pings
+  // into) this user's sync channel. If those policies/Realtime Authorization
+  // aren't applied yet, the subscribe just fails and the app falls back to the
+  // focus/visibility/45s-poll refresh — degraded live-sync, never a hard break.
+  const ch=sbClient.channel('user-sync-'+currentUser.id,{config:{private:true,broadcast:{self:false}}});
   realtimeChannel=ch;
   ch.on('broadcast',{event:'data-updated'},({payload})=>{
       if(payload&&payload.from===CLIENT_ID)return; // ignore our own echo
@@ -5688,16 +5693,40 @@ function isCipher(v){return typeof v==='string'&&v.indexOf('e1.')===0;}
 function genRecovery(){const a='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',r=_rand(20);let s='';for(let i=0;i<r.length;i++){s+=a[r[i]%a.length];if(i%4===3&&i<r.length-1)s+='-';}return s;}
 
 // Per-device cache of the raw DEK so reloads don't need the password again.
-function _dekCacheKey(){return 'salary_dek_'+(currentUser?currentUser.id:'x');}
+function _dekCacheKey(){return 'salary_dek_'+(currentUser?currentUser.id:'x');}   // legacy localStorage key
+function _dekIdbKey(){return 'dek_'+(currentUser?currentUser.id:'x');}
+// Cache the DEK at rest as a NON-EXTRACTABLE CryptoKey in IndexedDB instead of
+// raw base64 in localStorage. A stored-XSS reading IndexedDB then gets a key it
+// can use to decrypt while the page is open, but can NEVER export the raw bytes
+// to exfiltrate — the persisted secret can't leave the device. (cacheDEKLocal is
+// only ever called with an extractable in-memory DEK, right after enable/unlock.)
 async function cacheDEKLocal(){
-  try{const raw=await _sub().exportKey('raw',e2eeDEK);localStorage.setItem(_dekCacheKey(),_b64(raw));}catch(e){}
+  try{
+    const raw=await _sub().exportKey('raw',e2eeDEK);
+    const nonExtractable=await _sub().importKey('raw',raw,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+    await _idbPut(_dekIdbKey(),nonExtractable);
+    try{localStorage.removeItem(_dekCacheKey());}catch(_){}   // purge any legacy plaintext copy
+  }catch(e){}
 }
 async function loadDEKLocal(){
-  try{const s=localStorage.getItem(_dekCacheKey());if(!s)return false;
+  // Preferred: the non-extractable CryptoKey from IndexedDB.
+  try{
+    const k=await _idbGet(_dekIdbKey());
+    if(k&&k.type==='secret'){e2eeDEK=k;return true;}
+  }catch(e){}
+  // One-time migration: older builds stored the raw DEK (base64) in localStorage.
+  // Adopt it once, then immediately re-cache non-extractably (which deletes it).
+  try{
+    const s=localStorage.getItem(_dekCacheKey());if(!s)return false;
     e2eeDEK=await _sub().importKey('raw',_ub64(s),{name:'AES-GCM',length:256},true,['encrypt','decrypt']);
-    return true;}catch(e){return false;}
+    await cacheDEKLocal();
+    return true;
+  }catch(e){return false;}
 }
-function clearDEKLocal(){try{localStorage.removeItem(_dekCacheKey());}catch(e){}}
+async function clearDEKLocal(){
+  try{await _idbDel(_dekIdbKey());}catch(_){}
+  try{localStorage.removeItem(_dekCacheKey());}catch(_){}
+}
 
 async function fetchKeyBlob(){
   if(!currentUser||!sbClient)return null;
@@ -6297,7 +6326,7 @@ function pingFriend(fid,kind){
     let ch=_pingCh[fid];
     if(ch&&ch.state==='joined'){ch.send({type:'broadcast',event:'msg',payload});return;}
     if(ch){try{sbClient.removeChannel(ch);}catch(_){}delete _pingCh[fid];}
-    ch=sbClient.channel('user-sync-'+fid);
+    ch=sbClient.channel('user-sync-'+fid,{config:{private:true}});   // gated by realtime_setup.sql RLS
     _pingCh[fid]=ch;
     ch.subscribe(st=>{if(st==='SUBSCRIBED')try{ch.send({type:'broadcast',event:'msg',payload});}catch(_){}});
   }catch(e){}
@@ -6630,7 +6659,7 @@ async function loadChatMessages(){
 }
 async function chatSend(){
   const inp=document.getElementById('chatInput');if(!inp||!_chatFriend)return;
-  const text=(inp.value||'').trim();if(!text)return;
+  const text=(inp.value||'').trim().slice(0,4000);if(!text)return;   // cap length (also enforced by DB)
   if(!_chatFriend.pubkey){toast('У друга ещё нет ключа шифрования');return;}
   await msgEnsureKeys();
   if(_msgIdentityForeign){
