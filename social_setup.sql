@@ -22,6 +22,31 @@ create policy "profiles_read_all"   on public.profiles for select to authenticat
 create policy "profiles_upsert_own" on public.profiles for insert to authenticated with check (auth.uid() = user_id);
 create policy "profiles_update_own" on public.profiles for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+-- ── Anti-spoofing: the #number in the public directory must NOT be trusted from
+-- the client. RLS above only checks user_id, so a malicious client could upsert
+-- its own profile with seq = 1 (the owner's number) or any other user's number,
+-- impersonating them in friend search — and duplicate seqs also break the
+-- .maybeSingle() lookup. This trigger overwrites whatever seq the client sends
+-- with the authoritative value from user_numbers (assigned server-side), so the
+-- directory number can never be forged. SECURITY DEFINER lets it read
+-- user_numbers regardless of that table's RLS.
+create or replace function public.profiles_force_seq()
+  returns trigger
+  language plpgsql
+  security definer
+  set search_path = public
+as $$
+begin
+  select seq into new.seq from public.user_numbers where user_id = new.user_id;
+  return new;
+end;
+$$;
+
+drop trigger if exists profiles_force_seq_trg on public.profiles;
+create trigger profiles_force_seq_trg
+  before insert or update on public.profiles
+  for each row execute function public.profiles_force_seq();
+
 -- ── Friendship edges. Adding a friend inserts a 'pending' edge from me to them;
 -- when they accept, their edge becomes 'accepted' and a reciprocal edge is made.
 create table if not exists public.friends (
@@ -59,7 +84,19 @@ drop policy if exists "messages_select" on public.messages;
 drop policy if exists "messages_insert" on public.messages;
 drop policy if exists "messages_delete" on public.messages;
 create policy "messages_select" on public.messages for select using (auth.uid() = sender or auth.uid() = recipient);
-create policy "messages_insert" on public.messages for insert with check (auth.uid() = sender);
+-- A message may only be sent by its own sender AND only to an accepted friend.
+-- Without the friendship check, any authenticated user could write rows to any
+-- recipient (unsolicited messages / storage abuse). The app only ever opens a
+-- chat with an accepted friend, so this matches real usage.
+create policy "messages_insert" on public.messages for insert with check (
+  auth.uid() = sender
+  and exists (
+    select 1 from public.friends f
+    where f.user_id = sender
+      and f.friend_id = recipient
+      and f.status = 'accepted'
+  )
+);
 -- «Удалить у всех» — только автор может удалить своё сообщение с сервера.
 -- («Удалить у себя» серверу не нужно: это локальный скрытый список устройства.)
 create policy "messages_delete" on public.messages for delete using (auth.uid() = sender);
