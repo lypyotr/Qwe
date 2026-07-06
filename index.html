@@ -3745,7 +3745,7 @@ function renderBreakdown(){
     const amt=parseFloat(b.amount)||0;
     if(amt!==0){
       const lbl=b.name||(amt>0?'Доплата':'Вычет');
-      rows+=`<div class="breakdown-row bonus-r"><span class="lbl">${lbl}</span><span class="val" style="color:${amt>=0?'var(--accent3)':'var(--danger)'}">${amt>=0?'+':''}${M(amt)}</span></div>`;
+      rows+=`<div class="breakdown-row bonus-r"><span class="lbl">${esc(lbl)}</span><span class="val" style="color:${amt>=0?'var(--accent3)':'var(--danger)'}">${amt>=0?'+':''}${M(amt)}</span></div>`;
     }
   });
   if(taxEnabled)rows+=`<div class="breakdown-row tax-r"><span class="lbl">НДФЛ 13%</span><span class="val">−${M(tax)}</span></div>`;
