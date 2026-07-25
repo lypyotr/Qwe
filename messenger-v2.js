@@ -4,6 +4,13 @@ var msgV2={room:null,reply:null,edit:null,forward:null,kind:'text',meta:{},pinne
 var msgV2BaseOpenActions=window.openMsgActions;
 var msgV2LastLoadError='',msgV2LastLoadErrorAt=0;
 
+async function msgV2MarkRead(peer){
+  try{
+    const{error}=await sbClient.rpc('message_mark_read',{peer});
+    if(error)console.warn('message_mark_read',error);
+  }catch(e){console.warn('message_mark_read',e);}
+}
+
 function msgV2ShowTab(tab){
   document.getElementById('msgPeoplePane').style.display=tab==='people'?'':'none';
   document.getElementById('msgGroupsPane').style.display=tab==='groups'?'':'none';
@@ -59,7 +66,7 @@ window.loadChatMessages=async function(){
       const text=String(msgV2.room?m.body:await msgDecrypt(key,m.body)??'');texts[m.id]=text;
       out.push({id:m.id,clientId:m.client_id,me:m.sender===currentUser.id,sender:m.sender,text,t:m.created_at,readAt:m.read_at,status:'sent',replyTo:m.reply_to,replyText:texts[m.reply_to]||'',editedAt:m.edited_at,kind:m.kind||'text',meta:m.metadata||{},forwardedFrom:m.forwarded_from,reactions:reactions[m.id]||[]});
     }
-    _chatMsgs=out;renderChat(out);if(!msgV2.room){sbClient.rpc('message_mark_read',{peer:_chatFriend.id}).catch(()=>{});markReadNow(_chatFriend.id);clearUnread(_chatFriend.id);}
+    _chatMsgs=out;renderChat(out);if(!msgV2.room){void msgV2MarkRead(_chatFriend.id);markReadNow(_chatFriend.id);clearUnread(_chatFriend.id);}
     msgV2LastLoadError='';
   }catch(e){
     const detail=(e&&e.message)||String(e||'Неизвестная ошибка');

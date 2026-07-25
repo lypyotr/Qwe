@@ -7048,7 +7048,7 @@ async function loadChatMessages(){
       }
     }
     _chatMsgs=out;renderChat(out);
-    sbClient.rpc('message_mark_read',{peer:fid}).then(()=>pingFriend(fid,'read')).catch(()=>{});
+    sbClient.rpc('message_mark_read',{peer:fid}).then(({error})=>{if(!error)pingFriend(fid,'read')},()=>{});
     markReadNow(fid);clearUnread(fid);   // everything now on screen is read
   }catch(e){console.warn('loadChatMessages',e);}
   finally{_chatLoading=false;}
@@ -7213,6 +7213,6 @@ autoBackupLocal();        // roll a local safety snapshot (~daily)
 renderSyncStatus();       // paint the header sync pill
 checkBackupReminder();    // nudge if a file backup is overdue
 </script>
-<script src="messenger-v2.js?v=2"></script>
+<script src="messenger-v2.js?v=3"></script>
 </body>
 </html>
