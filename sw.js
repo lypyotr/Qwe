@@ -1,5 +1,5 @@
-const CACHE='salary-v39';
-const STATIC=['./manifest.json','./icon.svg'];
+const CACHE='salary-v40';
+const STATIC=['./index.html','./manifest.json','./icon.svg'];
 
 // Dynamic APIs that must NEVER be touched by the service worker: Supabase
 // (REST/auth/realtime) and the exchange-rate sources. Caching these cache-first
@@ -9,8 +9,7 @@ const STATIC=['./manifest.json','./icon.svg'];
 const BYPASS=/(^|\.)(supabase\.co|cbr-xml-daily\.ru|er-api\.com)$/i;
 
 self.addEventListener('install',e=>{
-  e.waitUntil(caches.open(CACHE).then(c=>c.addAll(STATIC)));
-  self.skipWaiting();
+  e.waitUntil(caches.open(CACHE).then(c=>c.addAll(STATIC)).then(()=>self.skipWaiting()));
 });
 
 self.addEventListener('activate',e=>{
@@ -34,10 +33,15 @@ self.addEventListener('fetch',e=>{
     // masked by GitHub Pages' max-age. Falls back to cache only when offline.
     e.respondWith(
       fetch(e.request,{cache:'no-store'}).then(resp=>{
-        const clone=resp.clone();
-        caches.open(CACHE).then(c=>c.put(e.request,clone));
+        if(resp.ok){
+          const clone=resp.clone();
+          e.waitUntil(caches.open(CACHE).then(c=>c.put(e.request,clone)));
+        }
         return resp;
-      }).catch(()=>caches.match(e.request))
+      }).catch(async()=>{
+        const cached=await caches.match(e.request);
+        return cached||caches.match('./index.html');
+      })
     );
   }else{
     // Cache-first for static assets (fonts, icons, CDN scripts). The trailing
@@ -45,8 +49,14 @@ self.addEventListener('fetch',e=>{
     // uncaught rejections.
     e.respondWith(
       caches.match(e.request)
-        .then(cached=>cached||fetch(e.request))
-        .catch(()=>caches.match(e.request))
+        .then(cached=>cached||fetch(e.request).then(resp=>{
+          if(resp.ok){
+            const clone=resp.clone();
+            e.waitUntil(caches.open(CACHE).then(c=>c.put(e.request,clone)));
+          }
+          return resp;
+        }))
+        .catch(()=>new Response('',{status:503,statusText:'Offline'}))
     );
   }
 });

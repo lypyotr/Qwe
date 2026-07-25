@@ -6610,8 +6610,8 @@ async function friendConfirmAdd(){
   if(_friendsCache.includes(tgt.id)){toast('Вы уже друзья');return;} // never downgrade accepted → pending
   try{
     const mutual=_reqCache.includes(tgt.id); // they already requested me
-    await sbClient.from('friends').upsert({user_id:currentUser.id,friend_id:tgt.id,status:mutual?'accepted':'pending'},{onConflict:'user_id,friend_id'});
-    if(mutual)await sbClient.from('friends').update({status:'accepted'}).eq('user_id',tgt.id).eq('friend_id',currentUser.id);
+    const{error}=await sbClient.rpc('friend_request',{target:tgt.id});
+    if(error)throw error;
     toast(mutual?('Теперь вы друзья с '+tgt.name):('Заявка отправлена: '+tgt.name+' (#'+tgt.seq+')'));haptic('medium');
     const inp=document.getElementById('friendAddInput');if(inp)inp.value='';
     loadFriends();
@@ -6619,8 +6619,8 @@ async function friendConfirmAdd(){
 }
 async function friendAccept(fid){
   try{
-    await sbClient.from('friends').update({status:'accepted'}).eq('user_id',fid).eq('friend_id',currentUser.id);
-    await sbClient.from('friends').upsert({user_id:currentUser.id,friend_id:fid,status:'accepted'},{onConflict:'user_id,friend_id'});
+    const{error}=await sbClient.rpc('friend_accept',{requester:fid});
+    if(error)throw error;
     toast('Заявка принята');haptic('medium');loadFriends();
   }catch(e){toast('Ошибка: '+((e&&e.message)||e));}
 }

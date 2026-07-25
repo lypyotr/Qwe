@@ -45,6 +45,8 @@ drop trigger if exists user_numbers_force_seq_trg on public.user_numbers;
 create trigger user_numbers_force_seq_trg
   before insert on public.user_numbers
   for each row execute function public.user_numbers_force_seq();
+-- Trigger-only function: never expose it as a Data API RPC.
+revoke all on function public.user_numbers_force_seq() from public, anon, authenticated;
 
 alter table public.user_numbers enable row level security;
 
