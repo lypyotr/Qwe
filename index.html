@@ -1241,6 +1241,20 @@ body.chat-open .bottom-nav{display:none}
 .chat-input{flex:1;min-width:0;max-height:120px;resize:none;font-family:'Manrope',sans-serif;font-size:15px;font-weight:500;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:11px 16px;outline:none}
 .chat-send{flex:none;width:44px;height:44px;border-radius:50%;background:var(--accent);color:#06281e;border:none;font-size:18px;cursor:pointer;touch-action:manipulation}
 .chat-send:active{transform:scale(.94)}
+.chat-tools{display:flex;gap:7px;padding:7px 12px;background:var(--surface);border-bottom:1px solid var(--border)}
+.chat-tools input{flex:1;min-width:0;background:var(--surface2);border:1px solid var(--border);border-radius:12px;color:var(--text);padding:9px 11px;font:600 12px 'Manrope',sans-serif}
+.chat-tool-btn{border:1px solid var(--border);background:var(--surface2);color:var(--text);border-radius:10px;padding:7px 10px;font-weight:800;cursor:pointer}
+.chat-compose-wrap{background:var(--surface);border-top:1px solid var(--border)}
+.chat-context{display:none;align-items:center;gap:8px;padding:7px 12px;font-size:11px;color:var(--muted);border-bottom:1px solid var(--border)}
+.chat-context.show{display:flex}.chat-context-text{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cb-reply{font-size:11px;border-left:3px solid currentColor;padding:4px 7px;margin-bottom:5px;opacity:.72;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cb-meta{display:flex;align-items:center;justify-content:flex-end;gap:5px}.cb-edited{font-size:9px;opacity:.58}
+.cb-reactions{display:flex;gap:4px;flex-wrap:wrap;margin-top:5px}.cb-react{font-size:11px;background:rgba(255,255,255,.18);border:0;border-radius:9px;padding:2px 6px;color:inherit}
+.cb-work{margin-top:6px;padding:8px;border-radius:10px;background:rgba(255,255,255,.15);font-size:12px}
+.chat-typing{font-size:10px;color:var(--accent);padding:0 15px 4px;min-height:14px}
+.messenger-tabs{display:flex;gap:6px;margin-bottom:12px}.messenger-tabs button{flex:1;padding:9px;border:1px solid var(--border);border-radius:11px;background:var(--surface2);color:var(--muted);font-weight:800}.messenger-tabs button.active{background:var(--accent);color:#06281e}
+.group-create{display:flex;gap:8px;margin-bottom:12px}.group-create input{flex:1;min-width:0;background:var(--surface2);border:1px solid var(--border);border-radius:12px;color:var(--text);padding:11px}
+.chat-bubble.pinned{box-shadow:0 0 0 2px var(--warn)}
 </style>
 </head>
 <body>
@@ -1826,6 +1840,12 @@ body.chat-open .bottom-nav{display:none}
     <div class="sync-pill" onclick="openSyncLog()" title="Синхронизация"><span class="sp-dot"></span><span class="sp-txt">—</span></div>
   </div>
   <div class="calc-wrap">
+    <div class="messenger-tabs"><button id="msgPeopleTab" class="active" onclick="msgV2ShowTab('people')">Личные</button><button id="msgGroupsTab" onclick="msgV2ShowTab('groups')">Группы</button></div>
+    <div id="msgGroupsPane" style="display:none">
+      <div class="group-create"><input id="groupTitleInput" maxlength="80" placeholder="Название рабочего чата"><button class="friend-add-btn" onclick="msgV2CreateGroup()">Создать</button></div>
+      <div id="groupsList"><div class="friend-empty">Загрузка…</div></div>
+    </div>
+    <div id="msgPeoplePane">
     <div class="calc-card">
       <div class="calc-card-title">Твой ID</div>
       <div class="calc-card-sub">Назови этот номер другу, чтобы он добавил тебя.</div>
@@ -1846,6 +1866,7 @@ body.chat-open .bottom-nav{display:none}
     </div>
     <div class="friend-section-title">Мои друзья</div>
     <div id="friendsList"><div class="friend-empty">Загрузка…</div></div>
+    </div>
   </div>
 </div><!-- /page-friends -->
 
@@ -1857,10 +1878,19 @@ body.chat-open .bottom-nav{display:none}
       <div><div class="header-label" id="chatTitle" style="font-size:16px">Чат</div><div class="chat-sub" id="chatSub" style="cursor:pointer" onclick="event.stopPropagation();showSafetyCode()">🔒 зашифровано</div></div>
     </div>
   </div>
+  <div class="chat-tools"><input id="chatSearch" type="search" placeholder="Поиск в переписке" oninput="msgV2Search(this.value)"><button class="chat-tool-btn" onclick="msgV2TogglePinned()" title="Закреплённые">📌</button></div>
   <div class="chat-messages" id="chatMessages"></div>
+  <div class="chat-compose-wrap">
+  <div class="chat-context" id="chatContext"><span id="chatContextIcon">↩</span><span class="chat-context-text" id="chatContextText"></span><button class="chat-tool-btn" onclick="msgV2ClearContext()">×</button></div>
+  <div class="chat-typing" id="chatTyping"></div>
   <div class="chat-input-bar">
-    <textarea class="chat-input" id="chatInput" rows="1" maxlength="4000" placeholder="Сообщение…" oninput="chatInputResize(this)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();chatSend()}"></textarea>
+    <input id="chatFileInput" type="file" style="display:none" accept="image/*,audio/*,.pdf,.txt,.doc,.docx" onchange="msgV2UploadFile(this)">
+    <button class="chat-send" style="background:var(--surface2);color:var(--text)" onclick="document.getElementById('chatFileInput').click()" title="Файл или фото">＋</button>
+    <button class="chat-send" id="chatVoiceBtn" style="background:var(--surface2);color:var(--text)" onclick="msgV2Voice()" title="Голосовое">🎙</button>
+    <button class="chat-send" style="background:var(--surface2);color:var(--text)" onclick="msgV2WorkCard()" title="Карточка работы">☑</button>
+    <textarea class="chat-input" id="chatInput" rows="1" maxlength="4000" placeholder="Сообщение…" oninput="chatInputResize(this);msgV2Typing()" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();chatSend()}"></textarea>
     <button class="chat-send" id="chatSendBtn" onclick="chatSend()" aria-label="Отправить">➤</button>
+  </div>
   </div>
 </div><!-- /page-chat -->
 
@@ -1991,6 +2021,14 @@ body.chat-open .bottom-nav{display:none}
   <div class="modal">
     <div class="modal-handle"></div>
     <div class="modal-title">Сообщение</div>
+    <button class="modal-btn" style="width:100%;padding:11px;margin-bottom:7px" onclick="msgV2Action('reply')">↩ Ответить</button>
+    <button class="modal-btn" style="width:100%;padding:11px;margin-bottom:7px" onclick="msgV2Action('react')">❤️ Реакция</button>
+    <button class="modal-btn" style="width:100%;padding:11px;margin-bottom:7px" onclick="msgV2Action('copy')">📋 Копировать</button>
+    <button class="modal-btn" id="msgEditBtn" style="width:100%;padding:11px;margin-bottom:7px" onclick="msgV2Action('edit')">✎ Редактировать</button>
+    <button class="modal-btn" style="width:100%;padding:11px;margin-bottom:7px" onclick="msgV2Action('forward')">↗ Переслать</button>
+    <button class="modal-btn" style="width:100%;padding:11px;margin-bottom:7px" onclick="msgV2Action('pin')">📌 Закрепить</button>
+    <button class="modal-btn" id="msgReportBtn" style="width:100%;padding:11px;margin-bottom:7px;background:var(--surface2);color:var(--warn)" onclick="msgV2Action('report')">⚑ Пожаловаться</button>
+    <button class="modal-btn" id="msgBlockBtn" style="width:100%;padding:11px;margin-bottom:7px;background:var(--surface2);color:var(--danger)" onclick="msgV2Action('block')">⛔ Заблокировать</button>
     <button class="modal-btn" style="width:100%;padding:13px;margin-bottom:8px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="msgDeleteForMe()">🗑 Удалить у себя</button>
     <button class="modal-btn" id="msgDelAllBtn" style="width:100%;padding:13px;background:rgba(248,113,113,.12);color:var(--danger);border:1px solid rgba(248,113,113,.3)" onclick="msgDeleteForAll()">🗑 Удалить у всех</button>
   </div>
@@ -5002,7 +5040,12 @@ const BACKUP_TABLES=[
   // messages have no natural key, so they are inserted rather than upserted.
   {name:'profiles',     conflict:'user_id'},
   {name:'friends',      conflict:'user_id,friend_id',strip:['id']},
+  {name:'chat_rooms',   conflict:'id'},
+  {name:'chat_members', conflict:'room_id,user_id'},
   {name:'messages',     insert:true,               strip:['id']},
+  {name:'message_reactions',conflict:'message_id,user_id,emoji'},
+  {name:'user_blocks',  conflict:'blocker,blocked'},
+  {name:'message_reports',insert:true,strip:['id']},
 ];
 const BACKUP_LS_KEY='salary_db_backup'; // record key in IDB; legacy localStorage key
 const BACKUP_IDB_NAME='salary_backups';
@@ -7170,5 +7213,6 @@ autoBackupLocal();        // roll a local safety snapshot (~daily)
 renderSyncStatus();       // paint the header sync pill
 checkBackupReminder();    // nudge if a file backup is overdue
 </script>
+<script src="messenger-v2.js"></script>
 </body>
 </html>
