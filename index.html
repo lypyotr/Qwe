@@ -752,6 +752,16 @@ body.light .cur-toggle.usd{background:rgba(74,222,128,.2);color:var(--text)}
 .calc-wrap{padding:0 16px 20px}
 .prof-label{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
 .prof-email{font-size:14px;font-weight:700;color:var(--text);margin-bottom:12px;word-break:break-all}
+.profile-hero{position:relative;overflow:hidden;padding:20px;border:1px solid rgba(74,222,128,.2);border-radius:24px;background:linear-gradient(145deg,rgba(74,222,128,.15),rgba(34,211,238,.08) 55%,var(--surface));box-shadow:var(--card-shadow);margin-bottom:14px}
+.profile-hero:after{content:"";position:absolute;width:150px;height:150px;border-radius:50%;right:-55px;top:-65px;background:radial-gradient(circle,rgba(34,211,238,.22),transparent 68%);pointer-events:none}
+.profile-person{display:flex;align-items:center;gap:14px;position:relative;z-index:1}
+.profile-avatar{width:62px;height:62px;border-radius:20px;display:flex;align-items:center;justify-content:center;flex:none;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#06281e;font-size:26px;font-weight:900;box-shadow:0 10px 25px rgba(34,211,238,.2)}
+.profile-person-main{min-width:0;flex:1}.profile-display-name{font-size:21px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.profile-display-info{font-size:12px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.profile-chips{display:flex;gap:7px;flex-wrap:wrap;margin-top:15px;position:relative;z-index:1}.profile-chip{padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid var(--border);font-size:11px;font-weight:800;color:var(--muted)}
+.profile-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:14px}.profile-action{min-height:88px;padding:14px;border-radius:18px;border:1px solid var(--border);background:var(--surface);color:var(--text);text-align:left;cursor:pointer;font-family:inherit;box-shadow:var(--card-shadow)}.profile-action:active{transform:scale(.98)}.profile-action-icon{font-size:22px}.profile-action-title{font-size:13px;font-weight:900;margin-top:7px}.profile-action-sub{font-size:10px;color:var(--muted);margin-top:2px}
+.profile-snapshot{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}.profile-metric{padding:13px 8px;border-radius:16px;background:var(--surface2);border:1px solid var(--border);text-align:center}.profile-metric-value{font-size:15px;font-weight:900;color:var(--accent-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.profile-metric-label{font-size:9px;color:var(--muted);font-weight:700;margin-top:3px}
+.profile-section-label{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);font-weight:900;margin:20px 4px 9px}.profile-edit-card{border-top:2px solid rgba(74,222,128,.3)}
+@media(max-width:380px){.profile-actions{grid-template-columns:1fr}.profile-avatar{width:54px;height:54px}.profile-display-name{font-size:18px}}
 .calc-card{
   background:var(--surface);border:1px solid var(--border);border-radius:18px;
   padding:18px;margin-bottom:14px;box-shadow:var(--card-shadow);
@@ -1567,10 +1577,52 @@ body.chat-open .bottom-nav{display:none}
   </div>
   <div class="calc-wrap">
 
+    <div class="profile-hero">
+      <div class="profile-person">
+        <div class="profile-avatar" id="profileAvatar">?</div>
+        <div class="profile-person-main">
+          <div class="profile-display-name" id="profileDisplayName">Работник</div>
+          <div class="profile-display-info" id="profileDisplayInfo">Добавьте должность или короткий статус</div>
+        </div>
+      </div>
+      <div class="profile-chips">
+        <span class="profile-chip" id="profilePublicId">ID #—</span>
+        <span class="profile-chip">🔒 E2EE-сообщения</span>
+        <span class="profile-chip" id="profileSyncChip">☁ синхронизация</span>
+      </div>
+    </div>
+
+    <div class="profile-actions">
+      <button class="profile-action" onclick="switchPage('friends')">
+        <div class="profile-action-icon">💬</div><div class="profile-action-title">Общение</div>
+        <div class="profile-action-sub" id="profileSocialSub">Друзья и сообщения</div>
+      </button>
+      <button class="profile-action" onclick="switchPage('work')">
+        <div class="profile-action-icon">🛠️</div><div class="profile-action-title">Моя работа</div>
+        <div class="profile-action-sub">Добавить выполненную работу</div>
+      </button>
+      <button class="profile-action" onclick="switchPage('stats')">
+        <div class="profile-action-icon">📈</div><div class="profile-action-title">Статистика</div>
+        <div class="profile-action-sub">Доходы и динамика</div>
+      </button>
+      <button class="profile-action" onclick="openDataModal()">
+        <div class="profile-action-icon">💾</div><div class="profile-action-title">Мои данные</div>
+        <div class="profile-action-sub">Экспорт и резервная копия</div>
+      </button>
+    </div>
+
+    <div class="profile-section-label">Текущий период</div>
+    <div class="profile-snapshot">
+      <div class="profile-metric"><div class="profile-metric-value" id="profileEarned">0 ₽</div><div class="profile-metric-label">заработано</div></div>
+      <div class="profile-metric"><div class="profile-metric-value" id="profileDays">0</div><div class="profile-metric-label">рабочих дней</div></div>
+      <div class="profile-metric"><div class="profile-metric-value" id="profileWorks">0</div><div class="profile-metric-label">видов работ</div></div>
+    </div>
+
+    <div class="profile-section-label">О себе</div>
     <!-- Name + extra info -->
-    <div class="calc-card">
-      <div class="calc-card-title">Профиль</div>
-      <div class="calc-card-sub">Имя показывается в шапке на главной, доп. информация — строкой ниже.</div>
+    <div class="calc-card profile-edit-card">
+      <div class="calc-card-title">Карточка работника</div>
+      <div class="calc-card-sub">Эти данные увидят друзья в приложении. Не указывайте лишнюю личную информацию.</div>
       <div class="prof-label">Имя</div>
       <input class="modal-input" id="profileNameIn" type="text" maxlength="40" placeholder="Как тебя зовут" style="width:100%;box-sizing:border-box;margin-bottom:14px">
       <div class="prof-label">Доп. информация</div>
@@ -1583,20 +1635,6 @@ body.chat-open .bottom-nav{display:none}
     <div class="calc-card">
       <div class="calc-card-title">Оформление</div>
       <button class="modal-btn" style="width:100%;padding:13px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="toggleTheme()">🌗 Сменить тему</button>
-    </div>
-
-    <!-- Friends & messages -->
-    <div class="calc-card">
-      <div class="calc-card-title">👥 Друзья и сообщения</div>
-      <div class="calc-card-sub">Добавляй друзей по их ID и переписывайся — сообщения зашифрованы «от устройства к устройству».</div>
-      <button class="modal-btn" style="width:100%;padding:13px" onclick="switchPage('friends')">Открыть друзей</button>
-    </div>
-
-    <!-- Statistics -->
-    <div class="calc-card">
-      <div class="calc-card-title">Статистика</div>
-      <div class="calc-card-sub">Заработок по месяцам, средние и тренды за всё время.</div>
-      <button class="modal-btn" style="width:100%;padding:13px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="switchPage('stats')">📊 Открыть статистику</button>
     </div>
 
     <!-- Data -->
@@ -2248,6 +2286,23 @@ function renderProfile(){
     infoEl.style.display=inf?'':'none';
   }
   renderUserId();
+  renderProfileDashboard();
+}
+
+function renderProfileDashboard(){
+  const p=(goals&&goals.profile)||{},name=String(p.name||'').trim(),info=String(p.info||'').trim();
+  const set=(id,value)=>{const el=document.getElementById(id);if(el)el.textContent=value;};
+  set('profileDisplayName',name||'Работник');
+  set('profileDisplayInfo',info||'Добавьте должность или короткий статус');
+  set('profileAvatar',(name||'Р').charAt(0).toUpperCase());
+  set('profilePublicId',userSeq?'ID #'+userSeq:'ID назначается…');
+  set('profileEarned',M(calcNetTotal()));
+  set('profileDays',String(calcWorkedDays()));
+  const names=new Set();Object.values(days||{}).forEach(ws=>(ws||[]).forEach(w=>{const n=String(w.name||'').trim();if(n)names.add(n);}));
+  set('profileWorks',String(names.size));
+  const unread=Object.values(unreadGet()).reduce((a,n)=>a+(Number(n)||0),0);
+  set('profileSocialSub',unread?unread+' непрочитанных · открыть':'Друзья и защищённые сообщения');
+  set('profileSyncChip',navigator.onLine?'☁ синхронизация':'○ офлайн-режим');
 }
 
 // ── Sequential public user number (#1, #2, …) ──
@@ -2287,6 +2342,8 @@ function initProfilePage(){
   if(ac)ac.style.display=isAdmin()?'':'none';
   const msg=document.getElementById('profileMsg');
   if(msg)msg.textContent='';
+  renderProfileDashboard();
+  if(currentUser&&sbClient)recountUnread().then(renderProfileDashboard);
 }
 function saveProfile(){
   const name=(document.getElementById('profileNameIn').value||'').trim();
