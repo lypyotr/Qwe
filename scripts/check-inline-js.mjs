@@ -9,14 +9,13 @@ import { execFileSync } from 'node:child_process';
 
 const html = fs.readFileSync('index.html', 'utf8');
 
-const start = html.indexOf('\n<script>\n');
-const end = html.indexOf('\n</script>\n');
-if (start < 0 || end < 0 || end < start) {
+const match = html.match(/(?:^|\r?\n)<script>\r?\n([\s\S]*?)\r?\n<\/script>(?=\r?\n|$)/);
+if (!match || match.index === undefined) {
   console.error('inline <script> block not found in index.html');
   process.exit(1);
 }
-const js = html.slice(start + '\n<script>\n'.length, end);
-const baseLine = html.slice(0, start).split('\n').length + 1;
+const js = match[1];
+const baseLine = html.slice(0, match.index).split(/\r?\n/).length + 1;
 
 // 1. Full parse via node --check.
 const tmp = path.join(os.tmpdir(), 'inline-check.js');

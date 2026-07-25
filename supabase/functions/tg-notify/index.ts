@@ -33,6 +33,13 @@ Deno.serve(async (req) => {
   const token = Deno.env.get("TG_BOT_TOKEN");
   const chatId = Deno.env.get("TG_CHAT_ID");
   if (!token || !chatId) return json({ error: "function not configured" }, 500);
+  const allowedUid = Deno.env.get("TG_ALLOWED_UID");
+  const allowedEmail = Deno.env.get("TG_ALLOWED_EMAIL");
+  // Fail closed: without an allow-list, every authenticated account could use
+  // the owner's bot and destination chat.
+  if (!allowedUid && !allowedEmail) {
+    return json({ error: "caller allow-list not configured" }, 500);
+  }
 
   // Require a genuine authenticated user (not just the public anon key).
   const authHeader = req.headers.get("Authorization") ?? "";
@@ -46,10 +53,8 @@ Deno.serve(async (req) => {
 
   // Restrict to a single owner. Set TG_ALLOWED_EMAIL (easiest — your login email)
   // and/or TG_ALLOWED_UID. If either is set, the caller must match it.
-  const allowedUid = Deno.env.get("TG_ALLOWED_UID");
   if (allowedUid && user.id !== allowedUid) return json({ error: "forbidden" }, 403);
 
-  const allowedEmail = Deno.env.get("TG_ALLOWED_EMAIL");
   if (
     allowedEmail &&
     (user.email ?? "").toLowerCase() !== allowedEmail.toLowerCase()
@@ -66,14 +71,28 @@ Deno.serve(async (req) => {
   const text = String(payload?.text ?? "").trim().slice(0, 4000);
   if (!text) return json({ error: "empty text" }, 400);
 
-  const tgRes = await fetch(
-    `https://api.telegram.org/bot${token}/sendMessage`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: chatId, text }),
-    },
-  );
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000);
+  let tgRes: Response;
+  try {
+    tgRes = await fetch(
+      `https://api.telegram.org/bot${token}/sendMessage`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: chatId, text }),
+        signal: controller.signal,
+      },
+    );
+  } catch (error) {
+    return json({
+      error: error instanceof DOMException && error.name === "AbortError"
+        ? "telegram timeout"
+        : "telegram unavailable",
+    }, 502);
+  } finally {
+    clearTimeout(timeout);
+  }
   const tg = await tgRes.json().catch(() => ({}));
   if (!tgRes.ok || !tg.ok) {
     return json({ error: tg.description ?? `telegram error ${tgRes.status}` }, 502);
