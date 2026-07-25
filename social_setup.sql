@@ -157,6 +157,11 @@ create table if not exists public.messages (
   body       text not null,             -- "m1.<iv>.<ct>"
   created_at timestamptz default now()
 );
+alter table public.messages add column if not exists client_id uuid;
+alter table public.messages add column if not exists read_at timestamptz;
+drop index if exists public.messages_sender_client_uidx;
+create unique index messages_sender_client_uidx
+  on public.messages(sender, client_id);
 create index if not exists messages_pair_idx on public.messages(sender, recipient, created_at);
 create index if not exists messages_recipient_idx on public.messages(recipient);
 -- Cap the ciphertext size (a 4000-char message encrypts to ~5.5 KB of base64);
@@ -186,5 +191,28 @@ create policy "messages_insert" on public.messages for insert with check (
 -- «Удалить у всех» — только автор может удалить своё сообщение с сервера.
 -- («Удалить у себя» серверу не нужно: это локальный скрытый список устройства.)
 create policy "messages_delete" on public.messages for delete using (auth.uid() = sender);
+
+-- Read receipts are updated through a narrow RPC so recipients can never
+-- rewrite ciphertext, sender, recipient or timestamps.
+create or replace function public.message_mark_read(peer uuid)
+  returns integer
+  language plpgsql
+  security definer
+  set search_path = public
+as $$
+declare
+  me uuid := auth.uid();
+  changed integer;
+begin
+  if me is null then raise exception 'authentication required'; end if;
+  update public.messages
+     set read_at = coalesce(read_at, now())
+   where recipient = me and sender = peer and read_at is null;
+  get diagnostics changed = row_count;
+  return changed;
+end;
+$$;
+revoke all on function public.message_mark_read(uuid) from public, anon;
+grant execute on function public.message_mark_read(uuid) to authenticated;
 
 notify pgrst, 'reload schema';
