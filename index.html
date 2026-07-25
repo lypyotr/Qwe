@@ -836,6 +836,38 @@ body.light .cur-toggle.usd{background:rgba(74,222,128,.2);color:var(--text)}
 .admin-status .dot.on{background:var(--danger);box-shadow:0 0 0 4px rgba(248,113,113,.18)}
 .admin-status .dot.off{background:#4ade80;box-shadow:0 0 0 4px rgba(74,222,128,.15)}
 .admin-msg{margin-top:10px;font-size:13px;text-align:center;font-weight:600;min-height:18px}
+.users-toolbar{display:flex;gap:8px;margin-bottom:12px}
+.users-search,.users-input{
+  width:100%;box-sizing:border-box;background:var(--surface2);color:var(--text);
+  border:1px solid var(--border);border-radius:12px;padding:12px;font:600 13px 'Manrope',sans-serif;
+}
+.users-search:focus,.users-input:focus{outline:none;border-color:var(--accent)}
+.users-toolbar .users-search{flex:1;min-width:0}
+.users-toolbar button{flex:none;padding:0 15px}
+.users-summary{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;font-size:12px;color:var(--muted);font-weight:700}
+.users-list{display:flex;flex-direction:column;gap:10px}
+.user-row{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:14px}
+.user-row-head{display:flex;align-items:center;gap:11px}
+.user-avatar{width:42px;height:42px;border-radius:13px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--accent),#7c3aed);color:#fff;font-size:15px;font-weight:800;flex:none}
+.user-main{flex:1;min-width:0}
+.user-name{font-size:14px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.user-email{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.user-state{font-size:10px;font-weight:800;padding:5px 8px;border-radius:999px;background:rgba(74,222,128,.13);color:#4ade80;flex:none}
+.user-state.wait{background:rgba(251,191,36,.13);color:var(--warn)}
+.user-state.blocked{background:rgba(248,113,113,.13);color:var(--danger)}
+.user-meta{display:grid;grid-template-columns:1fr 1fr;gap:5px 12px;margin-top:11px;padding-top:10px;border-top:1px solid var(--border);font-size:11px;color:var(--muted)}
+.user-actions{display:flex;gap:8px;margin-top:11px}
+.user-actions button{flex:1;border:none;border-radius:10px;padding:9px;font:800 12px 'Manrope',sans-serif;cursor:pointer;background:var(--surface2);color:var(--text)}
+.user-actions .danger{color:var(--danger);background:rgba(248,113,113,.1)}
+.users-form{background:var(--surface);border:1px solid var(--accent);border-radius:16px;padding:15px;margin-bottom:12px}
+.users-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.users-form-grid .wide{grid-column:1/-1}
+.users-form-title{font-size:15px;font-weight:800;margin-bottom:11px}
+.users-check{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);font-weight:700}
+.users-form-actions{display:flex;gap:8px;margin-top:12px}
+.users-form-actions button{flex:1}
+.users-empty{text-align:center;color:var(--muted);font-size:13px;padding:32px 15px}
+@media(max-width:380px){.users-form-grid{grid-template-columns:1fr}.users-form-grid .wide{grid-column:auto}.user-meta{grid-template-columns:1fr}}
 
 /* ── GLOBAL ANNOUNCEMENT BANNER ── */
 .announce-bar{
@@ -1677,6 +1709,12 @@ body.chat-open .bottom-nav{display:none}
   </div>
   <div class="admin-wrap">
 
+    <div class="admin-card">
+      <div class="admin-card-title">👥 Пользователи</div>
+      <div class="admin-card-sub">Все зарегистрированные сотрудники: поиск, создание аккаунтов, изменение данных, блокировка и удаление.</div>
+      <button class="modal-btn" style="width:100%;padding:13px" onclick="switchPage('users')">Открыть управление пользователями</button>
+    </div>
+
     <!-- Global announcement -->
     <div class="admin-card">
       <div class="admin-card-title">📢 Глобальное объявление</div>
@@ -1733,6 +1771,42 @@ body.chat-open .bottom-nav{display:none}
 
   </div>
 </div><!-- /page-admin -->
+
+<!-- ══ PAGE: ADMIN USERS ══ -->
+<div class="page" id="page-users">
+  <div class="header">
+    <div class="header-left">
+      <button aria-label="Назад" onclick="switchPage('admin')" style="border:0;background:transparent;color:var(--text);font-size:22px;padding:0 10px 0 0">‹</button>
+      <div class="header-label">👥 Пользователи</div>
+    </div>
+    <button class="modal-btn" style="padding:9px 12px" onclick="adminOpenUserForm()">＋ Добавить</button>
+  </div>
+  <div class="admin-wrap">
+    <div class="users-form" id="userEditor" style="display:none">
+      <div class="users-form-title" id="userEditorTitle">Новый пользователь</div>
+      <div class="users-form-grid">
+        <input class="users-input wide" id="userEditName" placeholder="Имя сотрудника" maxlength="100">
+        <input class="users-input wide" id="userEditEmail" type="email" placeholder="Email" maxlength="320" autocomplete="off">
+        <input class="users-input" id="userEditPhone" type="tel" placeholder="Телефон" maxlength="40" autocomplete="off">
+        <input class="users-input" id="userEditPassword" type="password" placeholder="Новый пароль" maxlength="200" autocomplete="new-password">
+        <label class="users-check wide"><input type="checkbox" id="userEditConfirmed" checked> Email подтверждён</label>
+        <label class="users-check wide" id="userEditBlockedWrap" style="display:none"><input type="checkbox" id="userEditBlocked"> Заблокировать вход</label>
+      </div>
+      <div class="users-form-actions">
+        <button class="modal-btn" onclick="adminSaveUser()">Сохранить</button>
+        <button class="modal-btn" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="adminCloseUserForm()">Отмена</button>
+      </div>
+      <div class="admin-msg" id="userEditMsg"></div>
+    </div>
+    <div class="users-toolbar">
+      <input class="users-search" id="usersSearch" type="search" placeholder="Имя, email, телефон или ID" oninput="adminRenderUsers()">
+      <button class="modal-btn" onclick="adminLoadUsers(true)" aria-label="Обновить">↻</button>
+    </div>
+    <div class="users-summary"><span id="usersCount">Загрузка…</span><span>Только для администратора</span></div>
+    <div class="users-list" id="usersList"><div class="users-empty">Загружаю пользователей…</div></div>
+    <div class="admin-msg" id="usersMsg"></div>
+  </div>
+</div><!-- /page-users -->
 
 <!-- ══ PAGE: STATISTICS ══ -->
 <div class="page" id="page-stats">
@@ -2003,9 +2077,10 @@ body.chat-open .bottom-nav{display:none}
 // ══════════════════════════════════════════════
 function switchPage(name){
   // Admin page is owner-only — quietly bounce everyone else to Работа.
-  if(name==='admin'&&!isAdmin())name='work';
+  if((name==='admin'||name==='users')&&!isAdmin())name='work';
   haptic('light');
   if(name==='admin'){renderAdminDiag();renderBackupInfo();}
+  if(name==='users')adminLoadUsers();
   if(name==='calc'){renderSpendCalc();initPlanCard();}
   if(name==='profile'){initProfilePage();renderBackupReminder();renderEncryptionCard();}
   if(name==='stats')renderStats();
@@ -4622,6 +4697,158 @@ async function adminToggleMaintenance(){
   const next=!appConfig.maintenance;
   const text=(document.getElementById('maintInput').value||'').trim();
   await adminWriteConfig({maintenance:next,maintenance_msg:text},'maintAdminMsg');
+}
+
+// ── Secure Auth user management through the admin-users Edge Function ──
+let adminUsers=[];
+let adminUsersLoaded=false;
+let adminEditingUserId='';
+
+function adminUserDate(value){
+  if(!value)return '—';
+  try{return new Intl.DateTimeFormat('ru-RU',{dateStyle:'short',timeStyle:'short'}).format(new Date(value));}
+  catch(e){return '—';}
+}
+function adminUserInitials(user){
+  const name=(user.profile&&user.profile.name)||user.user_metadata?.name||user.email||'?';
+  return name.split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join('').toUpperCase();
+}
+function adminUserName(user){
+  return (user.profile&&user.profile.name)||user.user_metadata?.name||'Без имени';
+}
+function adminUserIsBlocked(user){
+  return !!(user.banned_until&&new Date(user.banned_until)>new Date());
+}
+async function adminUsersInvoke(payload){
+  if(!isAdmin()||!sbClient)throw new Error('Доступно только администратору');
+  const{data,error}=await sbClient.functions.invoke('admin-users',{body:payload});
+  if(error){
+    let detail='';
+    try{detail=(await error.context?.json())?.error||'';}catch(e){}
+    throw new Error(detail||error.message||'Сервер управления пользователями недоступен');
+  }
+  if(data&&data.error)throw new Error(data.error);
+  return data;
+}
+async function adminLoadUsers(force=false){
+  const list=document.getElementById('usersList');
+  const msg=document.getElementById('usersMsg');
+  if(!list||!isAdmin())return;
+  if(adminUsersLoaded&&!force){adminRenderUsers();return;}
+  list.innerHTML='<div class="users-empty">Загружаю пользователей…</div>';
+  if(msg)msg.textContent='';
+  try{
+    const data=await adminUsersInvoke({action:'list',page:1,perPage:100});
+    adminUsers=Array.isArray(data.users)?data.users:[];
+    adminUsersLoaded=true;
+    adminRenderUsers();
+  }catch(e){
+    console.error('adminLoadUsers',e);
+    list.innerHTML='<div class="users-empty">Не удалось загрузить пользователей</div>';
+    if(msg){msg.style.color='var(--danger)';msg.textContent=e.message||String(e);}
+  }
+}
+function adminRenderUsers(){
+  const list=document.getElementById('usersList'),count=document.getElementById('usersCount');
+  if(!list)return;
+  const query=(document.getElementById('usersSearch')?.value||'').trim().toLowerCase();
+  const users=adminUsers.filter(user=>{
+    const hay=[adminUserName(user),user.email,user.phone,user.id,user.profile?.seq].join(' ').toLowerCase();
+    return !query||hay.includes(query);
+  });
+  if(count)count.textContent=query?`Найдено: ${users.length} из ${adminUsers.length}`:`Всего: ${adminUsers.length}`;
+  if(!users.length){list.innerHTML='<div class="users-empty">Пользователи не найдены</div>';return;}
+  list.innerHTML=users.map(user=>{
+    const blocked=adminUserIsBlocked(user);
+    const confirmed=!!user.email_confirmed_at;
+    const state=blocked?'Заблокирован':confirmed?'Активен':'Ожидает';
+    const stateClass=blocked?'blocked':confirmed?'':'wait';
+    const own=user.id===currentUser?.id;
+    return `<div class="user-row">
+      <div class="user-row-head">
+        <div class="user-avatar">${esc(adminUserInitials(user))}</div>
+        <div class="user-main"><div class="user-name">${esc(adminUserName(user))}${own?' · вы':''}</div><div class="user-email">${esc(user.email||user.phone||'Без контакта')}</div></div>
+        <span class="user-state ${stateClass}">${state}</span>
+      </div>
+      <div class="user-meta">
+        <span>Номер: ${user.profile?.seq?'#'+user.profile.seq:'—'}</span>
+        <span>Телефон: ${esc(user.phone||'—')}</span>
+        <span>Регистрация: ${adminUserDate(user.created_at)}</span>
+        <span>Последний вход: ${adminUserDate(user.last_sign_in_at)}</span>
+      </div>
+      <div class="user-actions">
+        <button onclick="adminOpenUserForm('${user.id}')">Изменить</button>
+        <button class="danger" onclick="adminDeleteUser('${user.id}')" ${own?'disabled title="Нельзя удалить свой аккаунт"':''}>Удалить</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function adminOpenUserForm(userId=''){
+  const editor=document.getElementById('userEditor');
+  if(!editor)return;
+  adminEditingUserId=userId;
+  const user=userId?adminUsers.find(x=>x.id===userId):null;
+  document.getElementById('userEditorTitle').textContent=user?'Редактирование сотрудника':'Новый пользователь';
+  document.getElementById('userEditName').value=user?adminUserName(user):'';
+  document.getElementById('userEditEmail').value=user?.email||'';
+  document.getElementById('userEditPhone').value=user?.phone||'';
+  document.getElementById('userEditPassword').value='';
+  document.getElementById('userEditPassword').placeholder=user?'Новый пароль (не менять)':'Пароль от 8 символов';
+  document.getElementById('userEditConfirmed').checked=user?!!user.email_confirmed_at:true;
+  document.getElementById('userEditBlocked').checked=user?adminUserIsBlocked(user):false;
+  document.getElementById('userEditBlockedWrap').style.display=user?'':'none';
+  document.getElementById('userEditMsg').textContent='';
+  editor.style.display='';
+  editor.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function adminCloseUserForm(){
+  adminEditingUserId='';
+  const editor=document.getElementById('userEditor');
+  if(editor)editor.style.display='none';
+}
+async function adminSaveUser(){
+  const msg=document.getElementById('userEditMsg');
+  const setMsg=(text,bad=false)=>{if(msg){msg.textContent=text;msg.style.color=bad?'var(--danger)':'var(--accent)';}};
+  const name=document.getElementById('userEditName').value.trim();
+  const email=document.getElementById('userEditEmail').value.trim();
+  const phone=document.getElementById('userEditPhone').value.trim();
+  const password=document.getElementById('userEditPassword').value;
+  const confirmed=document.getElementById('userEditConfirmed').checked;
+  if(!email||!email.includes('@')){setMsg('Укажите корректный email',true);return;}
+  if(!adminEditingUserId&&password.length<8){setMsg('Пароль должен быть не короче 8 символов',true);return;}
+  if(adminEditingUserId&&password&&password.length<8){setMsg('Новый пароль должен быть не короче 8 символов',true);return;}
+  setMsg('Сохраняю…');
+  try{
+    const wasEditing=!!adminEditingUserId;
+    const payload=adminEditingUserId
+      ?{action:'update',user_id:adminEditingUserId,name,email,phone,password,email_confirm:confirmed,ban_duration:document.getElementById('userEditBlocked').checked?'876000h':'none',user_metadata:{name}}
+      :{action:'create',name,email,phone,password,email_confirm:confirmed};
+    await adminUsersInvoke(payload);
+    adminCloseUserForm();
+    adminUsersLoaded=false;
+    await adminLoadUsers(true);
+    const usersMsg=document.getElementById('usersMsg');
+    if(usersMsg){usersMsg.style.color='var(--accent)';usersMsg.textContent=wasEditing?'Пользователь обновлён':'Пользователь создан';}
+  }catch(e){
+    console.error('adminSaveUser',e);
+    setMsg(e.message||String(e),true);
+  }
+}
+async function adminDeleteUser(userId){
+  const user=adminUsers.find(x=>x.id===userId);
+  if(!user||userId===currentUser?.id)return;
+  if(!confirm(`Удалить пользователя «${adminUserName(user)}» (${user.email||user.id})?\n\nБудут безвозвратно удалены его аккаунт, расчёты, сообщения и настройки.`))return;
+  const msg=document.getElementById('usersMsg');
+  if(msg){msg.style.color='var(--warn)';msg.textContent='Удаляю пользователя…';}
+  try{
+    await adminUsersInvoke({action:'delete',user_id:userId});
+    adminUsersLoaded=false;
+    await adminLoadUsers(true);
+    if(msg){msg.style.color='var(--accent)';msg.textContent='Пользователь удалён';}
+  }catch(e){
+    console.error('adminDeleteUser',e);
+    if(msg){msg.style.color='var(--danger)';msg.textContent=e.message||String(e);}
+  }
 }
 
 // Owner-only, LOCAL-only: wipe this device's caches + localStorage. Never
