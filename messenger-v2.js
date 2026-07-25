@@ -2,6 +2,7 @@
    forwarding, presence, moderation and protected group rooms. */
 var msgV2={room:null,reply:null,edit:null,forward:null,kind:'text',meta:{},pinnedOnly:false,typing:null,presence:null};
 var msgV2BaseOpenActions=window.openMsgActions;
+var msgV2LastLoadError='',msgV2LastLoadErrorAt=0;
 
 function msgV2ShowTab(tab){
   document.getElementById('msgPeoplePane').style.display=tab==='people'?'':'none';
@@ -41,6 +42,13 @@ async function msgV2FetchReactions(ids){
 window.loadChatMessages=async function(){
   if(!_chatFriend||!currentUser||!sbClient||_chatLoading)return;_chatLoading=true;
   try{
+    // Some older/new accounts have not published an E2EE key yet. The legacy
+    // chat handled this as an informational empty state; v2 used to continue
+    // into msgConvKey(), throw, and repeat a toast on every 4-second poll.
+    if(!msgV2.room&&!_chatFriend.pubkey){
+      renderChat([{system:'У собеседника ещё нет ключа шифрования. Попросите его открыть приложение и вкладку «Профиль».'}]);
+      return;
+    }
     let q=sbClient.from('messages').select('id,sender,recipient,room_id,body,created_at,client_id,read_at,reply_to,edited_at,kind,metadata,forwarded_from').order('created_at',{ascending:false}).limit(300);
     q=msgV2.room?q.eq('room_id',msgV2.room.id):q.or(`and(sender.eq.${currentUser.id},recipient.eq.${_chatFriend.id}),and(sender.eq.${_chatFriend.id},recipient.eq.${currentUser.id})`);
     const{data,error}=await q;if(error)throw error;
@@ -48,11 +56,22 @@ window.loadChatMessages=async function(){
     let key=null;if(!msgV2.room){await msgEnsureKeys();key=await msgConvKey(_chatFriend.id,_chatFriend.pubkey);}
     const texts={};const out=[];
     for(const m of rows){
-      const text=msgV2.room?m.body:await msgDecrypt(key,m.body);texts[m.id]=text;
+      const text=String(msgV2.room?m.body:await msgDecrypt(key,m.body)??'');texts[m.id]=text;
       out.push({id:m.id,clientId:m.client_id,me:m.sender===currentUser.id,sender:m.sender,text,t:m.created_at,readAt:m.read_at,status:'sent',replyTo:m.reply_to,replyText:texts[m.reply_to]||'',editedAt:m.edited_at,kind:m.kind||'text',meta:m.metadata||{},forwardedFrom:m.forwarded_from,reactions:reactions[m.id]||[]});
     }
     _chatMsgs=out;renderChat(out);if(!msgV2.room){sbClient.rpc('message_mark_read',{peer:_chatFriend.id}).catch(()=>{});markReadNow(_chatFriend.id);clearUnread(_chatFriend.id);}
-  }catch(e){console.warn('v2 load',e);toast('Не удалось обновить чат');}finally{_chatLoading=false;}
+    msgV2LastLoadError='';
+  }catch(e){
+    const detail=(e&&e.message)||String(e||'Неизвестная ошибка');
+    console.warn('v2 load',detail,e);
+    const now=Date.now();
+    // Polling is expected to retry silently. Show one actionable notification
+    // per distinct error, at most once a minute, instead of spamming the user.
+    if(detail!==msgV2LastLoadError||now-msgV2LastLoadErrorAt>60000){
+      msgV2LastLoadError=detail;msgV2LastLoadErrorAt=now;
+      toast('Не удалось обновить чат: '+detail);
+    }
+  }finally{_chatLoading=false;}
 };
 window.chatSend=async function(){
   const inp=document.getElementById('chatInput');if(!inp||!_chatFriend)return;
@@ -71,10 +90,11 @@ window.chatSend=async function(){
 window.renderChat=function(list){
   const box=document.getElementById('chatMessages');if(!box)return;
   const q=(document.getElementById('chatSearch')?.value||'').toLowerCase(),near=box.scrollHeight-box.scrollTop-box.clientHeight<100||!box.childElementCount;
-  const rows=(list||[]).filter(m=>(!q||m.text.toLowerCase().includes(q))&&(!msgV2.pinnedOnly||m.meta?.pinned));
+  const rows=(list||[]).filter(m=>(!q||String(m.text||'').toLowerCase().includes(q))&&(!msgV2.pinnedOnly||m.meta?.pinned));
   if(!rows.length){box.innerHTML='<div class="chat-empty">Сообщений не найдено</div>';return;}
   let lastDay='';
   box.innerHTML=rows.map(m=>{
+    if(m.system)return`<div class="chat-empty">${esc(m.system)}</div>`;
     const day=new Date(m.t).toLocaleDateString('ru-RU',{day:'numeric',month:'long'}),dayMark=day!==lastDay?`<div class="chat-day">${day}</div>`:'';lastDay=day;
     const state=m.me?(m.readAt?'✓✓':'✓'):'',name=msgV2.room&&!m.me?`<b>${esc(_pname(m.sender))}</b><br>`:'';
     const reply=m.replyTo?`<div class="cb-reply">↩ ${esc(m.replyText||'Сообщение')}</div>`:'';
