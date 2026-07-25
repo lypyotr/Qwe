@@ -1,5 +1,5 @@
-const CACHE='salary-v40';
-const STATIC=['./index.html','./manifest.json','./icon.svg'];
+const CACHE='salary-v41';
+const STATIC=['./index.html','./manifest.json','./icon.svg','./messenger-v2.js'];
 
 // Dynamic APIs that must NEVER be touched by the service worker: Supabase
 // (REST/auth/realtime) and the exchange-rate sources. Caching these cache-first
