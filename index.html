@@ -1188,12 +1188,15 @@ body.chat-open .bottom-nav{display:none}
 .chat-bubble{max-width:78%;padding:8px 12px;border-radius:16px;font-size:14px;font-weight:500;line-height:1.35;word-break:break-word;white-space:pre-wrap;
   -webkit-touch-callout:none;-webkit-user-select:none;user-select:none} /* long-press = меню действий, не выделение */
 .chat-bubble .cb-time{display:block;font-size:9px;font-weight:600;opacity:.6;margin-top:3px}
+.chat-bubble .cb-state{font-size:9px;margin-left:5px;opacity:.72}
+.chat-bubble.failed{outline:1px solid var(--danger);cursor:pointer}
+.chat-bubble.sending{opacity:.65}
 .chat-bubble.me{align-self:flex-end;background:var(--accent);color:#06281e;border-bottom-right-radius:5px}
 .chat-bubble.them{align-self:flex-start;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-bottom-left-radius:5px}
 .chat-day{align-self:center;font-size:10px;font-weight:700;color:var(--muted);background:var(--surface2);border-radius:10px;padding:3px 10px;margin:6px 0}
 .chat-empty{align-self:center;color:var(--muted);font-size:13px;font-weight:600;margin-top:30px;text-align:center}
 .chat-input-bar{display:flex;gap:8px;padding:8px 12px calc(8px + env(safe-area-inset-bottom));background:var(--surface);border-top:1px solid var(--border)}
-.chat-input{flex:1;min-width:0;font-family:'Manrope',sans-serif;font-size:15px;font-weight:500;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:11px 16px;outline:none}
+.chat-input{flex:1;min-width:0;max-height:120px;resize:none;font-family:'Manrope',sans-serif;font-size:15px;font-weight:500;color:var(--text);background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:11px 16px;outline:none}
 .chat-send{flex:none;width:44px;height:44px;border-radius:50%;background:var(--accent);color:#06281e;border:none;font-size:18px;cursor:pointer;touch-action:manipulation}
 .chat-send:active{transform:scale(.94)}
 </style>
@@ -1744,8 +1747,8 @@ body.chat-open .bottom-nav{display:none}
   </div>
   <div class="chat-messages" id="chatMessages"></div>
   <div class="chat-input-bar">
-    <input class="chat-input" id="chatInput" type="text" maxlength="4000" placeholder="Сообщение…" onkeydown="if(event.key==='Enter')chatSend()">
-    <button class="chat-send" onclick="chatSend()">➤</button>
+    <textarea class="chat-input" id="chatInput" rows="1" maxlength="4000" placeholder="Сообщение…" oninput="chatInputResize(this)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();chatSend()}"></textarea>
+    <button class="chat-send" id="chatSendBtn" onclick="chatSend()" aria-label="Отправить">➤</button>
   </div>
 </div><!-- /page-chat -->
 
@@ -6401,6 +6404,7 @@ function onIncomingMsgPing(from,kind){
     return;
   }
 
+  if(kind==='read')return;
   if(kind==='del'){recountUnread();return;}   // deletion: no bump, no sound
 
   bumpUnread(from);
@@ -6651,6 +6655,9 @@ async function removeFriend(id){
 
 // ── Chat ──
 let _chatFriend=null,_chatPoll=null,_chatMsgs=[],_chatSig='';
+let _chatLoading=false;
+function chatInputResize(el){if(!el)return;el.style.height='auto';el.style.height=Math.min(el.scrollHeight,120)+'px';}
+function chatClientId(){return crypto.randomUUID?crypto.randomUUID():([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g,c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16));}
 async function openChat(fid){
   // Re-fetch the peer's profile: a pubkey cached earlier in the session goes
   // stale if they rotated their key, and every message would silently fail.
@@ -6676,16 +6683,19 @@ function startChatPoll(){
 function stopChatPoll(){if(_chatPoll){clearInterval(_chatPoll);_chatPoll=null;}}
 async function loadChatMessages(){
   if(!_chatFriend||!currentUser||!sbClient)return;
+  if(_chatLoading)return;
+  _chatLoading=true;
   const fid=_chatFriend.id;
-  if(!_chatFriend.pubkey){renderChat([{system:'У друга ещё нет ключа шифрования — попросите его открыть приложение.'}]);return;}
+  if(!_chatFriend.pubkey){renderChat([{system:'У друга ещё нет ключа шифрования — попросите его открыть приложение.'}]);_chatLoading=false;return;}
   await msgEnsureKeys();
   if(_msgIdentityForeign){
     renderChat([{system:'🔑 Ключ переписки этого аккаунта — на другом устройстве. Откройте приложение там, и ключ синхронизируется сюда автоматически. Писать отсюда пока нельзя (собеседник не смог бы расшифровать).'}]);
+    _chatLoading=false;
     return;
   }
   try{
     // Newest 300, then reverse — a long history must not cut off recent messages.
-    const{data,error}=await sbClient.from('messages').select('*')
+    const{data,error}=await sbClient.from('messages').select('id,sender,recipient,body,created_at,client_id,read_at')
       .or(`and(sender.eq.${currentUser.id},recipient.eq.${fid}),and(sender.eq.${fid},recipient.eq.${currentUser.id})`)
       .order('created_at',{ascending:false}).limit(300);
     if(error)throw error;
@@ -6697,7 +6707,7 @@ async function loadChatMessages(){
     const sig=rows.length+':'+(rows.length?rows[rows.length-1].id:'');
     if(sig===_chatSig)return;
     _chatSig=sig;
-    const dec=async k=>{const o=[];for(const m of rows)o.push({id:m.id,me:m.sender===currentUser.id,text:await msgDecrypt(k,m.body),t:m.created_at});return o;};
+    const dec=async k=>{const o=[];for(const m of rows)o.push({id:m.id,clientId:m.client_id,me:m.sender===currentUser.id,text:await msgDecrypt(k,m.body),t:m.created_at,readAt:m.read_at,status:'sent'});return o;};
     let out=await dec(await msgConvKey(fid,_chatFriend.pubkey));
     if(out.some(m=>m.text===MSG_DECRYPT_FAIL)){
       // The peer may have republished a new key since we cached theirs —
@@ -6711,8 +6721,10 @@ async function loadChatMessages(){
       }
     }
     _chatMsgs=out;renderChat(out);
+    sbClient.rpc('message_mark_read',{peer:fid}).then(()=>pingFriend(fid,'read')).catch(()=>{});
     markReadNow(fid);clearUnread(fid);   // everything now on screen is read
   }catch(e){console.warn('loadChatMessages',e);}
+  finally{_chatLoading=false;}
 }
 async function chatSend(){
   const inp=document.getElementById('chatInput');if(!inp||!_chatFriend)return;
@@ -6727,19 +6739,30 @@ async function chatSend(){
       if(_msgIdentityForeign)return;
     }else return;
   }
-  inp.value='';
+  inp.value='';chatInputResize(inp);
+  const clientId=chatClientId();
+  const optimistic={id:null,clientId,me:true,text,t:new Date().toISOString(),status:'sending',readAt:null};
+  _chatMsgs.push(optimistic);renderChat(_chatMsgs);
   try{
     const key=await msgConvKey(_chatFriend.id,_chatFriend.pubkey);
     const body=await msgEncrypt(key,text);
     // .select() returns the row so the bubble knows its id right away — the
     // «удалить» menu needs it before the next poll happens.
-    const{data:ins,error}=await sbClient.from('messages').insert({sender:currentUser.id,recipient:_chatFriend.id,body}).select('id,created_at').single();
+    const{data:ins,error}=await sbClient.from('messages').upsert(
+      {sender:currentUser.id,recipient:_chatFriend.id,body,client_id:clientId},
+      {onConflict:'sender,client_id'}
+    ).select('id,created_at,client_id,read_at').single();
     if(error)throw error;
-    _chatMsgs.push({id:ins&&ins.id,me:true,text,t:(ins&&ins.created_at)||new Date().toISOString()});renderChat(_chatMsgs);
+    Object.assign(optimistic,{id:ins&&ins.id,t:(ins&&ins.created_at)||optimistic.t,status:'sent',readAt:ins&&ins.read_at});renderChat(_chatMsgs);
     const box=document.getElementById('chatMessages');if(box)box.scrollTop=box.scrollHeight; // always show my own send
     inp.focus();                 // keep the keyboard up for the next message
     pingFriend(_chatFriend.id);  // instant delivery: nudge the recipient to pull
-  }catch(e){toast('Не отправлено: '+((e&&e.message)||e));inp.value=text;}
+  }catch(e){optimistic.status='failed';optimistic.error=(e&&e.message)||String(e);renderChat(_chatMsgs);toast('Не отправлено — нажмите сообщение для повтора');}
+}
+async function chatRetry(clientId){
+  const m=_chatMsgs.find(x=>x.clientId===clientId&&x.status==='failed');if(!m)return;
+  _chatMsgs=_chatMsgs.filter(x=>x!==m);renderChat(_chatMsgs);
+  const inp=document.getElementById('chatInput');inp.value=m.text;chatInputResize(inp);await chatSend();
 }
 function renderChat(list){
   const box=document.getElementById('chatMessages');if(!box)return;
@@ -6748,9 +6771,12 @@ function renderChat(list){
   // someone who scrolled up to read history.
   const nearBottom=box.scrollHeight-box.scrollTop-box.clientHeight<90||!box.childElementCount;
   const fmt=t=>{const d=new Date(t),p=n=>String(n).padStart(2,'0');return p(d.getHours())+':'+p(d.getMinutes());};
-  box.innerHTML=list.map(m=>m.system
-    ?'<div class="chat-day">'+esc(m.system)+'</div>'
-    :'<div class="chat-bubble '+(m.me?'me':'them')+'" data-id="'+(m.id||'')+'">'+esc(m.text)+'<span class="cb-time">'+fmt(m.t)+'</span></div>').join('');
+  box.innerHTML=list.map(m=>{
+    if(m.system)return'<div class="chat-day">'+esc(m.system)+'</div>';
+    const state=m.me?(m.status==='sending'?'…':m.status==='failed'?'⚠':m.readAt?'✓✓':'✓'):'';
+    const retry=m.status==='failed'?` onclick="chatRetry('${m.clientId}')"`:'';
+    return`<div class="chat-bubble ${m.me?'me':'them'} ${m.status||''}" data-id="${m.id||''}"${retry}>${esc(m.text)}<span class="cb-time">${fmt(m.t)}${state?'<span class="cb-state">'+state+'</span>':''}</span></div>`;
+  }).join('');
   if(nearBottom)box.scrollTop=box.scrollHeight;
 }
 
