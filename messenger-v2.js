@@ -131,7 +131,27 @@ async function msgV2Action(a){
 async function msgV2React(id,emoji){if(!['👍','❤️','😂','👏','✅','👀'].includes(emoji))return;const{error}=await sbClient.from('message_reactions').upsert({message_id:id,user_id:currentUser.id,emoji});if(error)toast(error.message);else loadChatMessages();}
 function msgV2Search(){renderChat(_chatMsgs);}
 function msgV2TogglePinned(){msgV2.pinnedOnly=!msgV2.pinnedOnly;renderChat(_chatMsgs);toast(msgV2.pinnedOnly?'Только закреплённые':'Все сообщения');}
-function msgV2WorkCard(){const title=prompt('Название работы или задания');if(!title)return;const amount=prompt('Количество или сумма','1');msgV2.kind='work';msgV2.meta={title,amount,unit:'шт.'};document.getElementById('chatInput').value='Рабочее задание';msgV2SetContext('reply',{text:`${title}: ${amount}`});}
+function msgV2WorkCard(){
+  if(!_chatFriend){toast('Сначала откройте чат');return;}
+  const overlay=document.getElementById('workCardOverlay');
+  overlay?.classList.add('show');
+  document.getElementById('workCardTitle').value='';
+  document.getElementById('workCardAmount').value='1';
+  document.getElementById('workCardUnit').value='шт.';
+  setTimeout(()=>document.getElementById('workCardTitle')?.focus(),50);
+}
+function msgV2CloseWorkCard(){document.getElementById('workCardOverlay')?.classList.remove('show');}
+function msgV2SaveWorkCard(){
+  const title=document.getElementById('workCardTitle').value.trim().slice(0,120);
+  const amount=document.getElementById('workCardAmount').value.trim();
+  const unit=document.getElementById('workCardUnit').value;
+  if(!title||!amount){toast('Заполните название и количество');return;}
+  msgV2.kind='work';msgV2.meta={title,amount,unit};
+  document.getElementById('chatInput').value='Карточка работы';
+  msgV2SetContext('reply',{text:`${title}: ${amount} ${unit}`});
+  msgV2CloseWorkCard();
+  document.getElementById('chatInput')?.focus();
+}
 async function msgV2UploadBlob(file,kind){
   if(!file||!_chatFriend)return;toast('Загружаю…');
   const target={action:'upload',name:file.name||`${kind}.webm`,type:file.type,size:file.size,recipient:msgV2.room?'':_chatFriend.id,room_id:msgV2.room?.id||''};
