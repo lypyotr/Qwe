@@ -1,8 +1,9 @@
 /* Worker Messenger v2: replies, edits, reactions, search, pins, work cards,
    forwarding, presence, moderation and protected group rooms. */
-var msgV2={room:null,reply:null,edit:null,forward:null,kind:'text',meta:{},pinnedOnly:false,typing:null,presence:null};
+var msgV2={room:null,reply:null,edit:null,forward:null,kind:'text',meta:{},pinnedOnly:false,typing:null,presence:null,lastSeen:null,online:false};
 var msgV2BaseOpenActions=window.openMsgActions;
 var msgV2LastLoadError='',msgV2LastLoadErrorAt=0;
+var msgV2MediaUrls=new Map(),msgV2PresenceTimer=null;
 
 async function msgV2MarkRead(peer){
   try{
@@ -106,10 +107,12 @@ window.renderChat=function(list){
     const state=m.me?(m.readAt?'✓✓':'✓'):'',name=msgV2.room&&!m.me?`<b>${esc(_pname(m.sender))}</b><br>`:'';
     const reply=m.replyTo?`<div class="cb-reply">↩ ${esc(m.replyText||'Сообщение')}</div>`:'';
     const work=m.kind==='work'?`<div class="cb-work">☑ ${esc(m.meta.title||'Рабочее задание')}<br><b>${esc(m.meta.amount||'')}</b> ${esc(m.meta.unit||'')}</div>`:'';
-    const file=['image','file','voice'].includes(m.kind)?`<button class="chat-tool-btn" style="margin-top:7px" onclick="event.stopPropagation();msgV2Download('${m.id}')">${m.kind==='image'?'🖼 Фото':m.kind==='voice'?'▶ Голосовое':'📎 '+esc(m.meta.name||'Файл')}</button>`:'';
+    const mime=String(m.meta?.type||''),isImage=m.kind==='image'||mime.startsWith('image/'),isVideo=mime.startsWith('video/');
+    const media=isImage?`<button class="cb-media" onclick="event.stopPropagation();msgV2Download('${m.id}')" aria-label="Открыть фото"><img data-msg-media="${m.id}" alt="${esc(m.meta?.name||'Фото')}" loading="lazy"></button>`:isVideo?`<div class="cb-media cb-video" onclick="event.stopPropagation()"><video data-msg-media="${m.id}" controls preload="metadata" playsinline></video></div>`:'';
+    const file=!media&&['image','file','voice'].includes(m.kind)?`<button class="chat-tool-btn" style="margin-top:7px" onclick="event.stopPropagation();msgV2Download('${m.id}')">${m.kind==='image'?'🖼 Фото':m.kind==='voice'?'▶ Голосовое':'📎 '+esc(m.meta.name||'Файл')}</button>`:'';
     const reacts=Object.entries((m.reactions||[]).reduce((a,r)=>(a[r.emoji]=(a[r.emoji]||0)+1,a),{})).map(([e,n])=>`<button class="cb-react" onclick="event.stopPropagation();msgV2React('${m.id}','${e}')">${e} ${n}</button>`).join('');
-    return`${dayMark}<div class="chat-bubble ${m.me?'me':'them'} ${m.meta?.pinned?'pinned':''}" data-id="${m.id}">${name}${m.forwardedFrom?'<div class="cb-edited">↗ переслано</div>':''}${reply}${esc(m.text)}${work}${file}<div class="cb-reactions">${reacts}</div><div class="cb-meta">${m.editedAt?'<span class="cb-edited">изменено</span>':''}<span class="cb-time">${new Date(m.t).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})} <span class="cb-state">${state}</span></span></div></div>`;
-  }).join('');if(near)box.scrollTop=box.scrollHeight;
+    return`${dayMark}<div class="chat-bubble ${m.me?'me':'them'} ${m.meta?.pinned?'pinned':''}" data-id="${m.id}">${name}${m.forwardedFrom?'<div class="cb-edited">↗ переслано</div>':''}${reply}${media}${esc(m.text)}${work}${file}<div class="cb-reactions">${reacts}</div><div class="cb-meta">${m.editedAt?'<span class="cb-edited">изменено</span>':''}<span class="cb-time">${new Date(m.t).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})} <span class="cb-state">${state}</span></span></div></div>`;
+  }).join('');void msgV2HydrateMedia();if(near)box.scrollTop=box.scrollHeight;
 };
 window.openMsgActions=function(id,isMine){
   msgV2BaseOpenActions(id,isMine);document.getElementById('msgEditBtn').style.display=isMine?'':'none';document.getElementById('msgReportBtn').style.display=isMine?'none':'';document.getElementById('msgBlockBtn').style.display=(!isMine&&!msgV2.room)?'':'none';
@@ -157,12 +160,28 @@ async function msgV2UploadBlob(file,kind){
   const target={action:'upload',name:file.name||`${kind}.webm`,type:file.type,size:file.size,recipient:msgV2.room?'':_chatFriend.id,room_id:msgV2.room?.id||''};
   const{data,error}=await sbClient.functions.invoke('chat-files',{body:target});if(error||data?.error){toast(data?.error||error.message);return;}
   const up=await sbClient.storage.from('chat-files').uploadToSignedUrl(data.path,data.token,file,{contentType:file.type});if(up.error){toast(up.error.message);return;}
-  const text=kind==='image'?'Фото':kind==='voice'?'Голосовое сообщение':'Файл';
+  const text=kind==='image'?'Фото':kind==='voice'?'Голосовое сообщение':file.type.startsWith('video/')?'Видео':'Файл';
   const body=msgV2.room?text:await msgEncrypt(await msgConvKey(_chatFriend.id,_chatFriend.pubkey),text);
   const{error:ie}=await sbClient.from('messages').insert({sender:currentUser.id,recipient:msgV2.room?null:_chatFriend.id,room_id:msgV2.room?.id||null,body,client_id:chatClientId(),kind,metadata:{path:data.path,name:file.name||text,type:file.type,size:file.size}});
   if(ie){toast(ie.message);return;}await loadChatMessages();toast('Отправлено');
 }
 async function msgV2UploadFile(input){const f=input.files?.[0];input.value='';if(!f)return;await msgV2UploadBlob(f,f.type.startsWith('image/')?'image':'file');}
+async function msgV2MediaUrl(id){
+  const cached=msgV2MediaUrls.get(String(id));
+  if(cached&&cached.expires>Date.now())return cached.url;
+  const{data,error}=await sbClient.functions.invoke('chat-files',{body:{action:'download',message_id:Number(id)}});
+  if(error||data?.error){console.warn('media preview',data?.error||error);return'';}
+  msgV2MediaUrls.set(String(id),{url:data.url,expires:Date.now()+4*60*1000});
+  return data.url;
+}
+async function msgV2HydrateMedia(){
+  const nodes=[...document.querySelectorAll('[data-msg-media]:not([data-media-loading])')];
+  await Promise.all(nodes.map(async el=>{
+    el.dataset.mediaLoading='1';
+    const url=await msgV2MediaUrl(el.dataset.msgMedia);
+    if(url)el.src=url;else el.closest('.cb-media')?.classList.add('media-error');
+  }));
+}
 async function msgV2Download(id){const{data,error}=await sbClient.functions.invoke('chat-files',{body:{action:'download',message_id:Number(id)}});if(error||data?.error){toast(data?.error||error.message);return;}window.open(data.url,'_blank','noopener');}
 var msgV2Recorder=null,msgV2VoiceParts=[];
 async function msgV2Voice(){
@@ -175,8 +194,44 @@ function msgV2Typing(){
   const topic=msgV2.room?'room-presence-'+msgV2.room.id:'typing-'+[currentUser.id,_chatFriend.id].sort().join('-');
   const ch=sbClient.channel(topic);ch.subscribe(s=>{if(s==='SUBSCRIBED')ch.send({type:'broadcast',event:'typing',payload:{from:currentUser.id}})});setTimeout(()=>sbClient.removeChannel(ch),1200);
 }
+function msgV2FormatLastSeen(value){
+  if(!value)return'был(а) в сети давно';
+  const d=new Date(value);if(Number.isNaN(d.getTime()))return'был(а) в сети недавно';
+  const now=new Date(),same=d.toDateString()===now.toDateString();
+  const yesterday=new Date(now);yesterday.setDate(now.getDate()-1);
+  const time=d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+  if(same)return`был(а) сегодня в ${time}`;
+  if(d.toDateString()===yesterday.toDateString())return`был(а) вчера в ${time}`;
+  return`был(а) ${d.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'})} в ${time}`;
+}
+function msgV2RenderPresence(online){
+  if(msgV2.room)return;
+  const sub=document.getElementById('chatSub');if(!sub||!_chatFriend)return;
+  sub.textContent=online?`🟢 в сети · ${_pseq(_chatFriend.id)}`:`${msgV2FormatLastSeen(msgV2.lastSeen)} · ${_pseq(_chatFriend.id)}`;
+}
+async function msgV2LoadLastSeen(){
+  if(msgV2.room||!_chatFriend?.id)return;
+  const friendId=_chatFriend.id;
+  const{data,error}=await sbClient.from('profiles').select('last_seen_at').eq('user_id',friendId).maybeSingle();
+  if(!error&&_chatFriend?.id===friendId){msgV2.lastSeen=data?.last_seen_at||null;msgV2RenderPresence(msgV2.online);}
+}
+async function msgV2TouchLastSeen(){
+  if(!sbClient||!currentUser?.id)return;
+  const now=new Date().toISOString();
+  const{error}=await sbClient.from('profiles').update({last_seen_at:now}).eq('user_id',currentUser.id);
+  if(error)console.warn('last_seen_at',error);
+}
 function msgV2StartPresence(){
   if(msgV2.presence)try{sbClient.removeChannel(msgV2.presence)}catch(_){}
+  msgV2.lastSeen=null;msgV2.online=false;void msgV2LoadLastSeen();void msgV2TouchLastSeen();
   const topic=msgV2.room?'room-presence-'+msgV2.room.id:'typing-'+[currentUser.id,_chatFriend.id].sort().join('-');
-  msgV2.presence=sbClient.channel(topic).on('broadcast',{event:'typing'},({payload})=>{if(payload.from!==currentUser.id){const el=document.getElementById('chatTyping');el.textContent='печатает…';clearTimeout(msgV2.typing);msgV2.typing=setTimeout(()=>el.textContent='',1300)}}).on('presence',{event:'sync'},()=>{const n=Object.keys(msgV2.presence.presenceState()).length;const sub=document.getElementById('chatSub');if(msgV2.room)sub.textContent=`🛡 защищено · онлайн ${n}`;else sub.textContent=n>1?`🟢 в сети · ${_pseq(_chatFriend.id)}`:`🔒 зашифровано · ${_pseq(_chatFriend.id)}`}).subscribe(s=>{if(s==='SUBSCRIBED')msgV2.presence.track({user_id:currentUser.id,online_at:new Date().toISOString()})});
+  msgV2.presence=sbClient.channel(topic).on('broadcast',{event:'typing'},({payload})=>{if(payload.from!==currentUser.id){const el=document.getElementById('chatTyping');el.textContent='печатает…';clearTimeout(msgV2.typing);msgV2.typing=setTimeout(()=>el.textContent='',1300)}}).on('presence',{event:'sync'},()=>{
+    const people=Object.values(msgV2.presence.presenceState()).flat(),ids=new Set(people.map(p=>p.user_id).filter(Boolean));
+    const sub=document.getElementById('chatSub');
+    if(msgV2.room)sub.textContent=`🛡 защищено · онлайн ${ids.size}`;
+    else{msgV2.online=ids.has(_chatFriend.id);msgV2RenderPresence(msgV2.online);}
+  }).subscribe(s=>{if(s==='SUBSCRIBED')msgV2.presence.track({user_id:currentUser.id,online_at:new Date().toISOString()})});
 }
+msgV2PresenceTimer=setInterval(()=>{if(document.visibilityState==='visible')void msgV2TouchLastSeen()},60000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')void msgV2TouchLastSeen()});
+setTimeout(()=>void msgV2TouchLastSeen(),2000);

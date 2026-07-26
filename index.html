@@ -1259,6 +1259,9 @@ body.chat-open .bottom-nav{display:none}
 .cb-meta{display:flex;align-items:center;justify-content:flex-end;gap:5px}.cb-edited{font-size:9px;opacity:.58}
 .cb-reactions{display:flex;gap:4px;flex-wrap:wrap;margin-top:5px}.cb-react{font-size:11px;background:rgba(255,255,255,.18);border:0;border-radius:9px;padding:2px 6px;color:inherit}
 .cb-work{margin-top:6px;padding:8px;border-radius:10px;background:rgba(255,255,255,.15);font-size:12px}
+.cb-media{display:block;width:min(280px,72vw);margin:0 0 7px;padding:0;overflow:hidden;border:0;border-radius:13px;background:rgba(0,0,0,.18);cursor:pointer}
+.cb-media img,.cb-media video{display:block;width:100%;min-height:120px;max-height:360px;object-fit:cover;background:rgba(0,0,0,.18)}
+.cb-media video{cursor:default}.cb-media.media-error{display:none}
 .chat-typing{font-size:10px;color:var(--accent);padding:0 15px 4px;min-height:14px}
 .messenger-tabs{display:flex;gap:6px;margin-bottom:12px}.messenger-tabs button{flex:1;padding:9px;border:1px solid var(--border);border-radius:11px;background:var(--surface2);color:var(--muted);font-weight:800}.messenger-tabs button.active{background:var(--accent);color:#06281e}
 .group-create{display:flex;gap:8px;margin-bottom:12px}.group-create input{flex:1;min-width:0;background:var(--surface2);border:1px solid var(--border);border-radius:12px;color:var(--text);padding:11px}
@@ -1892,7 +1895,7 @@ body.chat-open .bottom-nav{display:none}
   <div class="chat-context" id="chatContext"><span id="chatContextIcon">↩</span><span class="chat-context-text" id="chatContextText"></span><button class="chat-tool-btn" onclick="msgV2ClearContext()">×</button></div>
   <div class="chat-typing" id="chatTyping"></div>
   <div class="chat-input-bar">
-    <input id="chatFileInput" type="file" style="display:none" accept="image/*,audio/*,.pdf,.txt,.doc,.docx" onchange="msgV2UploadFile(this)">
+    <input id="chatFileInput" type="file" style="display:none" accept="image/*,video/*,audio/*,.pdf,.txt,.doc,.docx" onchange="msgV2UploadFile(this)">
     <button class="chat-send" style="background:var(--surface2);color:var(--text)" onclick="document.getElementById('chatFileInput').click()" title="Файл или фото">＋</button>
     <button class="chat-send" id="chatVoiceBtn" style="background:var(--surface2);color:var(--text)" onclick="msgV2Voice()" title="Голосовое">🎙</button>
     <button class="chat-send" style="background:var(--surface2);color:var(--text)" onclick="msgV2WorkCard()" title="Карточка работы">☑</button>
@@ -7251,6 +7254,6 @@ autoBackupLocal();        // roll a local safety snapshot (~daily)
 renderSyncStatus();       // paint the header sync pill
 checkBackupReminder();    // nudge if a file backup is overdue
 </script>
-<script src="messenger-v2.js?v=4"></script>
+<script src="messenger-v2.js?v=5"></script>
 </body>
 </html>

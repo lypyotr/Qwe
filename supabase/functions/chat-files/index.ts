@@ -1,7 +1,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 const CORS={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS"};
 const json=(b:unknown,s=200)=>new Response(JSON.stringify(b),{status:s,headers:{...CORS,"Content-Type":"application/json"}});
-const allowed=new Set(["image/jpeg","image/png","image/webp","image/gif","audio/webm","audio/ogg","audio/mpeg","application/pdf","text/plain","application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document"]);
+const allowed=new Set(["image/jpeg","image/png","image/webp","image/gif","video/mp4","video/webm","video/quicktime","audio/webm","audio/ogg","audio/mpeg","application/pdf","text/plain","application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document"]);
 Deno.serve(async req=>{
  if(req.method==="OPTIONS")return new Response("ok",{headers:CORS});
  const auth=req.headers.get("Authorization")??"",url=Deno.env.get("SUPABASE_URL")!,anon=Deno.env.get("SUPABASE_ANON_KEY")!,secret=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -11,7 +11,7 @@ Deno.serve(async req=>{
  try{
   if(body.action==="upload"){
    const type=String(body.type||""),size=Number(body.size||0),recipient=String(body.recipient||""),room=String(body.room_id||"");
-   if(!allowed.has(type)||size<1||size>15728640)return json({error:"file type or size not allowed"},400);
+   if(!allowed.has(type)||size<1||size>52428800)return json({error:"file type or size not allowed"},400);
    let ok=false;if(room){const r=await admin.from("chat_members").select("room_id").eq("room_id",room).eq("user_id",user.id).maybeSingle();ok=!!r.data}
    else if(recipient){const r=await admin.from("friends").select("user_id").eq("user_id",user.id).eq("friend_id",recipient).eq("status","accepted").maybeSingle();ok=!!r.data}
    if(!ok)return json({error:"forbidden"},403);
