@@ -36,11 +36,12 @@ async function msgV2CreateGroup(){
 async function msgV2OpenGroup(id,title){
   msgV2.room={id,title};_chatFriend={id:'room:'+id,pubkey:null};
   document.getElementById('chatTitle').textContent=title;
+  document.getElementById('chatAvatar').textContent='👥';
   document.getElementById('chatSub').textContent='🛡 защищённый групповой чат';
   _chatMsgs=[];_chatSig='';switchPage('chat');await loadChatMessages();msgV2StartPresence();
 }
 var msgV2BaseOpenChat=window.openChat;
-window.openChat=async function(fid){msgV2.room=null;await msgV2BaseOpenChat(fid);msgV2StartPresence();};
+window.openChat=async function(fid){msgV2.room=null;await msgV2BaseOpenChat(fid);document.getElementById('chatAvatar').textContent=_avatar(fid);msgV2StartPresence();};
 
 async function msgV2FetchReactions(ids){
   if(!ids.length)return{};
