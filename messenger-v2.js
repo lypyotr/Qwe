@@ -159,7 +159,7 @@ function msgV2SaveWorkCard(){
 async function msgV2UploadBlob(file,kind){
   if(!file||!_chatFriend)return;toast('Загружаю…');
   const target={action:'upload',name:file.name||`${kind}.webm`,type:file.type,size:file.size,recipient:msgV2.room?'':_chatFriend.id,room_id:msgV2.room?.id||''};
-  const{data,error}=await sbClient.functions.invoke('chat-files',{body:target});if(error||data?.error){toast(data?.error||error.message);return;}
+  const{data,error}=await sbClient.functions.invoke('chat-files',{body:target});if(error||data?.error){toast('Не удалось загрузить: '+await msgV2InvokeError(error,data));return;}
   const up=await sbClient.storage.from('chat-files').uploadToSignedUrl(data.path,data.token,file,{contentType:file.type});if(up.error){toast(up.error.message);return;}
   const text=kind==='image'?'Фото':kind==='voice'?'Голосовое сообщение':file.type.startsWith('video/')?'Видео':'Файл';
   const body=msgV2.room?text:await msgEncrypt(await msgConvKey(_chatFriend.id,_chatFriend.pubkey),text);
@@ -175,6 +175,14 @@ async function msgV2MediaUrl(id){
   msgV2MediaUrls.set(String(id),{url:data.url,expires:Date.now()+4*60*1000});
   return data.url;
 }
+async function msgV2InvokeError(error,data){
+  if(data?.error)return data.error;
+  try{
+    const payload=await error?.context?.clone?.().json();
+    if(payload?.error)return payload.error;
+  }catch(_){}
+  return error?.message||'ошибка сервера';
+}
 async function msgV2HydrateMedia(){
   const nodes=[...document.querySelectorAll('[data-msg-media]:not([data-media-loading])')];
   await Promise.all(nodes.map(async el=>{
@@ -188,7 +196,19 @@ var msgV2Recorder=null,msgV2VoiceParts=[];
 async function msgV2Voice(){
   const btn=document.getElementById('chatVoiceBtn');
   if(msgV2Recorder&&msgV2Recorder.state==='recording'){msgV2Recorder.stop();btn.textContent='🎙';return;}
-  try{const stream=await navigator.mediaDevices.getUserMedia({audio:true});msgV2VoiceParts=[];msgV2Recorder=new MediaRecorder(stream);msgV2Recorder.ondataavailable=e=>{if(e.data.size)msgV2VoiceParts.push(e.data)};msgV2Recorder.onstop=async()=>{stream.getTracks().forEach(t=>t.stop());const blob=new Blob(msgV2VoiceParts,{type:msgV2Recorder.mimeType||'audio/webm'});Object.defineProperty(blob,'name',{value:'voice.webm'});await msgV2UploadBlob(blob,'voice')};msgV2Recorder.start();btn.textContent='■';toast('Запись началась — нажмите ещё раз для отправки');}catch(e){toast('Нет доступа к микрофону');}
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true}),types=['audio/webm;codecs=opus','audio/mp4','audio/ogg;codecs=opus'];
+    const mime=types.find(t=>MediaRecorder.isTypeSupported?.(t))||'';
+    msgV2VoiceParts=[];msgV2Recorder=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);
+    msgV2Recorder.ondataavailable=e=>{if(e.data.size)msgV2VoiceParts.push(e.data)};
+    msgV2Recorder.onstop=async()=>{
+      stream.getTracks().forEach(t=>t.stop());
+      const type=msgV2Recorder.mimeType||mime||'audio/webm',base=type.split(';',1)[0],ext=base==='audio/mp4'?'m4a':base==='audio/ogg'?'ogg':'webm';
+      const blob=new Blob(msgV2VoiceParts,{type});Object.defineProperty(blob,'name',{value:`voice.${ext}`});
+      await msgV2UploadBlob(blob,'voice');
+    };
+    msgV2Recorder.start();btn.textContent='■';toast('Запись началась — нажмите ещё раз для отправки');
+  }catch(e){toast(e?.name==='NotAllowedError'?'Нет доступа к микрофону':'Не удалось начать запись: '+(e?.message||e));}
 }
 function msgV2Typing(){
   if(!sbClient||!_chatFriend)return;clearTimeout(msgV2.typing);
