@@ -1,5 +1,5 @@
-const CACHE='salary-v47';
-const STATIC=['./index.html','./manifest.json','./icon.svg','./messenger-v2.js?v=7'];
+const CACHE='salary-v48';
+const STATIC=['./index.html','./manifest.json','./icon.svg','./messenger-v2.js?v=8','./workspace.css?v=1','./workspace.js?v=1'];
 
 // Dynamic APIs that must NEVER be touched by the service worker: Supabase
 // (REST/auth/realtime) and the exchange-rate sources. Caching these cache-first
@@ -13,8 +13,7 @@ self.addEventListener('install',e=>{
 });
 
 self.addEventListener('activate',e=>{
-  e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));
-  self.clients.claim();
+  e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('salary-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));
 });
 
 self.addEventListener('fetch',e=>{
