@@ -4,26 +4,66 @@ var msgV2={room:null,reply:null,edit:null,forward:null,kind:'text',meta:{},pinne
 var msgV2BaseOpenActions=window.openMsgActions;
 var msgV2LastLoadError='',msgV2LastLoadErrorAt=0;
 var msgV2MediaUrls=new Map(),msgV2PresenceTimer=null;
-var msgV2Sending=false,msgV2CreatingGroup=false,msgV2Rendered='',msgV2Drafts=new Map(),msgV2RequestedPeer=null,msgV2DraftOwner=null;
+var msgV2Sending=false,msgV2CreatingGroup=false,msgV2Rendered='',msgV2Drafts=new Map(),msgV2RequestedPeer=null,msgV2DraftOwner=null,msgV2Uploads=0,msgV2DraftStorageWarned=false;
 
 function msgV2DraftKey(peer){return currentUser?.id&&peer?currentUser.id+':'+peer:null;}
+function msgV2DraftSnapshot(){
+  const context=m=>m?{id:m.id??null,text:String(m.text||'').slice(0,4000)}:null;
+  return {text:document.getElementById('chatInput').value.slice(0,4000),kind:msgV2.kind,meta:{...msgV2.meta},reply:context(msgV2.reply),edit:context(msgV2.edit),forward:context(msgV2.forward)};
+}
+function msgV2ReadDraft(key){
+  if(!key)return null;
+  if(msgV2Drafts.has(key))return msgV2Drafts.get(key);
+  try{
+    const draft=JSON.parse(localStorage.getItem('salary-chat-draft:'+key)||'null');
+    if(draft&&typeof draft.text==='string'&&['text','work'].includes(draft.kind)){
+      msgV2Drafts.set(key,draft);return draft;
+    }
+  }catch(_){}
+  return null;
+}
+function msgV2WriteDraft(key,draft){
+  if(!key)return true;
+  if(draft)msgV2Drafts.set(key,draft);else msgV2Drafts.delete(key);
+  try{
+    if(draft)localStorage.setItem('salary-chat-draft:'+key,JSON.stringify(draft));
+    else localStorage.removeItem('salary-chat-draft:'+key);
+    return true;
+  }catch(_){
+    if(!msgV2DraftStorageWarned){msgV2DraftStorageWarned=true;toast('Не удалось сохранить черновик на устройстве. Не закрывайте приложение.');}
+    return false;
+  }
+}
 function msgV2SaveDraft(){
-  if(msgV2DraftOwner!==currentUser?.id)return;
-  const key=msgV2DraftKey(msgV2RequestedPeer||_chatFriend?.id),input=document.getElementById('chatInput');
-  if(key&&input&&!msgV2.edit){if(input.value)msgV2Drafts.set(key,input.value);else msgV2Drafts.delete(key);}
+  if(msgV2DraftOwner!==currentUser?.id||!msgV2RequestedPeer)return true;
+  const key=msgV2DraftKey(msgV2RequestedPeer),draft=msgV2DraftSnapshot();
+  return msgV2WriteDraft(key,draft.text||draft.kind!=='text'||draft.reply||draft.edit||draft.forward?draft:null);
 }
 function msgV2PrepareChat(peer){
-  msgV2SaveDraft();msgV2CancelVoice();stopChatPoll();msgV2ClearContext();msgV2RequestedPeer=peer;msgV2DraftOwner=currentUser?.id;msgV2Rendered='';
+  msgV2SaveDraft();msgV2CancelVoice();stopChatPoll();msgV2ClearContext(false);msgV2RequestedPeer=peer;msgV2DraftOwner=currentUser?.id;msgV2Rendered='';
   msgV2.pinnedOnly=false;document.getElementById('chatSearch').value='';
   const pinned=document.querySelector('[onclick="msgV2TogglePinned()"]');if(pinned)pinned.setAttribute('aria-pressed','false');
   document.getElementById('chatTyping').textContent='';
-  const input=document.getElementById('chatInput');input.value=msgV2Drafts.get(msgV2DraftKey(peer))||'';chatInputResize(input);
+  const draft=msgV2ReadDraft(msgV2DraftKey(peer)),input=document.getElementById('chatInput');
+  input.value=draft?.text||'';
+  if(draft){
+    msgV2.kind=draft.kind;msgV2.meta=draft.meta||{};msgV2.reply=draft.reply;msgV2.edit=draft.edit;msgV2.forward=draft.forward;
+    const type=msgV2.edit?'edit':msgV2.forward?'forward':'reply',context=msgV2[type];
+    if(context)msgV2ShowContext(type,context);
+  }
+  chatInputResize(input);
+}
+function msgV2ResetSession(){
+  msgV2LeaveChat();stopChatPoll();msgV2ClearContext(false);msgV2DraftOwner=null;msgV2Drafts.clear();msgV2.room=null;_chatFriend=null;
+  const input=document.getElementById('chatInput');input.value='';chatInputResize(input);
 }
 function msgV2LeaveChat(){
   msgV2SaveDraft();msgV2CancelVoice();msgV2RequestedPeer=null;
   clearTimeout(msgV2.typing);
   if(msgV2.presence){const channel=msgV2.presence;msgV2.presence=null;void sbClient?.removeChannel(channel);}
 }
+window.addEventListener('pagehide',()=>msgV2SaveDraft());
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')msgV2SaveDraft();});
 
 async function msgV2MarkRead(peer){
   try{
@@ -149,6 +189,7 @@ window.chatSend=async function(){
   const friend={..._chatFriend},room=msgV2.room?{...msgV2.room}:null,userId=currentUser.id;
   if(!room&&!friend.pubkey){toast('У собеседника ещё нет ключа шифрования');return;}
   const original=inp.value,edit=msgV2.edit,reply=msgV2.reply,forward=msgV2.forward,kind=msgV2.kind,meta={...msgV2.meta};
+  const sentDraft=JSON.stringify(msgV2DraftSnapshot());msgV2SaveDraft();
   const btn=document.getElementById('chatSendBtn');msgV2Sending=true;btn.disabled=true;btn.setAttribute('aria-busy','true');
   try{
     if(!room){await msgEnsureKeys();if(_msgIdentityForeign)throw new Error('Ключ переписки находится на другом устройстве. Откройте приложение там.');}
@@ -161,10 +202,9 @@ window.chatSend=async function(){
       const{error}=await sbClient.from('messages').insert(row);if(error)throw error;
     }
     const draftKey=userId+':'+friend.id;
-    if(msgV2Drafts.get(draftKey)===original)msgV2Drafts.delete(draftKey);
-    if(currentUser?.id===userId&&_chatFriend?.id===friend.id){
-      if(inp.value===original){inp.value='';chatInputResize(inp);}
-      if(msgV2.edit===edit&&msgV2.reply===reply&&msgV2.forward===forward)msgV2ClearContext();
+    if(JSON.stringify(msgV2ReadDraft(draftKey))===sentDraft)msgV2WriteDraft(draftKey,null);
+    if(currentUser?.id===userId&&msgV2RequestedPeer===friend.id&&_chatFriend?.id===friend.id){
+      if(JSON.stringify(msgV2DraftSnapshot())===sentDraft){inp.value='';chatInputResize(inp);msgV2ClearContext(false);}
       msgV2SaveDraft();await loadChatMessages();
     }
     if(!room&&currentUser?.id===userId)pingFriend(friend.id);
@@ -177,7 +217,7 @@ window.renderChat=function(list){
   const q=(document.getElementById('chatSearch')?.value||'').toLowerCase(),near=box.scrollHeight-box.scrollTop-box.clientHeight<100||!box.childElementCount;
   const rows=(list||[]).filter(m=>(!q||String(m.text||'').toLowerCase().includes(q))&&(!msgV2.pinnedOnly||m.meta?.pinned));
   const signature=JSON.stringify([_chatFriend?.id,q,msgV2.pinnedOnly,rows]);
-  if(signature===msgV2Rendered)return;msgV2Rendered=signature;
+  if(signature===msgV2Rendered){void msgV2HydrateMedia();return;}msgV2Rendered=signature;
   if(!rows.length){box.innerHTML=`<div class="chat-empty">${q?'Ничего не найдено. Измените запрос.':msgV2.pinnedOnly?'Закреплённых сообщений пока нет.':'Начните разговор — напишите первое сообщение.'}</div>`;return;}
   let lastDay='';
   box.innerHTML=rows.map(m=>{
@@ -197,13 +237,14 @@ window.openMsgActions=function(id,isMine){
   msgV2BaseOpenActions(id,isMine);document.getElementById('msgEditBtn').style.display=isMine?'':'none';document.getElementById('msgReportBtn').style.display=isMine?'none':'';document.getElementById('msgBlockBtn').style.display=(!isMine&&!msgV2.room)?'':'none';
 };
 function msgV2Target(){return _chatMsgs.find(x=>String(x.id)===String(_msgActTarget?.id));}
-function msgV2SetContext(type,m){msgV2.reply=msgV2.edit=msgV2.forward=null;msgV2[type]=m;document.getElementById('chatContext').classList.add('show');document.getElementById('chatContextIcon').textContent=type==='edit'?'✎':type==='forward'?'↗':'↩';document.getElementById('chatContextText').textContent=m.text;document.getElementById('chatInput').focus();}
-function msgV2ClearContext(){msgV2.reply=msgV2.edit=msgV2.forward=null;msgV2.kind='text';msgV2.meta={};document.getElementById('chatContext')?.classList.remove('show');}
+function msgV2ShowContext(type,m){document.getElementById('chatContext').classList.add('show');document.getElementById('chatContextIcon').textContent=type==='edit'?'✎':type==='forward'?'↗':'↩';document.getElementById('chatContextText').textContent=m.text;}
+function msgV2SetContext(type,m){msgV2.reply=msgV2.edit=msgV2.forward=null;msgV2[type]=m;msgV2ShowContext(type,m);document.getElementById('chatInput').focus();msgV2SaveDraft();}
+function msgV2ClearContext(persist=true){msgV2.reply=msgV2.edit=msgV2.forward=null;msgV2.kind='text';msgV2.meta={};document.getElementById('chatContext')?.classList.remove('show');if(persist)msgV2SaveDraft();}
 async function msgV2Action(a){
   const m=msgV2Target();closeMsgActions();if(!m)return;
   if(a==='reply')msgV2SetContext('reply',m);
   if(a==='copy'){await navigator.clipboard.writeText(m.text);toast('Скопировано');}
-  if(a==='edit'){msgV2SetContext('edit',m);document.getElementById('chatInput').value=m.text;}
+  if(a==='edit'){document.getElementById('chatInput').value=m.text;chatInputResize(document.getElementById('chatInput'));msgV2SetContext('edit',m);}
   if(a==='forward')msgV2SetContext('forward',m);
   if(a==='pin'){m.meta={...(m.meta||{}),pinned:!m.meta?.pinned};const{error}=await sbClient.from('messages').update({metadata:m.meta}).eq('id',m.id).eq('sender',currentUser.id);if(error)toast('Закреплять может автор');else loadChatMessages();}
   if(a==='react'){const e=prompt('Реакция: 👍 ❤️ 😂 👏 ✅ 👀','👍');if(e)msgV2React(m.id,e);}
@@ -241,6 +282,7 @@ async function msgV2UploadBlob(file,kind,context){
   const {friend,room,userId}=ctx;if(currentUser.id!==userId)return;
   if(!room&&!friend.pubkey){toast('У собеседника ещё нет ключа шифрования');return;}
   toast('Загружаю…');
+  msgV2Uploads++;
   try{
     if(!room){await msgEnsureKeys();if(_msgIdentityForeign)throw new Error('Сначала синхронизируйте ключ переписки с другого устройства.');}
     const target={action:'upload',name:file.name||`${kind}.webm`,type:file.type,size:file.size,recipient:room?'':friend.id,room_id:room?.id||''};
@@ -255,6 +297,7 @@ async function msgV2UploadBlob(file,kind,context){
     if(!room&&currentUser?.id===userId)pingFriend(friend.id);
     toast('Файл отправлен');
   }catch(e){toast('Не удалось отправить файл: '+(e.message||'проверьте подключение'));}
+  finally{msgV2Uploads--;}
 }
 async function msgV2UploadFile(input){const f=input.files?.[0];input.value='';if(!f)return;await msgV2UploadBlob(f,f.type.startsWith('image/')?'image':'file');}
 async function msgV2MediaUrl(id){
@@ -274,13 +317,19 @@ async function msgV2InvokeError(error,data){
   return error?.message||'ошибка сервера';
 }
 async function msgV2HydrateMedia(){
-  const nodes=[...document.querySelectorAll('[data-msg-media]:not([data-media-loading])')];
+  const nodes=[...document.querySelectorAll('#chatMessages [data-msg-media]:not([data-media-loaded]):not([data-media-loading])')].filter(el=>Number(el.dataset.mediaRetryAt||0)<=Date.now());
   await Promise.all(nodes.map(async el=>{
     el.dataset.mediaLoading='1';
-    const url=await msgV2MediaUrl(el.dataset.msgMedia);
-    if(url)el.src=url;else el.closest('.cb-media')?.classList.add('media-error');
+    try{
+      const url=await msgV2MediaUrl(el.dataset.msgMedia);if(!url)throw new Error('preview unavailable');
+      if(!el.isConnected)return;
+      el.onerror=()=>{delete el.dataset.mediaLoaded;el.dataset.mediaRetryAt=String(Date.now()+4000);msgV2MediaUrls.delete(String(el.dataset.msgMedia));};
+      el.src=url;el.dataset.mediaLoaded='1';el.closest('.cb-media')?.classList.remove('media-error');
+    }catch(_){el.dataset.mediaRetryAt=String(Date.now()+4000);el.closest('.cb-media')?.classList.add('media-error');}
+    finally{delete el.dataset.mediaLoading;}
   }));
 }
+window.addEventListener('online',()=>{document.querySelectorAll('[data-media-retry-at]').forEach(el=>delete el.dataset.mediaRetryAt);void msgV2HydrateMedia();});
 async function msgV2Download(id){const{data,error}=await sbClient.functions.invoke('chat-files',{body:{action:'download',message_id:Number(id)}});if(error||data?.error){toast(data?.error||error.message);return;}window.open(data.url,'_blank','noopener');}
 var msgV2Recorder=null,msgV2VoiceParts=[],msgV2VoiceStarting=false,msgV2VoiceToken=0;
 function msgV2CancelVoice(){
@@ -367,3 +416,4 @@ function msgV2StartPresence(){
 msgV2PresenceTimer=setInterval(()=>{if(document.visibilityState==='visible')void msgV2TouchLastSeen()},60000);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')void msgV2TouchLastSeen()});
 setTimeout(()=>void msgV2TouchLastSeen(),2000);
+

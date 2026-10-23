@@ -1321,7 +1321,7 @@ body:not(.light) #page-chat .chat-input{background:#2a2a2e;color:#f5f5f7}
   #page-chat .chat-bubble{max-width:84%}
 }
 </style>
-<link rel="stylesheet" href="workspace.css?v=1">
+<link rel="stylesheet" href="workspace.css?v=2">
 </head>
 <body>
 
@@ -1432,7 +1432,7 @@ body:not(.light) #page-chat .chat-input{background:#2a2a2e;color:#f5f5f7}
   <div class="cur-toggle" id="curToggle" onclick="toggleCurrency()" title="Показать в долларах">$</div>
   <div class="total-label" id="totalLabel">Итого к получению</div>
   <div class="total-view-toggle" id="totalViewToggle">
-    <span class="tvt-opt" id="tvtGross" onclick="setTotalView('gross')">До налога</span>
+    <span class="tvt-opt" id="tvtGross" onclick="setTotalView('gross')">До расходов</span>
     <span class="tvt-opt" id="tvtNet" onclick="setTotalView('net')">На руки</span>
   </div>
   <div class="total-amount" id="totalDisplay">0 <span>₽</span></div>
@@ -2409,6 +2409,19 @@ function getPeriod(){
   return{year,month,period,startDay,endDay};
 }
 function saveKey(){const{year,month,period}=getPeriod();return`salary_${year}_${month}_${period}`}
+function periodDayKey(){return 'salary-ui-day:'+(currentUser?.id||'local')+':'+saveKey();}
+function rememberPeriodDay(day){try{localStorage.setItem(periodDayKey(),String(day));}catch(_){} }
+function preferredPeriodDay(){
+  const {year,month,startDay,endDay}=getPeriod();
+  let remembered=0;try{remembered=Number(localStorage.getItem(periodDayKey()));}catch(_){}
+  if(Number.isInteger(remembered)&&remembered>=startDay&&remembered<=endDay)return remembered;
+  const now=new Date(),day=now.getDate();
+  return now.getFullYear()===year&&now.getMonth()===month&&day>=startDay&&day<=endDay?day:startDay;
+}
+function renderTaxToggle(){
+  const toggle=document.getElementById('taxToggle');
+  toggle.classList.toggle('on',taxEnabled);toggle.setAttribute('aria-checked',String(taxEnabled));
+}
 function save(){
   try{
     // Preserve the sync revision (_rev = last cloud updated_at we synced to);
@@ -2431,12 +2444,12 @@ function load(){
     // migrate: if period was saved before per-period expenses, fall back to old global key
     if(data.expenses!==undefined){expenseItems=data.expenses;}
     else{try{const old=JSON.parse(localStorage.getItem('salary_expenses')||'[]');expenseItems=Array.isArray(old)?old:[];}catch(_){expenseItems=[];}}
-    document.getElementById('taxToggle').classList.toggle('on',taxEnabled);
-  }catch(e){days={};bonuses=[];taxEnabled=false;dayOverrides={}}
+  }catch(e){days={};bonuses=[];taxEnabled=false;dayOverrides={};expenseItems=[];}
+  finally{renderTaxToggle();}
 }
 
 function onPeriodChange(){
-  selectedDay=null;load();
+  selectedDay=preferredPeriodDay();rememberPeriodDay(selectedDay);load();
   renderPeriodCard();renderDayStrip();renderDayPanel();renderBonuses();
   renderTotal();renderChart();renderHistory();renderGoals();renderExpenses();
   window.workspaceRefresh?.();
@@ -2834,6 +2847,7 @@ function fmtShort(n){
 function selectDay(d){
   haptic('light');
   selectedDay=d;
+  rememberPeriodDay(d);
   if(!days[d])days[d]=[];
   renderDayStrip();renderDayPanel();renderChart();
 }
@@ -3255,7 +3269,7 @@ function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').repla
 function toggleTax(){
   haptic('light');
   taxEnabled=!taxEnabled;
-  document.getElementById('taxToggle').classList.toggle('on',taxEnabled);
+  renderTaxToggle();
   save();renderTotal();renderGoals();
 }
 
@@ -4651,11 +4665,51 @@ function restoreScroll(){
 
 // ── SHARE RANK CARD ──
 // ── PWA / SERVICE WORKER ──
+let pwaRegistration=null,pwaReloadPending=false;
+function pwaOperationBusy(){
+  return !!(window.msgV2Sending||window.msgV2CreatingGroup||window.msgV2Uploads||window.msgV2VoiceStarting||window.msgV2Recorder?.state==='recording');
+}
+function showPWAUpdate(){
+  let banner=document.getElementById('pwaUpdateBanner');
+  if(!banner){
+    banner=document.createElement('div');banner.id='pwaUpdateBanner';banner.className='pwa-update-banner';banner.setAttribute('role','status');
+    banner.innerHTML='<span>Доступна новая версия приложения</span><button type="button" class="ui-button primary" id="pwaUpdateBtn">Обновить</button><button type="button" class="ui-button" id="pwaUpdateLater">Позже</button>';
+    document.body.append(banner);
+    document.getElementById('pwaUpdateBtn').addEventListener('click',applyPWAUpdate);
+    document.getElementById('pwaUpdateLater').addEventListener('click',()=>{banner.hidden=true;});
+  }
+  banner.hidden=false;
+}
+function applyPWAUpdate(){
+  if(pwaOperationBusy()){toast('Дождитесь отправки или завершите запись перед обновлением.');return;}
+  if(window.msgV2SaveDraft&&!msgV2SaveDraft())return;
+  if(!pwaRegistration?.waiting)return;
+  const button=document.getElementById('pwaUpdateBtn');button.disabled=true;button.textContent='Обновляем…';
+  pwaRegistration.waiting.postMessage({type:'SKIP_WAITING'});
+}
+function watchPWARegistration(registration){
+  pwaRegistration=registration;
+  let controlled=!!navigator.serviceWorker.controller;
+  const notice=()=>{if(registration.waiting&&navigator.serviceWorker.controller)showPWAUpdate();};
+  const watchInstalling=()=>{
+    const worker=registration.installing;
+    worker?.addEventListener('statechange',()=>{if(worker.state==='installed')notice();});
+  };
+  registration.addEventListener('updatefound',watchInstalling);watchInstalling();notice();
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    if(!controlled){controlled=true;return;}
+    if(pwaReloadPending)return;pwaReloadPending=true;
+    const reloadWhenReady=()=>{
+      if(pwaOperationBusy()){setTimeout(reloadWhenReady,1000);return;}
+      if(window.msgV2SaveDraft&&!msgV2SaveDraft()){pwaReloadPending=false;showPWAUpdate();return;}
+      window.location.reload();
+    };
+    reloadWhenReady();
+  });
+}
 function initPWA(){
   if('serviceWorker' in navigator&&!['localhost','127.0.0.1'].includes(location.hostname)){
-    navigator.serviceWorker.register('./sw.js').catch(()=>{});
-    // Reload page when a new SW takes control so users always get fresh HTML
-    navigator.serviceWorker.addEventListener('controllerchange',()=>window.location.reload());
+    navigator.serviceWorker.register('./sw.js').then(watchPWARegistration).catch(()=>{});
   }
   checkDailyReminder();
 }
@@ -4698,7 +4752,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-10-22 #59';
+const BUILD_VER='2026-10-23 #60';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
@@ -5622,6 +5676,7 @@ function initSupabase(){
         // lets the lock release first.
         setTimeout(()=>enterApp(session.user),0);
       }else if(event==='SIGNED_OUT'){
+        window.msgV2ResetSession?.();
         currentUser=null;
         // Drop the messaging identity so the next account on this browser
         // doesn't inherit it.
@@ -5656,9 +5711,11 @@ function initSupabase(){
 // or kick the user back to the login screen.
 let _cloudLoaded=false;
 function enterApp(user){
+  if(currentUser?.id!==user.id)window.msgV2ResetSession?.();
   currentUser=user;
   showAuthOverlay(false);
   load();                 // local data first
+  selectedDay=preferredPeriodDay();
   renderAll();            // render immediately
   hideLoader();           // never wait on the network
   refreshAdminUI();       // show/hide the owner-only admin tab
@@ -5797,6 +5854,7 @@ async function doLogout(){
   // directly (data is synced; local data survives the logout).
   if(_loggingOut)return;
   _loggingOut=true;
+  window.msgV2ResetSession?.();
   // Instant visual feedback so a slow network can never look like a dead button.
   const btn=document.getElementById('logoutBtn');
   if(btn){btn.disabled=true;btn.textContent='Выхожу…';}
@@ -6453,6 +6511,7 @@ function restorePeriodSnapshot(s){
     renderPeriodCard();window.workspaceRefresh?.();
   }
   days=s.days||{};bonuses=s.bonuses||[];taxEnabled=!!s.taxEnabled;dayOverrides=s.dayOverrides||{};expenseItems=s.expenses||[];
+  renderTaxToggle();rememberPeriodDay(selectedDay);
   save(); // persists the whole period payload (expenses included) + queues sync
   renderDayStrip();renderDayPanel();renderBonuses();renderTotal();renderChart();renderGoals();renderExpenses();
 }
@@ -7031,16 +7090,20 @@ if(kind === 'req'){
 } else if(kind === 'friend'){
   action = `<button class="friend-row-btn danger" onclick="event.stopPropagation();removeFriend('${id}')">Удалить</button>`;
 }
-  const click=kind==='friend'?`onclick="openChat('${id}')"`:'';
   const un=kind==='friend'?(unreadGet()[id]||0):0;
-  return `<div class="friend-row" ${click}>
-    <div class="friend-av">${esc(_avatar(id))}</div>
-    <div class="friend-info"><div class="friend-name">${esc(_pname(id))}</div><div class="friend-id">${_pseq(id)}</div></div>
+  const tag=kind==='friend'?'button':'div';
+  const open=kind==='friend'?`type="button" onclick="openChat('${id}')" aria-label="Открыть чат с ${esc(_pname(id))}"`:'';
+  return `<div class="friend-row">
+    <${tag} class="friend-open" ${open}>
+    <span class="friend-av">${esc(_avatar(id))}</span>
+    <span class="friend-info"><span class="friend-name">${esc(_pname(id))}</span><span class="friend-id">${_pseq(id)}</span></span>
     ${un?`<span class="friend-unread">${un>99?'99+':un}</span>`:''}
+    </${tag}>
     ${action}
   </div>`;
 }
 function renderFriends(){
+  window.msgV2RenderMembers?.();
   const reqWrap=document.getElementById('friendReqWrap'),reqEl=document.getElementById('friendRequests'),list=document.getElementById('friendsList');
   if(reqWrap&&reqEl){
     if(_reqCache.length){reqWrap.style.display='';reqEl.innerHTML=_reqCache.map(id=>friendRowHtml(id,'req')).join('');}
@@ -7359,7 +7422,8 @@ autoBackupLocal();        // roll a local safety snapshot (~daily)
 renderSyncStatus();       // paint the header sync pill
 checkBackupReminder();    // nudge if a file backup is overdue
 </script>
-<script src="messenger-v2.js?v=8"></script>
-<script src="workspace.js?v=1"></script>
+<script src="messenger-v2.js?v=9"></script>
+<script src="workspace.js?v=2"></script>
 </body>
 </html>
+

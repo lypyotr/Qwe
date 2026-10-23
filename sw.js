@@ -1,5 +1,5 @@
-const CACHE='salary-v48';
-const STATIC=['./index.html','./manifest.json','./icon.svg','./messenger-v2.js?v=8','./workspace.css?v=1','./workspace.js?v=1'];
+const CACHE='salary-v49';
+const STATIC=['./index.html','./manifest.json','./icon.svg','./messenger-v2.js?v=9','./workspace.css?v=2','./workspace.js?v=2'];
 
 // Dynamic APIs that must NEVER be touched by the service worker: Supabase
 // (REST/auth/realtime) and the exchange-rate sources. Caching these cache-first
@@ -9,7 +9,12 @@ const STATIC=['./index.html','./manifest.json','./icon.svg','./messenger-v2.js?v
 const BYPASS=/(^|\.)(supabase\.co|cbr-xml-daily\.ru|er-api\.com)$/i;
 
 self.addEventListener('install',e=>{
-  e.waitUntil(caches.open(CACHE).then(c=>c.addAll(STATIC)).then(()=>self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then(c=>c.addAll(STATIC)));
+});
+
+// A waiting update is activated only after the user's explicit request.
+self.addEventListener('message',e=>{
+  if(e.data?.type==='SKIP_WAITING')e.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener('activate',e=>{
@@ -64,3 +69,4 @@ self.addEventListener('notificationclick',e=>{
   e.notification.close();
   e.waitUntil(clients.openWindow('/Qwe/'));
 });
+

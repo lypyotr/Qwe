@@ -62,10 +62,12 @@ body.light .period-card,body.light .goals-card,body.light .chart-wrap,body.light
 .day-strip-wrap{padding:18px;border:1px solid var(--border);border-radius:18px;background:var(--surface)}
 .day-strip-label{font-size:15px;color:var(--text);text-transform:none;letter-spacing:0;font-weight:800}
 .calendar-hint{display:block;margin-top:3px;color:var(--muted);font-size:11px;font-weight:500}
-.day-grid{gap:6px}
+.day-grid{gap:6px;grid-template-columns:repeat(7,minmax(0,1fr))}
 .day-grid-dow{font-size:11px;padding:8px 0}
 .day-cell,body.light .day-cell{border:1px solid var(--border);background:var(--surface2);box-shadow:none;min-height:44px;color:var(--text);font-family:inherit}
 .day-cell.empty{background:none;border:0}
+.day-grid .day-cell{aspect-ratio:auto;min-width:0;width:100%;padding:4px 0}
+.day-grid .day-cell.empty{padding:0!important}
 .day-cell.active,body.light .day-cell.active{background:var(--accent);border-color:var(--accent);box-shadow:none}
 .day-cell.active .day-num,.day-cell.active .day-sum{color:#173b29}
 .day-cell.today-mark:not(.active){border:2px solid var(--accent2-ink)}
@@ -91,6 +93,8 @@ body.light .period-card,body.light .goals-card,body.light .chart-wrap,body.light
 .profile-section-label{letter-spacing:1px;margin-top:10px}
 .workspace-search{width:100%;min-height:46px;padding:11px 14px;margin:0 0 14px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text);font:inherit}
 .friend-row{min-height:70px;background:var(--surface);padding:14px;gap:12px}
+.friend-open{display:flex;align-items:center;gap:12px;flex:1;min-width:0;min-height:48px;border:0;background:transparent;color:inherit;text-align:left;font:inherit}
+.friend-open .friend-name,.friend-open .friend-id{display:block}
 .friend-empty,.empty{opacity:1!important;color:var(--muted);line-height:1.6;padding:22px 14px!important}
 .friend-myid{display:inline-flex;gap:12px;align-items:center}
 .group-member-picker{display:grid;gap:6px;max-height:240px;overflow:auto}
@@ -104,6 +108,8 @@ body.light .period-card,body.light .goals-card,body.light .chart-wrap,body.light
 .nav-brand,.desktop-nav{display:none}
 .nav-dot{top:6px;right:14px}
 #toastHost{bottom:calc(84px + env(safe-area-inset-bottom));max-width:500px}
+.pwa-update-banner{position:fixed;top:calc(12px + env(safe-area-inset-top));right:12px;z-index:99;display:flex;align-items:center;gap:8px;flex-wrap:wrap;width:min(430px,calc(100% - 24px));padding:12px;border:1px solid var(--border);border-radius:14px;background:var(--surface);color:var(--text);box-shadow:var(--card-shadow);font-size:13px}
+.pwa-update-banner[hidden]{display:none}.pwa-update-banner span{flex:1;min-width:140px}
 .toast{background:var(--surface);color:var(--text);border:1px solid var(--border)}
 .modal,body.light .modal,.auth-box,.af-card,.synclog-card,.work-card-dialog{background:var(--surface);backdrop-filter:none;-webkit-backdrop-filter:none}
 .modal-overlay{overflow-y:auto;overscroll-behavior:contain}
@@ -133,6 +139,19 @@ body.chat-open{padding-bottom:0}.chat-open .workspace-topbar{display:none}
 .chat-input-bar:after{content:'Enter — новая строка';grid-row:2;grid-column:4/6;align-self:center;font-size:10px;color:var(--muted);text-align:right}
 .chat-tools input{font-size:14px;min-height:42px}
 .chat-tool-btn{min-height:36px}.cb-react{min-height:32px;min-width:36px}
+/* Override the earlier Messenger UI kit with the same selector specificity. */
+#page-chat .messenger-header,body:not(.light) #page-chat .messenger-header{padding:14px 16px;padding-top:calc(14px + env(safe-area-inset-top));background:var(--surface);border-color:var(--border);backdrop-filter:none}
+#page-chat .chat-tools,body:not(.light) #page-chat .chat-tools{background:var(--surface);border-color:var(--border)}
+#page-chat .chat-tools input,body:not(.light) #page-chat .chat-tools input{min-height:42px;background:var(--surface2);color:var(--text)}
+#page-chat .chat-messages{padding:18px;gap:9px}
+#page-chat .chat-bubble{max-width:84%;padding:12px 15px;line-height:1.55}
+#page-chat .chat-bubble.me{background:var(--accent);color:#163b29}
+#page-chat .chat-bubble.them,body:not(.light) #page-chat .chat-bubble.them{background:var(--surface);color:var(--text);border:1px solid var(--border)}
+#page-chat .chat-compose-wrap,body:not(.light) #page-chat .chat-compose-wrap{background:var(--surface);border-color:var(--border)}
+#page-chat .chat-input-bar{gap:7px;padding:10px 12px calc(10px + env(safe-area-inset-bottom))}
+#page-chat .chat-input,body:not(.light) #page-chat .chat-input{min-height:46px;font-size:16px;font-family:inherit;background:var(--surface2);color:var(--text)}
+#page-chat .chat-input-bar>.chat-send{width:40px;height:40px;background:var(--surface2)!important;color:var(--text)!important}
+#page-chat .chat-input-bar>#chatSendBtn{width:44px;height:44px;background:var(--accent)!important;color:#163b29!important}
 @media (hover:hover) and (pointer:fine){
   .chat-input-bar:after{content:'Enter — отправить · Shift+Enter — строка'}
   .ui-button:hover,.workspace-destination:hover,.nav-btn:hover,.friend-row:hover{filter:brightness(1.08);border-color:var(--accent-ink)}
@@ -141,7 +160,7 @@ body.chat-open{padding-bottom:0}.chat-open .workspace-topbar{display:none}
   :root{--app-max:1440px}
   body{padding-left:236px;padding-right:24px;padding-bottom:32px;min-height:100vh}
   .workspace-topbar{padding:32px 20px 8px}.workspace-title{font-size:34px}
-  .bottom-nav,body.light .bottom-nav,body.chat-open .bottom-nav{display:flex;position:fixed;inset:0 auto 0 max(0px,calc((100vw - 1440px)/2));transform:none;width:220px;max-width:220px;height:100dvh;flex-direction:column;gap:7px;padding:28px 16px;border:0;border-right:1px solid var(--border);background:var(--bg);box-shadow:none}
+  .bottom-nav,body.light .bottom-nav,body.chat-open .bottom-nav{display:flex;position:fixed;inset:0 auto 0 max(0px,calc((100vw - 1440px)/2));transform:none;width:220px;max-width:220px;height:100dvh;overflow-y:auto;flex-direction:column;gap:7px;padding:28px 16px;border:0;border-right:1px solid var(--border);background:var(--bg);box-shadow:none}
   .nav-brand{display:flex;align-items:center;gap:12px;padding:4px 8px 32px;font-size:19px;font-weight:800;letter-spacing:-.5px}
   .nav-brand small{display:block;font-size:10px;font-weight:500;color:var(--muted);letter-spacing:0;margin-top:2px}
   .brand-mark{display:flex;align-items:center;justify-content:center;width:38px;height:42px;border-radius:13px;background:var(--accent);color:#163b29;font-size:24px}
@@ -162,6 +181,7 @@ body.chat-open{padding-bottom:0}.chat-open .workspace-topbar{display:none}
   #archiveList{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.arc-month-card{margin:0}
   .chat-open{padding:0 24px 0 236px}.chat-open #page-chat{height:100dvh;max-width:900px;margin:auto;border-inline:1px solid var(--border)}
   .chat-bubble{max-width:72%}.chat-messages{padding:24px 32px}
+  #page-chat .chat-bubble{max-width:72%}#page-chat .chat-messages{padding:24px 32px}
   #toastHost{left:calc(50% + 110px);bottom:24px}
 }
 @media(max-width:380px){
@@ -173,3 +193,4 @@ body.chat-open{padding-bottom:0}.chat-open .workspace-topbar{display:none}
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
 }
+

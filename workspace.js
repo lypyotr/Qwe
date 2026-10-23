@@ -1,4 +1,4 @@
-/* Presentation and navigation helpers; no new account or salary storage. */
+/* Presentation, navigation and keyboard access helpers. */
 (() => {
   'use strict';
   const pages = [
@@ -44,6 +44,7 @@
     if (!document.getElementById('authOverlay').classList.contains('hidden')) return;
     if (document.getElementById('maintOverlay').style.display !== 'none') return;
     if (dialog.open) return;
+    if (activeOverlays.length) return;
     find.value = '';
     drawDestinations();
     dialog.showModal();
@@ -161,24 +162,36 @@
   const focusOrigins = new Map();
   let activeOverlays = [];
   const isVisible = element => element.getClientRects().length > 0 && getComputedStyle(element).visibility !== 'hidden';
-  const focusable = element => [...element.querySelectorAll('button,input,select,textarea,a[href],[tabindex="0"]')].filter(el => !el.disabled && isVisible(el));
+  const isOpen = overlay => {
+    if (overlay.classList.contains('modal-overlay') || overlay.id === 'photoViewer') return overlay.classList.contains('open');
+    if (overlay.classList.contains('work-card-overlay')) return overlay.classList.contains('show');
+    return isVisible(overlay) && getComputedStyle(overlay).display !== 'none';
+  };
+  const focusable = element => [...element.querySelectorAll('button,input,select,textarea,a[href],[tabindex="0"]')].filter(el => !el.disabled && !el.closest('[inert]') && isVisible(el));
   function manageOverlays() {
-    const visible = overlays.filter(isVisible);
-    for (const overlay of visible) {
-      if (activeOverlays.includes(overlay)) continue;
-      focusOrigins.set(overlay, document.activeElement);
+    const visible = overlays.filter(isOpen);
+    const opened = visible.filter(overlay => !activeOverlays.includes(overlay));
+    const closed = activeOverlays.filter(overlay => !visible.includes(overlay));
+    const oldFocus = document.activeElement;
+    for (const overlay of overlays) {
+      const open = visible.includes(overlay);
+      overlay.inert = !open;
       overlay.setAttribute('role','dialog'); overlay.setAttribute('aria-modal','true');
+      if (!open) overlay.removeAttribute('aria-modal');
+      overlay.setAttribute('aria-hidden', String(!open));
       overlay.setAttribute('aria-label', overlay.querySelector('.modal-title,.synclog-title,h3')?.textContent || 'Диалог');
       overlay.tabIndex = -1;
-      (focusable(overlay)[0] || overlay).focus({preventScroll:true});
     }
-    for (const overlay of activeOverlays) {
-      if (visible.includes(overlay)) continue;
+    activeOverlays = activeOverlays.filter(overlay => visible.includes(overlay)).concat(opened);
+    activeOverlays.sort((a,b) => (parseInt(getComputedStyle(a).zIndex)||0) - (parseInt(getComputedStyle(b).zIndex)||0));
+    for (const overlay of opened) focusOrigins.set(overlay, oldFocus);
+    for (const overlay of closed.reverse()) {
       const origin = focusOrigins.get(overlay);
-      if (origin?.isConnected && isVisible(origin)) origin.focus({preventScroll:true});
+      if (!opened.length && (overlay.contains(oldFocus) || document.activeElement === document.body) && origin?.isConnected && !origin.closest('[inert]') && isVisible(origin)) origin.focus({preventScroll:true});
       focusOrigins.delete(overlay);
     }
-    activeOverlays = visible;
+    const top = activeOverlays[activeOverlays.length - 1];
+    if (opened.includes(top)) (focusable(top)[0] || top).focus({preventScroll:true});
   }
   document.addEventListener('keydown', event => {
     if (dialog.open || !activeOverlays.length) return;
@@ -192,6 +205,7 @@
     else if (!event.shiftKey && (document.activeElement === last || !overlay.contains(document.activeElement))) { event.preventDefault(); first.focus(); }
   });
   enhance(document.body);
+  manageOverlays();
   const observer = new MutationObserver(records => {
     for (const record of records) {
       if (record.type === 'childList') record.addedNodes.forEach(enhance);
@@ -204,7 +218,7 @@
   document.getElementById('tplList').setAttribute('aria-label', 'Шаблоны работ');
   workspaceNavigation(document.querySelector('.page.active')?.id.replace('page-','') || 'work');
   if (selectedDay === null) {
-    const {year,month,startDay,endDay} = getPeriod(), now = new Date();
-    selectDay(now.getFullYear() === year && now.getMonth() === month && now.getDate() >= startDay && now.getDate() <= endDay ? now.getDate() : startDay);
+    selectDay(preferredPeriodDay());
   }
 })();
+
