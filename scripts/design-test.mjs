@@ -29,18 +29,20 @@ try {
     for(const width of [320,390,768,999,1000,1440]){
       await page.setViewportSize({width,height:960});
       await page.waitForTimeout(50);
-      check('main action and calendar fit at '+width+'px '+(light?'light':'dark'),await page.evaluate(()=>{
+      const layout=await page.evaluate(()=>{
         const add=document.getElementById('workspaceAddWork').getBoundingClientRect();
         const grid=document.getElementById('dayStrip').getBoundingClientRect();
         const cells=[...document.querySelectorAll('#dayStrip .day-cell')];
-        return add.left>=0&&add.right<=innerWidth+1&&grid.left>=0&&grid.right<=innerWidth+1&&
-          cells.every(cell=>cell.getBoundingClientRect().right<=grid.right+1);
-      }));
+        return {width:innerWidth,add:{left:add.left,right:add.right},grid:{left:grid.left,right:grid.right},
+          outside:cells.filter(cell=>cell.getBoundingClientRect().right>grid.right+1).map(cell=>({text:cell.textContent,right:cell.getBoundingClientRect().right}))};
+      });
+      if(width===320||width===390||width===1440)await page.screenshot({path:'artifacts/design/'+(light?'light':'dark')+'-'+width+'.png',fullPage:true});
+      console.log('layout:',JSON.stringify(layout));
+      check('main action and calendar fit at '+width+'px '+(light?'light':'dark'),layout.add.left>=0&&layout.add.right<=width+1&&layout.grid.left>=0&&layout.grid.right<=width+1&&layout.outside.length===0);
       check('calculation settings follow the responsive reading order at '+width+'px '+(light?'light':'dark'),await page.evaluate(()=>{
         const parent=document.querySelector('.workspace-settings').parentElement;
         return parent.classList.contains(innerWidth>=1000?'work-overview':'work-journal');
       }));
-      if(width===390||width===1440)await page.screenshot({path:'artifacts/design/'+(light?'light':'dark')+'-'+width+'.png',fullPage:true});
     }
   }
   await page.locator('#navCalc').click();
