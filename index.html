@@ -1321,7 +1321,7 @@ body:not(.light) #page-chat .chat-input{background:#2a2a2e;color:#f5f5f7}
   #page-chat .chat-bubble{max-width:84%}
 }
 </style>
-<link rel="stylesheet" href="workspace.css?v=4">
+<link rel="stylesheet" href="workspace.css?v=5">
 </head>
 <body class="workspace-app">
 
@@ -1914,45 +1914,56 @@ body:not(.light) #page-chat .chat-input{background:#2a2a2e;color:#f5f5f7}
 </div><!-- /page-stats -->
 
 <!-- ══ PAGE: FRIENDS ══ -->
-<div class="page" id="page-friends">
-  <div class="header">
-    <div class="header-left"><div class="header-label">💬 Сообщения</div></div>
-    <div class="sync-pill" onclick="openSyncLog()" title="Синхронизация"><span class="sp-dot"></span><span class="sp-txt">—</span></div>
-  </div>
-  <div class="calc-wrap">
-    <div class="messenger-tabs"><button id="msgPeopleTab" class="active" onclick="msgV2ShowTab('people')">Личные</button><button id="msgGroupsTab" onclick="msgV2ShowTab('groups')">Группы</button></div>
-    <div id="msgGroupsPane" style="display:none">
-      <div class="calc-card">
-        <label class="prof-label" for="groupTitleInput">Новый рабочий чат</label>
-        <div class="group-create"><input id="groupTitleInput" maxlength="80" placeholder="Название чата"><button id="groupCreateBtn" class="friend-add-btn" onclick="msgV2CreateGroup()">Создать</button></div>
-        <div class="calc-card-sub">Выберите участников. В чат попадут только отмеченные друзья.</div>
-        <div id="groupMemberPicker" class="group-member-picker"></div>
-      </div>
-      <div id="groupsList"><div class="friend-empty">Загрузка…</div></div>
+<div class="page" id="page-friends" aria-label="Сообщения">
+  <div class="messages-heading"><span data-workspace-icon="friends" aria-hidden="true"></span><h2 class="sr-only">Сообщения</h2></div>
+  <div class="calc-wrap messages-dashboard">
+    <div class="messenger-tabs" aria-label="Тип переписки"><button type="button" id="msgPeopleTab" class="active" aria-pressed="true" onclick="msgV2ShowTab('people')">Личные</button><button type="button" id="msgGroupsTab" aria-pressed="false" onclick="msgV2ShowTab('groups')">Группы</button></div>
+    <div id="msgGroupsPane" class="messages-grid" style="display:none">
+      <section class="calc-card message-card" aria-labelledby="groupCreateHeading">
+        <span class="message-card-icon" data-workspace-icon="plus" aria-hidden="true"></span>
+        <h3 class="calc-card-title" id="groupCreateHeading">Новый рабочий чат</h3>
+        <label class="sr-only" for="groupTitleInput">Название чата</label>
+        <div class="group-create"><input id="groupTitleInput" maxlength="80" placeholder="Название чата"><button type="button" id="groupCreateBtn" class="friend-add-btn" onclick="msgV2CreateGroup()">Создать</button></div>
+        <div class="calc-card-sub">Выберите участников из друзей.</div>
+        <div id="groupMemberPicker" class="group-member-picker message-card-list"></div>
+      </section>
+      <section class="calc-card message-card" aria-labelledby="groupsHeading">
+        <span class="message-card-icon" data-workspace-icon="friends" aria-hidden="true"></span>
+        <h3 class="calc-card-title" id="groupsHeading">Мои группы</h3>
+        <div id="groupsList" class="message-card-list"><div class="friend-empty">Загрузка…</div></div>
+      </section>
     </div>
-    <div id="msgPeoplePane">
-    <div class="calc-card">
-      <div class="calc-card-title">Твой ID</div>
-      <div class="calc-card-sub">Назови этот номер другу, чтобы он добавил тебя.</div>
-      <div class="friend-myid" id="friendMyId">#—</div>
-    </div>
-    <div class="calc-card">
-      <div class="calc-card-title">Добавить друга по ID</div>
-      <div class="friend-add-row">
-        <span class="friend-add-hash">#</span>
-        <input class="friend-add-input" id="friendAddInput" type="number" inputmode="numeric" min="1" placeholder="номер" onkeydown="if(event.key==='Enter')friendLookup()">
-        <button class="friend-add-btn" onclick="friendLookup()">Найти</button>
-      </div>
-      <div class="friend-add-msg" id="friendAddMsg"></div>
-    </div>
-    <div id="friendReqWrap" style="display:none">
-      <div class="friend-section-title">Заявки в друзья</div>
-      <div id="friendRequests"></div>
-    </div>
-    <div class="friend-section-title">Мои друзья</div>
-    <label class="sr-only" for="friendSearch">Найти друга по имени или ID</label>
-    <input class="workspace-search" id="friendSearch" type="search" placeholder="Имя или ID друга…" oninput="renderFriends()">
-    <div id="friendsList"><div class="friend-empty">Загрузка…</div></div>
+    <div id="msgPeoplePane" class="messages-grid">
+      <section class="calc-card message-card message-id-card" aria-labelledby="myIdHeading">
+        <span class="message-card-icon" data-workspace-icon="profile" aria-hidden="true"></span>
+        <h3 class="calc-card-title" id="myIdHeading">Твой ID</h3>
+        <div class="calc-card-sub">Поделитесь ID с другом.</div>
+        <div class="message-id-row"><div class="friend-myid" id="friendMyId">#—</div></div>
+      </section>
+      <section class="calc-card message-card" aria-labelledby="addFriendHeading">
+        <span class="message-card-icon" data-workspace-icon="userPlus" aria-hidden="true"></span>
+        <h3 class="calc-card-title" id="addFriendHeading">Добавить друга</h3>
+        <label class="sr-only" for="friendAddInput">ID друга</label>
+        <div class="friend-add-row">
+          <span class="friend-add-hash" aria-hidden="true">#</span>
+          <input class="friend-add-input" id="friendAddInput" type="number" inputmode="numeric" min="1" onkeydown="if(event.key==='Enter')friendLookup()">
+        </div>
+        <button type="button" class="friend-add-btn message-find-button" onclick="friendLookup()">Найти</button>
+        <div class="friend-add-msg" id="friendAddMsg" role="status" aria-live="polite"></div>
+      </section>
+      <section class="calc-card message-card message-friends-card" aria-labelledby="friendsHeading">
+        <span class="message-card-icon" data-workspace-icon="users" aria-hidden="true"></span>
+        <h3 class="calc-card-title" id="friendsHeading">Мои друзья</h3>
+        <label class="sr-only" for="friendSearch">Найти друга по имени или ID</label>
+        <input class="workspace-search" id="friendSearch" type="search" placeholder="Имя или ID" oninput="renderFriends()">
+        <div class="message-card-list" tabindex="0" role="region" aria-label="Друзья и заявки">
+          <div id="friendReqWrap" style="display:none">
+            <div class="friend-section-title">Заявки в друзья</div>
+            <div id="friendRequests"></div>
+          </div>
+          <div id="friendsList"><div class="friend-empty">Загрузка…</div></div>
+        </div>
+      </section>
     </div>
   </div>
 </div><!-- /page-friends -->
@@ -4767,7 +4778,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-10-24 #62';
+const BUILD_VER='2026-10-24 #63';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
@@ -7438,8 +7449,9 @@ renderSyncStatus();       // paint the header sync pill
 checkBackupReminder();    // nudge if a file backup is overdue
 </script>
 <script src="messenger-v2.js?v=9"></script>
-<script src="workspace.js?v=4"></script>
+<script src="workspace.js?v=5"></script>
 <script src="workspace-avatar.js?v=1"></script>
 </body>
 </html>
+
 

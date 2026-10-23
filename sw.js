@@ -1,5 +1,5 @@
-const CACHE='salary-v51';
-const STATIC=['./index.html','./manifest.json','./icon.svg','./messenger-v2.js?v=9','./workspace.css?v=4','./workspace.js?v=4','./workspace-avatar.js?v=1'];
+const CACHE='salary-v52';
+const STATIC=['./index.html','./manifest.json','./icon.svg','./messenger-v2.js?v=9','./workspace.css?v=5','./workspace.js?v=5','./workspace-avatar.js?v=1'];
 
 // Dynamic APIs that must NEVER be touched by the service worker: Supabase
 // (REST/auth/realtime) and the exchange-rate sources. Caching these cache-first
@@ -69,4 +69,5 @@ self.addEventListener('notificationclick',e=>{
   e.notification.close();
   e.waitUntil(clients.openWindow('/Qwe/'));
 });
+
 

@@ -42,6 +42,9 @@ jobs:
       - name: Compact journal and avatar tests (headless Chromium)
         run: node scripts/compact-test.mjs
 
+      - name: Messages dashboard tests (headless Chromium)
+        run: node scripts/messages-test.mjs
+
       - name: PWA update tests (headless Chromium)
         run: node scripts/pwa-test.mjs
 
@@ -57,3 +60,4 @@ jobs:
           path: artifacts/design/
           if-no-files-found: ignore
           retention-days: 7
+

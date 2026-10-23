@@ -18,6 +18,8 @@
     friends:'<path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5H4l-2 2V11.5A8.5 8.5 0 0 1 10.5 3h2a8.5 8.5 0 0 1 8.5 8.5Z"/><path d="M7 10h10M7 14h6"/>',
     stats:'<path d="M4 20h16M7 16v-5M12 16V4M17 16V8"/>',
     profile:'<circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/>',
+    userPlus:'<circle cx="9" cy="7" r="4"/><path d="M2 21v-2a7 7 0 0 1 14 0v2M19 8v8M15 12h8"/>',
+    users:'<circle cx="9" cy="7" r="4"/><path d="M2 21v-2a7 7 0 0 1 14 0v2M17 3a4 4 0 0 1 0 8M18 15a6 6 0 0 1 4 6"/>',
     search:'<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/>',
     plus:'<path d="M12 5v14M5 12h14"/>',
     sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M5 19l1.5-1.5M17.5 6.5 19 5"/>',
@@ -36,6 +38,7 @@
   };
   const uiIcon = name => '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' + (iconPaths[name] || iconPaths.work) + '</svg>';
   window.workspaceIcon=uiIcon;
+  document.querySelectorAll('[data-workspace-icon]').forEach(node=>node.innerHTML=uiIcon(node.dataset.workspaceIcon));
   const topbar = document.createElement('header');
   topbar.className = 'workspace-topbar';
   topbar.innerHTML = '<div class="workspace-brandbar"><span class="workspace-brand-icon">'+uiIcon('mark')+'</span><span>Зарплата</span></div><div class="workspace-tools"><button class="workspace-search-button" type="button" aria-label="Найти раздел" title="Найти раздел · Ctrl K" aria-haspopup="dialog">'+uiIcon('search')+'</button><button class="workspace-add-button" id="workspaceAddWork" type="button" aria-label="Добавить работу в выбранный день">'+uiIcon('plus')+'<span class="button-label">Добавить работу</span></button></div><div class="workspace-heading"><h1 class="workspace-title" id="workspaceTitle">Дневник работы</h1><p class="sr-only" id="workspaceSubtitle">Дни, выполненные работы и заработок</p></div><div class="workspace-account"><span class="workspace-date" id="workspaceDate"></span></div>';
@@ -44,7 +47,7 @@
   const legacy=document.createElement('div');legacy.hidden=true;
   legacy.append(...account.querySelector('.header-left').children);topbar.append(legacy);
   const sync=account.querySelector('.sync-pill');
-  topbar.querySelector('.workspace-account').append(sync);
+  topbar.querySelector('.workspace-tools').prepend(sync);
   const theme=document.createElement('button');theme.type='button';theme.id='themeBtn';theme.className='workspace-icon-button';
   theme.addEventListener('click',()=>toggleTheme());
   const avatar=document.createElement('button');avatar.type='button';avatar.id='workspaceAvatar';avatar.className='workspace-avatar-button';avatar.setAttribute('aria-label','Настройки аватара');avatar.setAttribute('aria-haspopup','dialog');avatar.title='Настройки аватара';
@@ -136,7 +139,7 @@
   const dialog = document.createElement('dialog');
   dialog.className = 'workspace-dialog';
   dialog.setAttribute('aria-labelledby', 'workspaceDialogTitle');
-  dialog.innerHTML = '<div class="workspace-dialog-head"><h2 id="workspaceDialogTitle">Куда перейти?</h2><button type="button" class="ui-icon" aria-label="Закрыть">×</button></div><label class="sr-only" for="workspaceFind">Название раздела</label><input id="workspaceFind" class="workspace-search" type="search" placeholder="Например: архив, расходы, друзья…" autocomplete="off"><div class="workspace-destinations"></div><p>Работы сохраняются при вводе. Статус рядом с именем показывает синхронизацию. Резервную копию можно скачать в профиле, в разделе «Данные».</p>';
+  dialog.innerHTML = '<div class="workspace-dialog-head"><h2 id="workspaceDialogTitle">Куда перейти?</h2><button type="button" class="ui-icon" aria-label="Закрыть">×</button></div><label class="sr-only" for="workspaceFind">Название раздела</label><input id="workspaceFind" class="workspace-search" type="search" placeholder="Например: архив, расходы, друзья…" autocomplete="off"><div class="workspace-destinations"></div><p>Работы сохраняются при вводе. Индикатор вверху справа показывает синхронизацию. Резервную копию можно скачать в профиле, в разделе «Данные».</p>';
   document.body.append(dialog);
   const find = dialog.querySelector('input');
   const destinations = dialog.querySelector('.workspace-destinations');
@@ -224,7 +227,7 @@
   // Expose the clipboard action beside the public ID, with an actionable fallback.
   const idBox = document.getElementById('friendMyId');
   const copyId = document.createElement('button');
-  copyId.type = 'button'; copyId.className = 'ui-button'; copyId.textContent = 'Скопировать ID';
+  copyId.type = 'button'; copyId.className = 'workspace-icon-button message-copy-id'; copyId.innerHTML = uiIcon('copy'); copyId.setAttribute('aria-label','Скопировать ID'); copyId.title = 'Скопировать ID';
   copyId.addEventListener('click', async () => {
     if (!userSeq) { toast('ID ещё загружается'); return; }
     try { await navigator.clipboard.writeText(String(userSeq)); toast('ID скопирован'); }
@@ -346,4 +349,5 @@
   if (selectedDay === null) selectDay(preferredPeriodDay());
   else renderDayPanel();
 })();
+
 

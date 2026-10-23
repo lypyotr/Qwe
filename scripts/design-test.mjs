@@ -22,7 +22,7 @@ try {
     ]};bonuses=[];expenseItems=[];renderAll();switchPage('work');
   });
   check('navigation uses consistent vector icons',await page.locator('.nav-btn .nav-icon svg').count()===7);
-  check('account and sync remain available in the shared header',await page.locator('.workspace-topbar #themeBtn').count()===1&&await page.locator('.workspace-account .sync-pill').count()===1);
+  check('account and sync remain available in the shared header',await page.locator('.workspace-topbar #themeBtn').count()===1&&await page.locator('.workspace-tools .sync-pill').count()===1);
   check('payment card shows the selected period payout',await page.locator('#workspacePayDate').textContent()!=='');
   for(const light of [false,true]){
     await page.evaluate(light=>document.body.classList.toggle('light',light),light);
@@ -61,3 +61,4 @@ try {
   check('no uncaught browser errors',errors.length===0);
   console.log('design tests OK: '+assertions+' assertions');
 } finally {await browser.close();await server.close();}
+
