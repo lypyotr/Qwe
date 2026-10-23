@@ -23,7 +23,12 @@ jobs:
         run: |
           npm init -y >/dev/null
           npm install --no-save playwright
-          npx playwright install --with-deps chromium
+          browser_path="$(command -v google-chrome || command -v chromium || true)"
+          if [ -n "$browser_path" ]; then
+            echo "CHROMIUM_PATH=$browser_path" >> "$GITHUB_ENV"
+          else
+            npx playwright install --with-deps chromium
+          fi
 
       - name: Boot smoke test (headless Chromium)
         run: node scripts/smoke.mjs
