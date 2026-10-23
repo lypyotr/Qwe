@@ -31,9 +31,21 @@ jobs:
       - name: Workspace regression tests (headless Chromium)
         run: node scripts/workspace-test.mjs
 
+      - name: Design and quick-entry checks (headless Chromium)
+        run: node scripts/design-test.mjs
+
       - name: PWA update tests (headless Chromium)
         run: node scripts/pwa-test.mjs
 
       - name: Crypto-core tests (headless Chromium)
         run: node scripts/crypto-test.mjs
 
+
+      - name: Upload design previews
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workspace-design-previews
+          path: artifacts/design/
+          if-no-files-found: ignore
+          retention-days: 7

@@ -3,7 +3,7 @@ import {chromium} from 'playwright';
 import {testServer,blockExternal} from './test-server.mjs';
 
 let nextVersion=false;
-const server=await testServer((file,body)=>file==='sw.js'&&nextVersion?body.replace("salary-v49","salary-test-next"):body);
+const server=await testServer((file,body)=>file==='sw.js'&&nextVersion?body.replace("salary-v50","salary-test-next"):body);
 const browser=await chromium.launch(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{});
 let assertions=0;
 const check=(name,value)=>{assert.ok(value,name);assertions++;console.log('PASS:',name);};
@@ -43,9 +43,9 @@ try {
     currentUser={id:'second-user'};msgV2PrepareChat('room:B');return document.getElementById('chatInput').value==='Вторая вкладка';
   }));
   check('old app cache is deleted and unrelated cache survives',await page.evaluate(async()=>{
-    const keys=await caches.keys();return keys.includes('salary-test-next')&&!keys.includes('salary-v49')&&keys.includes('unrelated-test-cache');
+    const keys=await caches.keys();return keys.includes('salary-test-next')&&!keys.includes('salary-v50')&&keys.includes('unrelated-test-cache');
   }));
   await context.setOffline(true);await page.reload({waitUntil:'networkidle'});
-  check('updated app opens offline with its styles and scripts',await page.evaluate(()=>typeof workspaceNavigation==='function'&&!![...document.styleSheets].find(sheet=>sheet.href?.includes('workspace.css?v=2'))));
+  check('updated app opens offline with its styles and scripts',await page.evaluate(()=>typeof workspaceNavigation==='function'&&!![...document.styleSheets].find(sheet=>sheet.href?.includes('workspace.css?v=3'))));
   console.log(`PWA tests OK: ${assertions} assertions`);
 } finally {await browser.close();await server.close();}

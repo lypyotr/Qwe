@@ -1,4 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
-  <rect width="192" height="192" rx="40" fill="#6366f1"/>
-  <text y="130" x="96" text-anchor="middle" font-size="110">💰</text>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="18" fill="#c1dea6"/><path d="M17 46V26m15 20V16m15 30V31" fill="none" stroke="#213b23" stroke-width="7" stroke-linecap="round"/></svg>

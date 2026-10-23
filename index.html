@@ -7,15 +7,15 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Зарплата">
-<meta name="theme-color" content="#6366f1">
+<meta name="theme-color" content="#101816">
 <link rel="manifest" href="manifest.json">
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230d0f14'/><text y='.9em' font-size='72' x='12'>💰</text></svg>">
-<link rel="shortcut icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230d0f14'/><text y='.9em' font-size='72' x='12'>💰</text></svg>">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="shortcut icon" href="icon.svg">
 <!-- CSP: even if an XSS slips through, stolen data has nowhere to go — only
      Supabase, the two rate APIs, fonts and the script CDNs are reachable. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://www.cbr-xml-daily.ru https://open.er-api.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https://*.supabase.co; media-src 'self' blob: https://*.supabase.co; worker-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230d0f14'/><text y='.9em' font-size='72' x='12'>💰</text></svg>">
+<link rel="apple-touch-icon" href="icon.svg">
 <title>Зарплата</title>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -1321,9 +1321,9 @@ body:not(.light) #page-chat .chat-input{background:#2a2a2e;color:#f5f5f7}
   #page-chat .chat-bubble{max-width:84%}
 }
 </style>
-<link rel="stylesheet" href="workspace.css?v=2">
+<link rel="stylesheet" href="workspace.css?v=3">
 </head>
-<body>
+<body class="workspace-app">
 
 <!-- AURORA BACKGROUND (shines through frosted glass cards) -->
 <div class="bg-aurora" id="bgAurora"></div>
@@ -1485,7 +1485,7 @@ body:not(.light) #page-chat .chat-input{background:#2a2a2e;color:#f5f5f7}
   <div class="day-works" id="dayWorks"></div>
   <div class="photo-section">
     <div class="photo-header">
-      <div class="photo-title">📷 Фото-отчёт<span id="photoCount"></span></div>
+      <div class="photo-title">Фотографии за день<span id="photoCount"></span></div>
       <div class="photo-add-btn" onclick="document.getElementById('photoFileIn').click()">+ Добавить</div>
     </div>
     <div class="photo-grid" id="photoGrid"></div>
@@ -2880,7 +2880,7 @@ function renderDayPanel(){
   const works=days[selectedDay]||[];
   const container=document.getElementById('dayWorks');
   if(!works.length){
-    container.innerHTML='<div class="empty" style="padding:14px 4px;font-size:12px">Нет работ — нажми «+» ниже</div>';
+    container.innerHTML='<div class="journal-empty"><strong>Здесь начнётся рабочий день</strong><p>Добавьте работу, количество и цену — сумма посчитается сама.</p></div>';
   } else {
     container.innerHTML=works.map(w=>`
       <div class="day-work-row">
@@ -3062,7 +3062,7 @@ function saveTemplates(){try{localStorage.setItem('salary_templates',JSON.string
 
 function renderTemplates(){
   const list=document.getElementById('tplList');
-  if(!templates.length){list.innerHTML='<span class="tpl-empty">Шаблоны пусты</span>';return}
+  if(!templates.length){list.innerHTML='<span class="tpl-empty">Сохраните повторяющиеся работы в шаблоны, чтобы добавлять их одним нажатием.</span>';return}
   list.innerHTML=templates.map(t=>`
     <div class="tpl-chip" onclick="applyTemplate(${t.id})">
       <span>${esc(t.name)}</span>
@@ -3794,6 +3794,7 @@ function renderTotal(){
   document.getElementById('totalMeta').innerHTML=meta.join('');
   renderCompareBadge(disp);
   renderTodaySummary();
+  window.workspaceOverview?.();
 }
 
 function renderTodaySummary(){
@@ -4752,7 +4753,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-10-23 #60';
+const BUILD_VER='2026-10-23 #61';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
@@ -7423,7 +7424,7 @@ renderSyncStatus();       // paint the header sync pill
 checkBackupReminder();    // nudge if a file backup is overdue
 </script>
 <script src="messenger-v2.js?v=9"></script>
-<script src="workspace.js?v=2"></script>
+<script src="workspace.js?v=3"></script>
 </body>
 </html>
 
