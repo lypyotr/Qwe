@@ -39,6 +39,9 @@ jobs:
       - name: Design and quick-entry checks (headless Chromium)
         run: node scripts/design-test.mjs
 
+      - name: Compact journal and avatar tests (headless Chromium)
+        run: node scripts/compact-test.mjs
+
       - name: PWA update tests (headless Chromium)
         run: node scripts/pwa-test.mjs
 

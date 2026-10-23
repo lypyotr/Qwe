@@ -23,22 +23,35 @@
     sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M5 19l1.5-1.5M17.5 6.5 19 5"/>',
     moon:'<path d="M20.5 13.5A8.5 8.5 0 0 1 10.5 3a9 9 0 1 0 10 10.5Z"/>',
     arrow:'<path d="M5 12h14m-6-6 6 6-6 6"/>',
-    mark:'<path d="M5 18V9M12 18V5M19 18v-6"/>'
+    mark:'<path d="M5 18V9M12 18V5M19 18v-6"/>',
+    chevron:'<path d="m9 6 6 6-6 6"/>',
+    box:'<path d="m12 3 9 5-9 5-9-5 9-5ZM3 8v9l9 5 9-5V8M12 13v9M7.5 5.5l9 5"/>',
+    coins:'<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v5c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 10v5c0 1.7 3.6 3 8 3s8-1.3 8-3v-5M4 15v4c0 1.7 3.6 3 8 3s8-1.3 8-3v-4"/>',
+    check:'<path d="m5 12 4 4L19 6"/>',
+    trash:'<path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/>',
+    copy:'<rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V3H3v13h5"/>',
+    photo:'<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.5"/><path d="m3 17 5-5 4 4 4-7 5 8"/>',
+    download:'<path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/>',
+    close:'<path d="m6 6 12 12M18 6 6 18"/>'
   };
   const uiIcon = name => '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' + (iconPaths[name] || iconPaths.work) + '</svg>';
+  window.workspaceIcon=uiIcon;
   const topbar = document.createElement('header');
   topbar.className = 'workspace-topbar';
-  topbar.innerHTML = '<div class="workspace-heading"><div class="workspace-kicker">Мой рабочий кабинет</div><h1 class="workspace-title" id="workspaceTitle">Дневник работы</h1><p class="workspace-subtitle" id="workspaceSubtitle">Дни, выполненные работы и заработок</p></div><div class="workspace-tools"><button class="workspace-search-button" type="button" aria-label="Найти раздел" aria-haspopup="dialog">' + uiIcon('search') + '<span class="search-label">Разделы</span><kbd>Ctrl K</kbd></button><button class="workspace-add-button" id="workspaceAddWork" type="button" aria-label="Добавить работу в выбранный день">' + uiIcon('plus') + '<span class="button-label">Добавить работу</span></button></div><div class="workspace-account"><span class="workspace-date" id="workspaceDate"></span></div>';
+  topbar.innerHTML = '<div class="workspace-brandbar"><span class="workspace-brand-icon">'+uiIcon('mark')+'</span><span>Зарплата</span></div><div class="workspace-tools"><button class="workspace-search-button" type="button" aria-label="Найти раздел" title="Найти раздел · Ctrl K" aria-haspopup="dialog">'+uiIcon('search')+'</button><button class="workspace-add-button" id="workspaceAddWork" type="button" aria-label="Добавить работу в выбранный день">'+uiIcon('plus')+'<span class="button-label">Добавить работу</span></button></div><div class="workspace-heading"><h1 class="workspace-title" id="workspaceTitle">Дневник работы</h1><p class="sr-only" id="workspaceSubtitle">Дни, выполненные работы и заработок</p></div><div class="workspace-account"><span class="workspace-date" id="workspaceDate"></span></div>';
   document.getElementById('page-work').before(topbar);
-
-  // Keep the existing account, theme and sync actions available on every page.
-  const account = document.querySelector('#page-work > .header');
-  topbar.querySelector('.workspace-account').append(account);
-  const avatar = document.createElement('span');
-  avatar.className = 'workspace-avatar'; avatar.innerHTML = uiIcon('profile');
-  account.querySelector('.header-left').prepend(avatar);
-  account.querySelector('.header-left').setAttribute('aria-label', 'Открыть профиль');
-  document.getElementById('workspaceDate').textContent = new Intl.DateTimeFormat('ru', {weekday:'long',day:'numeric',month:'long'}).format(new Date());
+  const account=document.querySelector('#page-work > .header');
+  const legacy=document.createElement('div');legacy.hidden=true;
+  legacy.append(...account.querySelector('.header-left').children);topbar.append(legacy);
+  const sync=account.querySelector('.sync-pill');
+  topbar.querySelector('.workspace-account').append(sync);
+  const theme=document.createElement('button');theme.type='button';theme.id='themeBtn';theme.className='workspace-icon-button';
+  theme.addEventListener('click',()=>toggleTheme());
+  const avatar=document.createElement('button');avatar.type='button';avatar.id='workspaceAvatar';avatar.className='workspace-avatar-button';avatar.setAttribute('aria-label','Настройки аватара');avatar.setAttribute('aria-haspopup','dialog');avatar.title='Настройки аватара';
+  avatar.addEventListener('click',()=>window.workspaceOpenAvatar?.());avatar.textContent='Р';
+  topbar.querySelector('.workspace-tools').append(theme,avatar);
+  account.remove();
+  document.getElementById('workspaceDate').textContent = new Intl.DateTimeFormat('ru', {weekday:'short',day:'numeric',month:'long'}).format(new Date());
   for (const [id] of pages) {
     const button = document.getElementById('nav' + id[0].toUpperCase() + id.slice(1));
     if (button) button.querySelector('.nav-icon').innerHTML = uiIcon(id);
@@ -58,9 +71,30 @@
 
   const payday = document.createElement('button');
   payday.type = 'button'; payday.className = 'workspace-payday';
-  payday.innerHTML = '<span class="payday-icon">' + uiIcon('period') + '</span><span class="payday-description"><small>Выплата за период</small><strong id="workspacePayDate"></strong></span><span class="payday-timing" id="workspacePayIn"></span>' + uiIcon('arrow');
+  payday.innerHTML = '<span class="payday-icon">' + uiIcon('period') + '</span><span class="payday-description"><small>Выплата</small><strong id="workspacePayDate"></strong></span><span class="payday-timing" id="workspacePayIn"></span>';
   payday.addEventListener('click', () => switchPage('period'));
   document.getElementById('totalCard').after(payday);
+  const quickAdd=document.getElementById('workspaceAddWork');
+  payday.after(quickAdd);
+  const currencyRow=document.createElement('div');currencyRow.className='workspace-currency-row';
+  const currencyLabel=document.createElement('span');currencyLabel.textContent='Валюта отображения';
+  currencyRow.append(currencyLabel,document.getElementById('curToggle'));settingsBody.append(currencyRow);
+  const statsButton=document.createElement('button');statsButton.type='button';statsButton.className='workspace-balance-stats workspace-icon-button';
+  statsButton.setAttribute('aria-label','Открыть статистику');statsButton.title='Статистика';statsButton.innerHTML=uiIcon('stats');statsButton.addEventListener('click',()=>switchPage('stats'));
+  document.getElementById('totalCard').prepend(statsButton);
+  function compactControl(element,name,label){
+    if(!element)return;element.innerHTML=uiIcon(name);element.setAttribute('aria-label',label);element.title=label;
+  }
+  compactControl(document.querySelector('#dayPanel .copy-day-btn'),'copy','Копировать работы с другого дня');
+  compactControl(document.querySelector('.templates-header .copy-day-btn'),'plus','Создать шаблон');
+  compactControl(document.querySelector('#dayPanel .photo-add-btn'),'photo','Прикрепить фотографии');
+  const arrows=document.querySelectorAll('.calendar-actions button');
+  arrows[0].innerHTML=uiIcon('chevron');arrows[1].innerHTML=uiIcon('chevron');
+  document.querySelector('.templates-header .section-title').textContent='Частые работы';
+  document.querySelectorAll('.profile-action').forEach((button,index)=>{
+    const label=button.querySelector('.profile-action-title').textContent;button.title=label;button.setAttribute('aria-label',label);
+    button.querySelector('.profile-action-icon').innerHTML=uiIcon(['friends','work','stats','download'][index]);
+  });
   const photoSection = document.querySelector('#dayPanel .photo-section');
   photoSection.before(document.querySelector('#dayPanel .add-work-btn'));
   document.getElementById('dayPanel').after(document.getElementById('todaySummaryCard'));
@@ -79,7 +113,7 @@
 
   function updateThemeIcon() {
     const light = document.body.classList.contains('light'), button = document.getElementById('themeBtn');
-    if (button.dataset.workspaceTheme === String(light)) return;
+    if (button.dataset.workspaceTheme === String(light) && button.querySelector('svg')) return;
     button.dataset.workspaceTheme = String(light);
     button.innerHTML = uiIcon(light ? 'moon' : 'sun');
     button.setAttribute('aria-label', light ? 'Включить тёмную тему' : 'Включить светлую тему');
@@ -93,6 +127,9 @@
     document.getElementById('workspacePayDate').textContent = info.payDate.toLocaleDateString('ru', {day:'numeric',month:'long'});
     document.getElementById('workspacePayIn').textContent = info.diffDays === 0 ? 'Сегодня' : info.diffDays > 0 ? 'Через ' + info.diffDays + ' ' + pl(info.diffDays) : 'Дата прошла';
     document.getElementById('workspaceTaxStatus').textContent = taxEnabled ? 'НДФЛ 13%' : 'Без НДФЛ';
+    const {year,month}=getPeriod();
+    document.getElementById('workspaceCalendarMonth').textContent=new Intl.DateTimeFormat('ru',{month:'long',year:'numeric'}).format(new Date(year,month,1)).replace(/ г\.$/,'');
+    document.getElementById('workspaceCalendarHint').textContent=selectedDay===null?'Выберите день для записи':selectedDay+' '+MG[month]+' · выбранный день';
   };
 
 
@@ -124,7 +161,7 @@
   function openNavigation() {
     if (!document.getElementById('authOverlay').classList.contains('hidden')) return;
     if (document.getElementById('maintOverlay').style.display !== 'none') return;
-    if (dialog.open) return;
+    if (document.querySelector('dialog[open]')) return;
     if (activeOverlays.length) return;
     find.value = '';
     drawDestinations();
@@ -145,9 +182,10 @@
   });
 
   window.workspaceRefresh = function () {
-    const {year, month, startDay, endDay} = getPeriod();
-    const shortMonth = new Intl.DateTimeFormat('ru', {month:'short'}).format(new Date(year,month,1));
-    document.getElementById('workspacePeriodLabel').textContent = startDay + '–' + endDay + ' ' + shortMonth + ' ' + year;
+    const {year, month, startDay, endDay, period} = getPeriod();
+    document.getElementById('workspacePeriodLabel').textContent = startDay + '–' + endDay + ' ' + new Intl.DateTimeFormat('ru',{month:'long'}).format(new Date(year,month,1));
+    document.getElementById('workspacePeriodMeta').textContent=year+' · '+(period===1?'первая половина':'вторая половина');
+    const now=new Date();document.getElementById('workspaceCurrentPeriod').hidden=year===now.getFullYear()&&month===now.getMonth()&&period===(now.getDate()<=15?1:2);
     workspaceOverview();
     const monthLabel = document.getElementById('monthSel');
     monthLabel.setAttribute('aria-label', 'Месяц расчёта');
@@ -172,6 +210,7 @@
     document.getElementById('workspaceTitle').textContent = route?.[1] || ({admin:'Управление',users:'Пользователи',chat:'Переписка'}[name] || 'Зарплата');
     document.getElementById('workspaceSubtitle').textContent = route?.[2] || 'Личный рабочий кабинет';
     document.body.dataset.workspacePage = name;
+    if(name==='work')payday.after(quickAdd);else topbar.querySelector('.workspace-tools').insertBefore(quickAdd,theme);
     const active = name === 'chat' ? 'friends' : ['admin','users'].includes(name) ? 'profile' : name;
     document.querySelectorAll('.nav-btn').forEach(button => {
       const selected = button.id === 'nav' + active[0].toUpperCase() + active.slice(1);
@@ -304,8 +343,7 @@
   document.querySelectorAll('.auth-error').forEach(el => el.setAttribute('role', 'alert'));
   document.getElementById('tplList').setAttribute('aria-label', 'Шаблоны работ');
   workspaceNavigation(document.querySelector('.page.active')?.id.replace('page-','') || 'work');
-  if (selectedDay === null) {
-    selectDay(preferredPeriodDay());
-  }
+  if (selectedDay === null) selectDay(preferredPeriodDay());
+  else renderDayPanel();
 })();
 

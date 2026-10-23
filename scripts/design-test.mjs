@@ -22,7 +22,7 @@ try {
     ]};bonuses=[];expenseItems=[];renderAll();switchPage('work');
   });
   check('navigation uses consistent vector icons',await page.locator('.nav-btn .nav-icon svg').count()===7);
-  check('account and sync remain available in the shared header',await page.locator('.workspace-account #themeBtn').count()===1&&await page.locator('.workspace-account .sync-pill').count()===1);
+  check('account and sync remain available in the shared header',await page.locator('.workspace-topbar #themeBtn').count()===1&&await page.locator('.workspace-account .sync-pill').count()===1);
   check('payment card shows the selected period payout',await page.locator('#workspacePayDate').textContent()!=='');
   for(const light of [false,true]){
     await page.evaluate(light=>document.body.classList.toggle('light',light),light);
@@ -33,12 +33,13 @@ try {
         const add=document.getElementById('workspaceAddWork').getBoundingClientRect();
         const grid=document.getElementById('dayStrip').getBoundingClientRect();
         const cells=[...document.querySelectorAll('#dayStrip .day-cell')];
-        return {width:innerWidth,add:{left:add.left,right:add.right},grid:{left:grid.left,right:grid.right},
+        const overflow=document.documentElement.scrollWidth>innerWidth+1;
+        return {overflow,width:innerWidth,add:{left:add.left,right:add.right},grid:{left:grid.left,right:grid.right},
           outside:cells.filter(cell=>cell.getBoundingClientRect().right>grid.right+1).map(cell=>({text:cell.textContent,right:cell.getBoundingClientRect().right}))};
       });
       if(width===320||width===390||width===1440)await page.screenshot({path:'artifacts/design/'+(light?'light':'dark')+'-'+width+'.png',fullPage:true});
       console.log('layout:',JSON.stringify(layout));
-      check('main action and calendar fit at '+width+'px '+(light?'light':'dark'),layout.add.left>=0&&layout.add.right<=width+1&&layout.grid.left>=0&&layout.grid.right<=width+1&&layout.outside.length===0);
+      check('main action and calendar fit at '+width+'px '+(light?'light':'dark'),layout.add.left>=0&&layout.add.right<=width+1&&layout.grid.left>=0&&layout.grid.right<=width+1&&layout.outside.length===0&&!layout.overflow);
       check('calculation settings follow the responsive reading order at '+width+'px '+(light?'light':'dark'),await page.evaluate(()=>{
         const parent=document.querySelector('.workspace-settings').parentElement;
         return parent.classList.contains(innerWidth>=1000?'work-overview':'work-journal');

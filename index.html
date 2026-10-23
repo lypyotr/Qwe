@@ -1321,7 +1321,7 @@ body:not(.light) #page-chat .chat-input{background:#2a2a2e;color:#f5f5f7}
   #page-chat .chat-bubble{max-width:84%}
 }
 </style>
-<link rel="stylesheet" href="workspace.css?v=3">
+<link rel="stylesheet" href="workspace.css?v=4">
 </head>
 <body class="workspace-app">
 
@@ -1422,9 +1422,9 @@ body:not(.light) #page-chat .chat-input{background:#2a2a2e;color:#f5f5f7}
 
 <div class="workspace-period" aria-label="Выбор расчётного периода">
   <button type="button" class="ui-icon" onclick="shiftPeriod(-1)" aria-label="Предыдущий период">‹</button>
-  <button type="button" class="workspace-period-label" onclick="switchPage('period')"><span id="workspacePeriodLabel">Расчётный период</span><small>Выбрать период</small></button>
+  <button type="button" class="workspace-period-label" onclick="switchPage('period')"><span id="workspacePeriodLabel">Расчётный период</span><small id="workspacePeriodMeta">Выбрать период</small></button>
   <button type="button" class="ui-icon" onclick="shiftPeriod(1)" aria-label="Следующий период">›</button>
-  <button type="button" class="ui-button" onclick="workspaceToday()">Сегодня</button>
+  <button type="button" class="ui-icon workspace-current-period" id="workspaceCurrentPeriod" onclick="workspaceToday()" aria-label="Текущий период" title="Текущий период">↶</button>
 </div>
 <div class="work-layout"><div class="work-overview">
 <!-- TOTAL CARD -->
@@ -1436,6 +1436,7 @@ body:not(.light) #page-chat .chat-input{background:#2a2a2e;color:#f5f5f7}
     <span class="tvt-opt" id="tvtNet" onclick="setTotalView('net')">На руки</span>
   </div>
   <div class="total-amount" id="totalDisplay">0 <span>₽</span></div>
+  <div class="total-hint" id="totalHint"></div>
   <div class="total-meta" id="totalMeta"></div>
   <div id="compareBadge"></div>
 </div>
@@ -1466,8 +1467,9 @@ body:not(.light) #page-chat .chat-input{background:#2a2a2e;color:#f5f5f7}
 </div><div class="work-journal">
 <!-- DAY GRID -->
 <div class="day-strip-wrap">
-  <div class="day-strip-label">Дневник работы <span class="calendar-hint">Выберите день для записи</span></div>
+  <div class="day-strip-label"><span id="workspaceCalendarMonth">Календарь</span><div class="calendar-actions"><button type="button" class="workspace-icon-button" onclick="shiftPeriod(-1)" aria-label="Предыдущий период в календаре"></button><button type="button" class="workspace-icon-button" onclick="shiftPeriod(1)" aria-label="Следующий период в календаре"></button></div></div>
   <div class="day-grid" id="dayStrip"></div>
+  <div class="calendar-hint" id="workspaceCalendarHint">Выберите день для записи</div>
 </div>
 
 <!-- DAY PANEL -->
@@ -1475,6 +1477,7 @@ body:not(.light) #page-chat .chat-input{background:#2a2a2e;color:#f5f5f7}
   <div class="day-panel-header">
     <div class="day-panel-left">
       <div class="day-panel-title" id="dpTitle">—</div>
+      <div class="day-panel-meta" id="dpMeta"></div>
     </div>
     <div style="display:flex;align-items:center;gap:8px">
       <button type="button" class="copy-day-btn" onclick="openCopyModal()" title="Копировать работы с другого дня">Копировать</button>
@@ -1702,7 +1705,7 @@ body:not(.light) #page-chat .chat-input{background:#2a2a2e;color:#f5f5f7}
 
     <div class="profile-hero">
       <div class="profile-person">
-        <div class="profile-avatar" id="profileAvatar">?</div>
+        <button type="button" class="profile-avatar" id="profileAvatar" onclick="workspaceOpenAvatar()" aria-label="Настройки аватара" aria-haspopup="dialog">?</button>
         <div class="profile-person-main">
           <div class="profile-display-name" id="profileDisplayName">Работник</div>
           <div class="profile-display-info" id="profileDisplayInfo">Добавьте должность или короткий статус</div>
@@ -2378,8 +2381,9 @@ function toggleTheme(){
 function loadTheme(){
   try{
     const t=localStorage.getItem('salary_theme');
-    if(t==='light'){lightTheme=true;document.body.classList.add('light');document.getElementById('themeBtn').textContent='🌙'}
-    else{document.getElementById('themeBtn').textContent='☀️'}
+    lightTheme=t!=='dark';
+    document.body.classList.toggle('light',lightTheme);
+    document.getElementById('themeBtn').textContent=lightTheme?'🌙':'☀️';
   }catch(e){}
 }
 
@@ -2552,6 +2556,7 @@ function renderProfileDashboard(){
   const unread=Object.values(unreadGet()).reduce((a,n)=>a+(Number(n)||0),0);
   set('profileSocialSub',unread?unread+' непрочитанных · открыть':'Друзья и защищённые сообщения');
   set('profileSyncChip',navigator.onLine?'☁ синхронизация':'○ офлайн-режим');
+  window.workspaceRenderAvatar?.();
 }
 
 // ── Sequential public user number (#1, #2, …) ──
@@ -2861,46 +2866,64 @@ function selectDayFromChart(d){
 // ══════════════════════════════════════════════
 //  DAY PANEL
 // ══════════════════════════════════════════════
+// Compact summaries remain visible; the editor opens only for the selected row.
+let editingWorkId=null;
+function workspaceWorkMarkup(w){
+  const id=Number(w.id),editing=String(w.id)===editingWorkId;
+  const icon=name=>window.workspaceIcon?.(name)||'';
+  const qty=parseFloat(w.qty)||0,price=parseFloat(w.price)||0;
+  return '<div class="day-work-row'+(editing?' is-editing':'')+'" data-work-id="'+esc(String(w.id))+'">'+
+    '<button type="button" class="work-summary" aria-expanded="'+editing+'" aria-controls="work-editor-'+id+'" onclick="workspaceToggleWork('+id+')">'+
+      '<span class="work-summary-heading"><span class="work-summary-name">'+esc(w.name||'Новая работа')+'</span><span class="work-summary-sum">'+M(qty*price)+'</span><span class="work-summary-chevron">'+icon('chevron')+'</span></span>'+
+      '<span class="work-summary-meta"><span>'+icon('box')+'<span class="work-summary-qty">'+qty.toLocaleString('ru')+' шт.</span></span><span>'+icon('coins')+'<span class="work-summary-price">'+M(price)+'/шт.</span></span></span>'+
+    '</button>'+
+    '<div class="work-editor" id="work-editor-'+id+'"'+(editing?'':' hidden')+'>'+
+      '<label class="work-name-field"><span class="work-field-label">Название работы</span><input class="dw-name" type="text" maxlength="160" placeholder="Вид работы" value="'+esc(w.name)+'" oninput="updateWork('+selectedDay+','+id+',\'name\',this.value)"></label>'+
+      '<label><span class="work-field-label">Количество</span><span class="dw-qty-wrap"><input type="number" min="0" step="any" inputmode="decimal" placeholder="0" value="'+esc(String(w.qty))+'" oninput="updateWork('+selectedDay+','+id+',\'qty\',this.value)"><span class="dw-suffix">шт.</span></span></label>'+
+      '<label><span class="work-field-label">За единицу</span><span class="dw-price-wrap"><input type="number" min="0" step="any" inputmode="decimal" placeholder="0" value="'+esc(String(w.price))+'" oninput="updateWork('+selectedDay+','+id+',\'price\',this.value)"><span class="dw-suffix">₽</span></span></label>'+
+      '<div class="work-editor-actions"><button type="button" class="dw-del workspace-icon-button" aria-label="Удалить работу" title="Удалить работу" onclick="delWork('+selectedDay+','+id+')">'+icon('trash')+'</button><button type="button" class="work-done" onclick="workspaceToggleWork('+id+')">'+icon('check')+'Готово</button></div>'+
+    '</div></div>';
+}
+function workspaceToggleWork(id){
+  const opening=editingWorkId!==String(id);
+  editingWorkId=opening?String(id):null;
+  renderDayPanel();
+  const row=[...document.querySelectorAll('#dayWorks .day-work-row')].find(el=>el.dataset.workId===String(id));
+  (row?.querySelector(opening?'.dw-name':'.work-summary'))?.focus({preventScroll:true});
+}
+function workspaceUpdateWorkSummary(w){
+  const row=[...document.querySelectorAll('#dayWorks .day-work-row')].find(el=>el.dataset.workId===String(w.id));
+  if(!row)return;
+  row.querySelector('.work-summary-name').textContent=w.name||'Новая работа';
+  row.querySelector('.work-summary-sum').textContent=M((parseFloat(w.qty)||0)*(parseFloat(w.price)||0));
+  row.querySelector('.work-summary-qty').textContent=(parseFloat(w.qty)||0).toLocaleString('ru')+' шт.';
+  row.querySelector('.work-summary-price').textContent=M(parseFloat(w.price)||0)+'/шт.';
+}
 function renderDayPanel(){
   const panel=document.getElementById('dayPanel');
   if(selectedDay===null){panel.style.display='none';return}
   panel.style.display='';
   const{month,year}=getPeriod();
   const date=new Date(year,month,selectedDay);
-  document.getElementById('dpTitle').textContent=`${selectedDay} ${MG[month]}, ${DOW[date.getDay()]}`;
+  document.getElementById('dpTitle').textContent=selectedDay+' '+MG[month]+', '+DOW[date.getDay()];
   const sum=daySum(selectedDay);
   document.getElementById('dpSum').textContent=sum>0?M(sum):'';
   const btn=document.getElementById('dayTypeBtn');
   if(btn){
-    const off=isDayOff(selectedDay,date);
-    btn.textContent=off?'Выходной':'Рабочий';
-    btn.setAttribute('aria-label',(off?'Выходной':'Рабочий день')+'. Изменить тип дня');
+    const off=isDayOff(selectedDay,date),label=off?'Выходной':'Рабочий день';
+    btn.innerHTML=window.workspaceIcon?workspaceIcon(off?'sun':'work'):label;
+    btn.setAttribute('aria-label',label+'. Изменить тип дня');
+    btn.title=label+'. Изменить тип дня';
     btn.className='day-type-btn '+(off?'is-off':'is-work');
   }
   const works=days[selectedDay]||[];
+  const qty=works.reduce((total,w)=>total+(parseFloat(w.qty)||0),0);
+  document.getElementById('dpMeta').textContent=works.length+' '+(works.length===1?'работа':works.length<5&&works.length>1?'работы':'работ')+' · '+qty.toLocaleString('ru')+' шт.';
   const container=document.getElementById('dayWorks');
-  if(!works.length){
-    container.innerHTML='<div class="journal-empty"><strong>Здесь начнётся рабочий день</strong><p>Добавьте работу, количество и цену — сумма посчитается сама.</p></div>';
-  } else {
-    container.innerHTML=works.map(w=>`
-      <div class="day-work-row">
-        <input class="dw-name" type="text" maxlength="160" aria-label="Название работы" placeholder="Вид работы" value="${esc(w.name)}"
-          oninput="updateWork(${selectedDay},${w.id},'name',this.value)">
-        <div class="dw-qty-wrap">
-          <input type="number" min="0" step="any" inputmode="decimal" aria-label="Количество изделий" placeholder="Кол-во" value="${esc(String(w.qty))}"
-            oninput="updateWork(${selectedDay},${w.id},'qty',this.value)">
-          <span class="dw-suffix">шт</span>
-        </div>
-        <div class="dw-price-wrap">
-          <input type="number" min="0" step="any" inputmode="decimal" aria-label="Цена за единицу в рублях" placeholder="Цена" value="${esc(String(w.price))}"
-            oninput="updateWork(${selectedDay},${w.id},'price',this.value)">
-          <span class="dw-suffix">₽</span>
-        </div>
-        <button type="button" class="dw-del" aria-label="Удалить работу" onclick="delWork(${selectedDay},${w.id})">✕</button>
-      </div>`).join('');
-  }
+  container.innerHTML=works.length?works.map(workspaceWorkMarkup).join(''):'<div class="journal-empty"><strong>Здесь начнётся рабочий день</strong><p>Добавьте работу, количество и цену — сумма посчитается сама.</p></div>';
   renderTodaySummary();
   renderDayPhotos();
+  window.workspaceOverview?.();
 }
 
 // ══════════════════════════════════════════════
@@ -3032,7 +3055,9 @@ function addWork(){
   if(selectedDay===null)return;
   haptic('medium');
   if(!days[selectedDay])days[selectedDay]=[];
-  days[selectedDay].push({id:Date.now(),name:'',qty:'',price:''});
+  const id=Date.now();
+  editingWorkId=String(id);
+  days[selectedDay].push({id,name:'',qty:'',price:''});
   save();
   renderDayPanel();renderDayStrip();renderTotal();renderChart();renderGoals();
   setTimeout(()=>{const inputs=document.querySelectorAll('.dw-name');if(inputs.length)inputs[inputs.length-1].focus()},50);
@@ -3049,6 +3074,7 @@ function updateWork(day,id,field,value){
   const w=(days[day]||[]).find(w=>w.id===id);
   if(!w)return;
   w[field]=value;save();
+  workspaceUpdateWorkSummary(w);
   const sum=daySum(day);
   document.getElementById('dpSum').textContent=sum>0?M(sum):'';
   renderDayStrip();renderTotal();renderChart();renderGoals();
@@ -3061,14 +3087,9 @@ function loadTemplates(){try{templates=JSON.parse(localStorage.getItem('salary_t
 function saveTemplates(){try{localStorage.setItem('salary_templates',JSON.stringify(templates))}catch(e){}saveSettingsToFirestore();}
 
 function renderTemplates(){
-  const list=document.getElementById('tplList');
-  if(!templates.length){list.innerHTML='<span class="tpl-empty">Сохраните повторяющиеся работы в шаблоны, чтобы добавлять их одним нажатием.</span>';return}
-  list.innerHTML=templates.map(t=>`
-    <div class="tpl-chip" onclick="applyTemplate(${t.id})">
-      <span>${esc(t.name)}</span>
-      <span class="tpl-price">${M(t.price)}</span>
-      <span class="tpl-del" onclick="deleteTpl(event,${t.id})">✕</span>
-    </div>`).join('');
+  const list=document.getElementById('tplList'),icon=name=>window.workspaceIcon?.(name)||'';
+  if(!templates.length){list.innerHTML='<span class="tpl-empty">Создайте шаблон, чтобы добавлять частые работы одним нажатием.</span>';return}
+  list.innerHTML=templates.map(t=>'<div class="tpl-chip"><button type="button" class="tpl-use" onclick="applyTemplate('+Number(t.id)+')">'+icon('box')+'<span>'+esc(t.name)+'</span><span class="tpl-price">'+M(t.price)+'</span></button><button type="button" class="tpl-del" aria-label="Удалить шаблон" title="Удалить шаблон" onclick="deleteTpl(event,'+Number(t.id)+')">'+icon('close')+'</button></div>').join('');
 }
 
 function openTplModal(){
@@ -3111,9 +3132,11 @@ function applyTemplate(id){
   if(selectedDay===null){alert('Сначала выбери день');return}
   const t=templates.find(t=>t.id===id);if(!t)return;
   if(!days[selectedDay])days[selectedDay]=[];
-  days[selectedDay].push({id:Date.now(),name:t.name,qty:'',price:String(t.price)});
+  const workId=Date.now();editingWorkId=String(workId);
+  days[selectedDay].push({id:workId,name:t.name,qty:'',price:String(t.price)});
   save();haptic('light');
   renderDayPanel();renderDayStrip();renderTotal();renderChart();
+  setTimeout(()=>document.querySelector('#dayWorks .is-editing .dw-qty-wrap input')?.focus(),50);
 }
 function applyTemplateFromModal(id){
   applyTemplate(id);
@@ -3763,7 +3786,8 @@ function renderTotal(){
     tog.style.display='none';
   }
   const showNet=hasExp&&totalView==='net';
-  document.getElementById('totalLabel').textContent=showNet?'На руки':'К получению';
+  document.getElementById('totalLabel').textContent=showNet?'На руки':'Заработано';
+  document.getElementById('totalHint').textContent=(showNet?'После расходов':'До расходов')+' · '+(taxEnabled?'НДФЛ 13%':'налог выключен');
   const disp=showNet?net:total;
   const dispEl=document.getElementById('totalDisplay');
   const usd=currencyView==='usd'&&usdRate>0;
@@ -3778,19 +3802,9 @@ function renderTotal(){
   }
   const filledDays=Object.keys(days).filter(d=>daySum(parseInt(d))>0).length;
   const meta=[];
-  if(usd){
-    const fresh=usdRateAt?new Date(usdRateAt).toLocaleDateString('ru-RU',{day:'numeric',month:'short'}):'';
-    meta.push(`<div class="meta-item">Курс: <strong>1 $ = ${usdRate.toFixed(2).replace('.',',')} ₽</strong> <span style="font-weight:400;color:var(--muted)">${usdRateSource}${fresh?' · '+fresh:''}</span></div>`);
-  }
-  if(filledDays>0)meta.push(`<div class="meta-item">Дней: <strong>${filledDays}</strong></div>`);
-  if(base>0)meta.push(`<div class="meta-item">База: <strong>${M(base)}</strong></div>`);
-  if(filledDays>1)meta.push(`<div class="meta-item">Ср/день: <strong>${M(base/filledDays)}</strong></div>`);
-  if(hasExp)meta.push(`<div class="meta-item" style="color:var(--danger)">Расходы: <strong>−${M(expTotal)}</strong></div>`);
-  const days2pay=daysToNextPayday();
-  if(disp>0&&days2pay>0){
-    const perDay=Math.round(disp/days2pay);
-    meta.push(`<div class="meta-item" style="color:var(--accent2)">~${M(perDay)}/день <span style="font-weight:400;color:var(--muted)">до зп (${days2pay} дн.)</span></div>`);
-  }
+  meta.push('<div class="meta-item"><strong>'+filledDays+'</strong><span>'+plWD(filledDays)+'</span></div>');
+  meta.push('<div class="meta-item"><strong>'+M(filledDays?base/filledDays:0)+'</strong><span>в среднем / день</span></div>');
+  if(usd)meta.push('<div class="meta-rate">1 $ = '+usdRate.toFixed(2).replace('.',',')+' ₽</div>');
   document.getElementById('totalMeta').innerHTML=meta.join('');
   renderCompareBadge(disp);
   renderTodaySummary();
@@ -4408,7 +4422,7 @@ async function forceSyncToCloud(){
     const tpl=JSON.parse(localStorage.getItem('salary_templates')||'[]');
     const gl=JSON.parse(localStorage.getItem('salary_goals')||'{"period":0,"week":0,"month":0}');
     gl._counter=counter;  // carry the synced production counter (see goals._counter)
-    const th=localStorage.getItem('salary_theme')||'dark';
+    const th=localStorage.getItem('salary_theme')||'light';
     const r1=await sbClient.from('user_settings').upsert({user_id:currentUser.id,templates:tpl,goals:gl,theme:th,updated_at:new Date().toISOString()},{onConflict:'user_id'});
     if(r1.error)throw r1.error;
     // all periods
@@ -4753,7 +4767,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-10-23 #61';
+const BUILD_VER='2026-10-24 #62';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
@@ -7424,7 +7438,8 @@ renderSyncStatus();       // paint the header sync pill
 checkBackupReminder();    // nudge if a file backup is overdue
 </script>
 <script src="messenger-v2.js?v=9"></script>
-<script src="workspace.js?v=3"></script>
+<script src="workspace.js?v=4"></script>
+<script src="workspace-avatar.js?v=1"></script>
 </body>
 </html>
 
