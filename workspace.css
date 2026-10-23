@@ -228,8 +228,8 @@ body.workspace-app .workspace-period-label{min-width:0;font-size:13px;font-weigh
 body.workspace-app .workspace-period-label small{font-size:10px;color:var(--muted);font-weight:500;margin-top:2px}
 body.workspace-app .workspace-period>.ui-button{font-size:12px;padding:8px 10px;min-height:38px;border-radius:10px}
 body.workspace-app .work-layout{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;margin:18px 16px 28px}
-body.workspace-app .work-overview,body.workspace-app .work-journal{display:grid;gap:14px;min-width:0;align-content:start}
-body.workspace-app .work-layout :is(.total-card,.day-strip-wrap,.day-panel,.today-summary,.templates-section,.tax-row,.cnt-card){margin:0}
+body.workspace-app .work-overview,body.workspace-app .work-journal{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;min-width:0;align-content:start}
+body.workspace-app .work-layout :is(.total-card,.day-strip-wrap,.day-panel,.today-summary,.templates-section,.tax-row,.cnt-card){margin:0;min-width:0}
 body.workspace-app .work-overview .total-card{--muted:#536748;--accent2:#3b654b;--danger:#9b3937;position:relative;background:#dcebbd;color:#213b23;border:1px solid #c9dba6;border-radius:22px;padding:26px 24px;box-shadow:0 10px 24px #07120b0b;min-width:0}
 body.workspace-app .total-card .total-label{font-size:11px;text-transform:none;letter-spacing:.2px;font-weight:650;color:#4e6445;margin-bottom:12px}
 body.workspace-app .total-card .total-amount{font-size:clamp(40px,7vw,62px);font-weight:800;line-height:1.08;letter-spacing:-2.2px;color:#213b23;font-variant-numeric:tabular-nums}
@@ -283,7 +283,7 @@ body.workspace-app .day-panel-header>div:last-child{gap:7px!important;max-width:
 body.workspace-app .copy-day-btn,body.workspace-app .day-type-btn{padding:6px 9px;min-height:32px;font-size:10px;border-radius:8px;background:var(--surface2);border:1px solid var(--border)}
 body.workspace-app .day-works{padding:0 18px}
 body.workspace-app .day-work-row{gap:8px;padding:16px 0}
-body.workspace-app .dw-name{font-size:16px;font-weight:600;background:var(--surface2);border-color:var(--border);border-radius:10px;padding:11px 12px}
+body.workspace-app .dw-name{min-width:0;font-size:16px;font-weight:600;background:var(--surface2);border-color:var(--border);border-radius:10px;padding:11px 12px}
 body.workspace-app .dw-qty-wrap,body.workspace-app .dw-price-wrap{width:100%;min-width:0;border-radius:10px;background:var(--surface2);border:1px solid var(--border)}
 body.workspace-app .dw-qty-wrap input,body.workspace-app .dw-price-wrap input{font-size:16px;font-weight:700;min-width:0}
 body.workspace-app .dw-suffix{font-size:11px;color:var(--muted)}
