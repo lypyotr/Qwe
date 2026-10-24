@@ -35,7 +35,9 @@ try{
   await page.locator('#friendAddInput').fill('10');await page.locator('#friendAddInput').press('Enter');
   check('Enter performs lookup and rejects own ID',await page.locator('#friendAddMsg').innerText()==='Это твой ID');
   await page.locator('#friendAddInput').clear();
-  await page.evaluate(()=>document.getElementById('friendAddMsg').textContent='');
+  await page.locator('#friendSearch').clear();
+  await page.evaluate(()=>{document.getElementById('friendAddMsg').textContent='';document.activeElement.blur();document.getElementById('toastHost').replaceChildren();});
+  check('active navigation label inherits readable text color',await page.evaluate(()=>getComputedStyle(document.querySelector('#navFriends .nav-lbl')).color===getComputedStyle(document.getElementById('navFriends')).color));
   for(const light of [false,true]){
     await page.evaluate(light=>document.body.classList.toggle('light',light),light);
     for(const width of [320,390,768,999,1000,1241,1440]){

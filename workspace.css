@@ -659,3 +659,5 @@ body.workspace-app #page-friends .group-member-picker{display:flex;flex-directio
   body.workspace-app[data-workspace-page="friends"] .workspace-topbar{grid-template-areas:"tools tools" "account account";gap:8px}
   body[data-workspace-page="friends"] .workspace-tools{justify-self:end}
 }
+/* Keep the active navigation label readable on its mint background. */
+body.workspace-app .nav-btn.active .nav-lbl{color:inherit}
