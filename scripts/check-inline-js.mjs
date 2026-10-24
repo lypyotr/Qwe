@@ -45,3 +45,8 @@ for (const m of js.matchAll(/^(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(/gm
 if (dupes) process.exit(1);
 
 console.log(`inline script OK: parses cleanly, ${seen.size} top-level functions, no duplicates`);
+for (const file of ['messenger-v2.js', 'workspace.js', 'workspace-avatar.js', 'sw.js']) {
+  execFileSync(process.execPath, ['--check', file], { stdio: 'inherit' });
+  console.log(`${file} syntax OK`);
+}
+

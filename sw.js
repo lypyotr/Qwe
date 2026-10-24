@@ -1,5 +1,5 @@
-const CACHE='salary-v47';
-const STATIC=['./index.html','./manifest.json','./icon.svg','./messenger-v2.js?v=7'];
+const CACHE='salary-v52';
+const STATIC=['./index.html','./manifest.json','./icon.svg','./messenger-v2.js?v=9','./workspace.css?v=5','./workspace.js?v=5','./workspace-avatar.js?v=1'];
 
 // Dynamic APIs that must NEVER be touched by the service worker: Supabase
 // (REST/auth/realtime) and the exchange-rate sources. Caching these cache-first
@@ -9,12 +9,16 @@ const STATIC=['./index.html','./manifest.json','./icon.svg','./messenger-v2.js?v
 const BYPASS=/(^|\.)(supabase\.co|cbr-xml-daily\.ru|er-api\.com)$/i;
 
 self.addEventListener('install',e=>{
-  e.waitUntil(caches.open(CACHE).then(c=>c.addAll(STATIC)).then(()=>self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then(c=>c.addAll(STATIC)));
+});
+
+// A waiting update is activated only after the user's explicit request.
+self.addEventListener('message',e=>{
+  if(e.data?.type==='SKIP_WAITING')e.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener('activate',e=>{
-  e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));
-  self.clients.claim();
+  e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('salary-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));
 });
 
 self.addEventListener('fetch',e=>{
@@ -65,3 +69,5 @@ self.addEventListener('notificationclick',e=>{
   e.notification.close();
   e.waitUntil(clients.openWindow('/Qwe/'));
 });
+
+

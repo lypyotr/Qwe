@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { chromium } from 'playwright';
 
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json', '.svg': 'image/svg+xml' };
+const MIME = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json', '.svg': 'image/svg+xml' };
 const server = http.createServer((req, res) => {
   const file = path.join(process.cwd(), req.url === '/' ? 'index.html' : decodeURIComponent(req.url.split('?')[0]));
   try {
@@ -87,3 +87,4 @@ for (const r of results) {
 if (!results.length) { console.error('FAIL: no crypto assertions ran'); failed = true; }
 if (failed) process.exit(1);
 console.log(`crypto tests OK: ${results.length} assertions`);
+

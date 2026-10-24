@@ -23,10 +23,41 @@ jobs:
         run: |
           npm init -y >/dev/null
           npm install --no-save playwright
-          npx playwright install --with-deps chromium
+          browser_path="$(command -v google-chrome || command -v chromium || true)"
+          if [ -n "$browser_path" ]; then
+            echo "CHROMIUM_PATH=$browser_path" >> "$GITHUB_ENV"
+          else
+            npx playwright install --with-deps chromium
+          fi
 
       - name: Boot smoke test (headless Chromium)
         run: node scripts/smoke.mjs
 
+      - name: Workspace regression tests (headless Chromium)
+        run: node scripts/workspace-test.mjs
+
+      - name: Design and quick-entry checks (headless Chromium)
+        run: node scripts/design-test.mjs
+
+      - name: Compact journal and avatar tests (headless Chromium)
+        run: node scripts/compact-test.mjs
+
+      - name: Messages dashboard tests (headless Chromium)
+        run: node scripts/messages-test.mjs
+
+      - name: PWA update tests (headless Chromium)
+        run: node scripts/pwa-test.mjs
+
       - name: Crypto-core tests (headless Chromium)
         run: node scripts/crypto-test.mjs
+
+
+      - name: Upload design previews
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workspace-design-previews
+          path: artifacts/design/
+          if-no-files-found: ignore
+          retention-days: 7
+

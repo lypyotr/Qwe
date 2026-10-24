@@ -2,20 +2,20 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Зарплата">
-<meta name="theme-color" content="#6366f1">
+<meta name="theme-color" content="#101816">
 <link rel="manifest" href="manifest.json">
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230d0f14'/><text y='.9em' font-size='72' x='12'>💰</text></svg>">
-<link rel="shortcut icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230d0f14'/><text y='.9em' font-size='72' x='12'>💰</text></svg>">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="shortcut icon" href="icon.svg">
 <!-- CSP: even if an XSS slips through, stolen data has nowhere to go — only
      Supabase, the two rate APIs, fonts and the script CDNs are reachable. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://www.cbr-xml-daily.ru https://open.er-api.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https://*.supabase.co; media-src 'self' blob: https://*.supabase.co; worker-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230d0f14'/><text y='.9em' font-size='72' x='12'>💰</text></svg>">
+<link rel="apple-touch-icon" href="icon.svg">
 <title>Зарплата</title>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -1321,8 +1321,9 @@ body:not(.light) #page-chat .chat-input{background:#2a2a2e;color:#f5f5f7}
   #page-chat .chat-bubble{max-width:84%}
 }
 </style>
+<link rel="stylesheet" href="workspace.css?v=5">
 </head>
-<body>
+<body class="workspace-app">
 
 <!-- AURORA BACKGROUND (shines through frosted glass cards) -->
 <div class="bg-aurora" id="bgAurora"></div>
@@ -1419,15 +1420,23 @@ body:not(.light) #page-chat .chat-input{background:#2a2a2e;color:#f5f5f7}
   </div>
 </div>
 
+<div class="workspace-period" aria-label="Выбор расчётного периода">
+  <button type="button" class="ui-icon" onclick="shiftPeriod(-1)" aria-label="Предыдущий период">‹</button>
+  <button type="button" class="workspace-period-label" onclick="switchPage('period')"><span id="workspacePeriodLabel">Расчётный период</span><small id="workspacePeriodMeta">Выбрать период</small></button>
+  <button type="button" class="ui-icon" onclick="shiftPeriod(1)" aria-label="Следующий период">›</button>
+  <button type="button" class="ui-icon workspace-current-period" id="workspaceCurrentPeriod" onclick="workspaceToday()" aria-label="Текущий период" title="Текущий период">↶</button>
+</div>
+<div class="work-layout"><div class="work-overview">
 <!-- TOTAL CARD -->
 <div class="total-card" id="totalCard">
   <div class="cur-toggle" id="curToggle" onclick="toggleCurrency()" title="Показать в долларах">$</div>
   <div class="total-label" id="totalLabel">Итого к получению</div>
   <div class="total-view-toggle" id="totalViewToggle">
-    <span class="tvt-opt" id="tvtGross" onclick="setTotalView('gross')">Грязными</span>
+    <span class="tvt-opt" id="tvtGross" onclick="setTotalView('gross')">До расходов</span>
     <span class="tvt-opt" id="tvtNet" onclick="setTotalView('net')">На руки</span>
   </div>
   <div class="total-amount" id="totalDisplay">0 <span>₽</span></div>
+  <div class="total-hint" id="totalHint"></div>
   <div class="total-meta" id="totalMeta"></div>
   <div id="compareBadge"></div>
 </div>
@@ -1455,10 +1464,12 @@ body:not(.light) #page-chat .chat-input{background:#2a2a2e;color:#f5f5f7}
   <div class="toggle" id="taxToggle" onclick="toggleTax()"></div>
 </div>
 
+</div><div class="work-journal">
 <!-- DAY GRID -->
 <div class="day-strip-wrap">
-  <div class="day-strip-label">Выбери день</div>
+  <div class="day-strip-label"><span id="workspaceCalendarMonth">Календарь</span><div class="calendar-actions"><button type="button" class="workspace-icon-button" onclick="shiftPeriod(-1)" aria-label="Предыдущий период в календаре"></button><button type="button" class="workspace-icon-button" onclick="shiftPeriod(1)" aria-label="Следующий период в календаре"></button></div></div>
   <div class="day-grid" id="dayStrip"></div>
+  <div class="calendar-hint" id="workspaceCalendarHint">Выберите день для записи</div>
 </div>
 
 <!-- DAY PANEL -->
@@ -1466,9 +1477,10 @@ body:not(.light) #page-chat .chat-input{background:#2a2a2e;color:#f5f5f7}
   <div class="day-panel-header">
     <div class="day-panel-left">
       <div class="day-panel-title" id="dpTitle">—</div>
+      <div class="day-panel-meta" id="dpMeta"></div>
     </div>
     <div style="display:flex;align-items:center;gap:8px">
-      <div class="copy-day-btn" onclick="openCopyModal()" title="Копировать с дня">📋</div>
+      <button type="button" class="copy-day-btn" onclick="openCopyModal()" title="Копировать работы с другого дня">Копировать</button>
       <div class="day-type-btn" id="dayTypeBtn" onclick="toggleDayWorkStatus()"></div>
       <div class="day-panel-sum" id="dpSum"></div>
     </div>
@@ -1476,7 +1488,7 @@ body:not(.light) #page-chat .chat-input{background:#2a2a2e;color:#f5f5f7}
   <div class="day-works" id="dayWorks"></div>
   <div class="photo-section">
     <div class="photo-header">
-      <div class="photo-title">📷 Фото-отчёт<span id="photoCount"></span></div>
+      <div class="photo-title">Фотографии за день<span id="photoCount"></span></div>
       <div class="photo-add-btn" onclick="document.getElementById('photoFileIn').click()">+ Добавить</div>
     </div>
     <div class="photo-grid" id="photoGrid"></div>
@@ -1495,12 +1507,13 @@ body:not(.light) #page-chat .chat-input{background:#2a2a2e;color:#f5f5f7}
   </div>
   <div class="tpl-list" id="tplList"></div>
 </div>
-
+</div></div>
 </div><!-- /page-work -->
 
 <!-- ══ PAGE: PERIOD ══ -->
 <div class="page" id="page-period">
 <div class="synbar"><div class="sync-pill" onclick="openSyncLog()" title="Синхронизация — нажми, чтобы обновить"><span class="sp-dot"></span><span class="sp-txt">—</span></div></div>
+<div class="section-shortcuts"><button class="ui-button" onclick="switchPage('archive')">Архив периодов</button><button class="ui-button" onclick="switchPage('stats')">Статистика</button></div>
 
 <!-- PERIOD CARD -->
 <div class="period-card">
@@ -1630,6 +1643,8 @@ body:not(.light) #page-chat .chat-input{background:#2a2a2e;color:#f5f5f7}
 <!-- ALL PERIODS ARCHIVE -->
 <div class="archive-section" id="archiveSection">
   <div class="archive-title">Все периоды</div>
+  <label class="sr-only" for="archiveSearch">Найти месяц или год</label>
+  <input class="workspace-search" id="archiveSearch" type="search" placeholder="Найти месяц или год…" oninput="renderArchive()">
   <div class="archive-list" id="archiveList"></div>
 </div>
 
@@ -1690,7 +1705,7 @@ body:not(.light) #page-chat .chat-input{background:#2a2a2e;color:#f5f5f7}
 
     <div class="profile-hero">
       <div class="profile-person">
-        <div class="profile-avatar" id="profileAvatar">?</div>
+        <button type="button" class="profile-avatar" id="profileAvatar" onclick="workspaceOpenAvatar()" aria-label="Настройки аватара" aria-haspopup="dialog">?</button>
         <div class="profile-person-main">
           <div class="profile-display-name" id="profileDisplayName">Работник</div>
           <div class="profile-display-info" id="profileDisplayInfo">Добавьте должность или короткий статус</div>
@@ -1899,38 +1914,56 @@ body:not(.light) #page-chat .chat-input{background:#2a2a2e;color:#f5f5f7}
 </div><!-- /page-stats -->
 
 <!-- ══ PAGE: FRIENDS ══ -->
-<div class="page" id="page-friends">
-  <div class="header">
-    <div class="header-left"><div class="header-label">💬 Сообщения</div></div>
-    <div class="sync-pill" onclick="openSyncLog()" title="Синхронизация"><span class="sp-dot"></span><span class="sp-txt">—</span></div>
-  </div>
-  <div class="calc-wrap">
-    <div class="messenger-tabs"><button id="msgPeopleTab" class="active" onclick="msgV2ShowTab('people')">Личные</button><button id="msgGroupsTab" onclick="msgV2ShowTab('groups')">Группы</button></div>
-    <div id="msgGroupsPane" style="display:none">
-      <div class="group-create"><input id="groupTitleInput" maxlength="80" placeholder="Название рабочего чата"><button class="friend-add-btn" onclick="msgV2CreateGroup()">Создать</button></div>
-      <div id="groupsList"><div class="friend-empty">Загрузка…</div></div>
+<div class="page" id="page-friends" aria-label="Сообщения">
+  <div class="messages-heading"><span data-workspace-icon="friends" aria-hidden="true"></span><h2 class="sr-only">Сообщения</h2></div>
+  <div class="calc-wrap messages-dashboard">
+    <div class="messenger-tabs" aria-label="Тип переписки"><button type="button" id="msgPeopleTab" class="active" aria-pressed="true" onclick="msgV2ShowTab('people')">Личные</button><button type="button" id="msgGroupsTab" aria-pressed="false" onclick="msgV2ShowTab('groups')">Группы</button></div>
+    <div id="msgGroupsPane" class="messages-grid" style="display:none">
+      <section class="calc-card message-card" aria-labelledby="groupCreateHeading">
+        <span class="message-card-icon" data-workspace-icon="plus" aria-hidden="true"></span>
+        <h3 class="calc-card-title" id="groupCreateHeading">Новый рабочий чат</h3>
+        <label class="sr-only" for="groupTitleInput">Название чата</label>
+        <div class="group-create"><input id="groupTitleInput" maxlength="80" placeholder="Название чата"><button type="button" id="groupCreateBtn" class="friend-add-btn" onclick="msgV2CreateGroup()">Создать</button></div>
+        <div class="calc-card-sub">Выберите участников из друзей.</div>
+        <div id="groupMemberPicker" class="group-member-picker message-card-list"></div>
+      </section>
+      <section class="calc-card message-card" aria-labelledby="groupsHeading">
+        <span class="message-card-icon" data-workspace-icon="friends" aria-hidden="true"></span>
+        <h3 class="calc-card-title" id="groupsHeading">Мои группы</h3>
+        <div id="groupsList" class="message-card-list"><div class="friend-empty">Загрузка…</div></div>
+      </section>
     </div>
-    <div id="msgPeoplePane">
-    <div class="calc-card">
-      <div class="calc-card-title">Твой ID</div>
-      <div class="calc-card-sub">Назови этот номер другу, чтобы он добавил тебя.</div>
-      <div class="friend-myid" id="friendMyId">#—</div>
-    </div>
-    <div class="calc-card">
-      <div class="calc-card-title">Добавить друга по ID</div>
-      <div class="friend-add-row">
-        <span class="friend-add-hash">#</span>
-        <input class="friend-add-input" id="friendAddInput" type="number" inputmode="numeric" min="1" placeholder="номер" onkeydown="if(event.key==='Enter')friendLookup()">
-        <button class="friend-add-btn" onclick="friendLookup()">Найти</button>
-      </div>
-      <div class="friend-add-msg" id="friendAddMsg"></div>
-    </div>
-    <div id="friendReqWrap" style="display:none">
-      <div class="friend-section-title">Заявки в друзья</div>
-      <div id="friendRequests"></div>
-    </div>
-    <div class="friend-section-title">Мои друзья</div>
-    <div id="friendsList"><div class="friend-empty">Загрузка…</div></div>
+    <div id="msgPeoplePane" class="messages-grid">
+      <section class="calc-card message-card message-id-card" aria-labelledby="myIdHeading">
+        <span class="message-card-icon" data-workspace-icon="profile" aria-hidden="true"></span>
+        <h3 class="calc-card-title" id="myIdHeading">Твой ID</h3>
+        <div class="calc-card-sub">Поделитесь ID с другом.</div>
+        <div class="message-id-row"><div class="friend-myid" id="friendMyId">#—</div></div>
+      </section>
+      <section class="calc-card message-card" aria-labelledby="addFriendHeading">
+        <span class="message-card-icon" data-workspace-icon="userPlus" aria-hidden="true"></span>
+        <h3 class="calc-card-title" id="addFriendHeading">Добавить друга</h3>
+        <label class="sr-only" for="friendAddInput">ID друга</label>
+        <div class="friend-add-row">
+          <span class="friend-add-hash" aria-hidden="true">#</span>
+          <input class="friend-add-input" id="friendAddInput" type="number" inputmode="numeric" min="1" onkeydown="if(event.key==='Enter')friendLookup()">
+        </div>
+        <button type="button" class="friend-add-btn message-find-button" onclick="friendLookup()">Найти</button>
+        <div class="friend-add-msg" id="friendAddMsg" role="status" aria-live="polite"></div>
+      </section>
+      <section class="calc-card message-card message-friends-card" aria-labelledby="friendsHeading">
+        <span class="message-card-icon" data-workspace-icon="users" aria-hidden="true"></span>
+        <h3 class="calc-card-title" id="friendsHeading">Мои друзья</h3>
+        <label class="sr-only" for="friendSearch">Найти друга по имени или ID</label>
+        <input class="workspace-search" id="friendSearch" type="search" placeholder="Имя или ID" oninput="renderFriends()">
+        <div class="message-card-list" tabindex="0" role="region" aria-label="Друзья и заявки">
+          <div id="friendReqWrap" style="display:none">
+            <div class="friend-section-title">Заявки в друзья</div>
+            <div id="friendRequests"></div>
+          </div>
+          <div id="friendsList"><div class="friend-empty">Загрузка…</div></div>
+        </div>
+      </section>
     </div>
   </div>
 </div><!-- /page-friends -->
@@ -1956,7 +1989,7 @@ body:not(.light) #page-chat .chat-input{background:#2a2a2e;color:#f5f5f7}
     <button class="chat-send" style="background:var(--surface2);color:var(--text)" onclick="document.getElementById('chatFileInput').click()" title="Файл или фото">＋</button>
     <button class="chat-send" id="chatVoiceBtn" style="background:var(--surface2);color:var(--text)" onclick="msgV2Voice()" title="Голосовое">🎙</button>
     <button class="chat-send" style="background:var(--surface2);color:var(--text)" onclick="msgV2WorkCard()" title="Карточка работы">☑</button>
-    <textarea class="chat-input" id="chatInput" rows="1" maxlength="4000" placeholder="Сообщение…" oninput="chatInputResize(this);msgV2Typing()" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();chatSend()}"></textarea>
+    <textarea class="chat-input" id="chatInput" rows="1" maxlength="4000" aria-label="Сообщение" placeholder="Сообщение…" oninput="chatInputResize(this);msgV2Typing()" onkeydown="if(event.key==='Enter'&&!event.shiftKey&&!event.isComposing&&(event.ctrlKey||event.metaKey||matchMedia('(hover:hover) and (pointer:fine)').matches)){event.preventDefault();chatSend()}"></textarea>
     <button class="chat-send" id="chatSendBtn" onclick="chatSend()" aria-label="Отправить">➤</button>
   </div>
   </div>
@@ -2154,7 +2187,8 @@ body:not(.light) #page-chat .chat-input{background:#2a2a2e;color:#f5f5f7}
 
 
 <!-- BOTTOM NAV -->
-<nav class="bottom-nav">
+<nav class="bottom-nav" aria-label="Основные разделы">
+  <div class="nav-brand"><span class="brand-mark">З</span><div>Зарплата<small>Работа под контролем</small></div></div>
   <div class="nav-btn active" id="navWork" onclick="switchPage('work')">
     <span class="nav-icon">💰</span>
     <span class="nav-lbl">Работа</span>
@@ -2163,14 +2197,16 @@ body:not(.light) #page-chat .chat-input{background:#2a2a2e;color:#f5f5f7}
     <span class="nav-icon">📋</span>
     <span class="nav-lbl">Период</span>
   </div>
-  <div class="nav-btn" id="navArchive" onclick="switchPage('archive')">
+  <div class="nav-btn desktop-nav" id="navArchive" onclick="switchPage('archive')">
     <span class="nav-icon">📁</span>
     <span class="nav-lbl">Архив</span>
   </div>
   <div class="nav-btn" id="navCalc" onclick="switchPage('calc')">
     <span class="nav-icon">🧮</span>
-    <span class="nav-lbl">Калькуляторы</span>
+    <span class="nav-lbl">Расчёты</span>
   </div>
+  <div class="nav-btn" id="navFriends" onclick="switchPage('friends')"><span class="nav-icon">💬</span><span class="nav-lbl">Сообщения</span><span class="nav-dot" id="navFriendsDot"></span></div>
+  <div class="nav-btn desktop-nav" id="navStats" onclick="switchPage('stats')"><span class="nav-icon">↗</span><span class="nav-lbl">Статистика</span></div>
   <div class="nav-btn" id="navProfile" onclick="switchPage('profile')">
     <span class="nav-icon">👤</span>
     <span class="nav-lbl">Профиль</span>
@@ -2179,7 +2215,7 @@ body:not(.light) #page-chat .chat-input{background:#2a2a2e;color:#f5f5f7}
 </nav>
 
 <!-- Toast / Undo host -->
-<div id="toastHost"></div>
+<div id="toastHost" role="status" aria-live="polite" aria-atomic="true"></div>
 
 <!-- Sync log popup (opened by tapping the sync pill) -->
 <div id="syncLogOverlay" onclick="if(event.target===this)closeSyncLog()">
@@ -2212,6 +2248,7 @@ body:not(.light) #page-chat .chat-input{background:#2a2a2e;color:#f5f5f7}
 //  PAGE NAVIGATION
 // ══════════════════════════════════════════════
 function switchPage(name){
+  if(!document.getElementById('page-'+name))name='work';
   // Admin page is owner-only — quietly bounce everyone else to Работа.
   if((name==='admin'||name==='users')&&!isAdmin())name='work';
   haptic('light');
@@ -2221,7 +2258,7 @@ function switchPage(name){
   if(name==='profile'){initProfilePage();renderBackupReminder();renderEncryptionCard();}
   if(name==='stats')renderStats();
   if(name==='friends')initFriendsPage();
-  if(name!=='chat')stopChatPoll();   // leaving the chat view
+  if(name!=='chat'){stopChatPoll();window.msgV2LeaveChat?.();}
   document.body.classList.toggle('chat-open',name==='chat'); // frees the input bar from the fixed nav
   // Unknown page (corrupted salary_page, future rename) must not strip
   // 'active' from everything and throw — that leaves a blank screen.
@@ -2232,8 +2269,9 @@ function switchPage(name){
   // Admin is reachable from Profile and has no nav button — guard the lookup.
   const navBtn=document.getElementById('nav'+name.charAt(0).toUpperCase()+name.slice(1));
   if(navBtn)navBtn.classList.add('active');
-  window.scrollTo({top:0,behavior:'smooth'});
+  window.scrollTo({top:0,behavior:'instant'});
   try{localStorage.setItem('salary_page',name)}catch(e){}
+  window.workspaceNavigation?.(name);
 }
 function restorePage(){
   try{
@@ -2297,7 +2335,7 @@ const HOLIDAYS=new Set([
   '2026-01-01','2026-01-02','2026-01-07','2026-01-08','2026-01-09',
   '2026-02-23','2026-03-09','2026-05-01','2026-05-11','2026-06-12','2026-11-04',
 ]);
-function isNonWorking(d){const dow=d.getDay(),key=d.toISOString().slice(0,10);return dow===0||dow===6||HOLIDAYS.has(key)}
+function isNonWorking(d){const dow=d.getDay(),key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;return dow===0||dow===6||HOLIDAYS.has(key)}
 function adjustPayDate(date){let d=new Date(date),shifted=false;while(isNonWorking(d)){d.setDate(d.getDate()-1);shifted=true}return{date:d,shifted}}
 
 // Returns true if a day (by day-number in current period) is effectively non-working
@@ -2354,8 +2392,9 @@ function toggleTheme(){
 function loadTheme(){
   try{
     const t=localStorage.getItem('salary_theme');
-    if(t==='light'){lightTheme=true;document.body.classList.add('light');document.getElementById('themeBtn').textContent='🌙'}
-    else{document.getElementById('themeBtn').textContent='☀️'}
+    lightTheme=t!=='dark';
+    document.body.classList.toggle('light',lightTheme);
+    document.getElementById('themeBtn').textContent=lightTheme?'🌙':'☀️';
   }catch(e){}
 }
 
@@ -2385,6 +2424,19 @@ function getPeriod(){
   return{year,month,period,startDay,endDay};
 }
 function saveKey(){const{year,month,period}=getPeriod();return`salary_${year}_${month}_${period}`}
+function periodDayKey(){return 'salary-ui-day:'+(currentUser?.id||'local')+':'+saveKey();}
+function rememberPeriodDay(day){try{localStorage.setItem(periodDayKey(),String(day));}catch(_){} }
+function preferredPeriodDay(){
+  const {year,month,startDay,endDay}=getPeriod();
+  let remembered=0;try{remembered=Number(localStorage.getItem(periodDayKey()));}catch(_){}
+  if(Number.isInteger(remembered)&&remembered>=startDay&&remembered<=endDay)return remembered;
+  const now=new Date(),day=now.getDate();
+  return now.getFullYear()===year&&now.getMonth()===month&&day>=startDay&&day<=endDay?day:startDay;
+}
+function renderTaxToggle(){
+  const toggle=document.getElementById('taxToggle');
+  toggle.classList.toggle('on',taxEnabled);toggle.setAttribute('aria-checked',String(taxEnabled));
+}
 function save(){
   try{
     // Preserve the sync revision (_rev = last cloud updated_at we synced to);
@@ -2407,14 +2459,15 @@ function load(){
     // migrate: if period was saved before per-period expenses, fall back to old global key
     if(data.expenses!==undefined){expenseItems=data.expenses;}
     else{try{const old=JSON.parse(localStorage.getItem('salary_expenses')||'[]');expenseItems=Array.isArray(old)?old:[];}catch(_){expenseItems=[];}}
-    document.getElementById('taxToggle').classList.toggle('on',taxEnabled);
-  }catch(e){days={};bonuses=[];taxEnabled=false;dayOverrides={}}
+  }catch(e){days={};bonuses=[];taxEnabled=false;dayOverrides={};expenseItems=[];}
+  finally{renderTaxToggle();}
 }
 
 function onPeriodChange(){
-  selectedDay=null;load();
+  selectedDay=preferredPeriodDay();rememberPeriodDay(selectedDay);load();
   renderPeriodCard();renderDayStrip();renderDayPanel();renderBonuses();
   renderTotal();renderChart();renderHistory();renderGoals();renderExpenses();
+  window.workspaceRefresh?.();
   // Full cycle (flush → pull → flush) with the watchdog and busy-guard, instead
   // of a raw pull. The broadcast channel is per-user, not per-period — do NOT
   // recreate it here (that dropped pings on every month/period switch).
@@ -2514,6 +2567,7 @@ function renderProfileDashboard(){
   const unread=Object.values(unreadGet()).reduce((a,n)=>a+(Number(n)||0),0);
   set('profileSocialSub',unread?unread+' непрочитанных · открыть':'Друзья и защищённые сообщения');
   set('profileSyncChip',navigator.onLine?'☁ синхронизация':'○ офлайн-режим');
+  window.workspaceRenderAvatar?.();
 }
 
 // ── Sequential public user number (#1, #2, …) ──
@@ -2796,7 +2850,7 @@ function renderDayStrip(){
       hasData?'has-data':''
     ].filter(Boolean).join(' ');
     const sumStr=hasData?fmtShort(convCur(sum)):'';
-    html+=`<div class="${cls}" onclick="selectDay(${d})"><span class="day-num">${d}</span><span class="day-sum">${sumStr}</span></div>`;
+    html+=`<button type="button" class="${cls}" aria-pressed="${isActive}" ${isToday?'aria-current="date"':''} aria-label="${d} ${MG[month]}, ${effectiveOff?'выходной':'рабочий день'}${hasData?', '+esc(M(sum)):''}" onclick="selectDay(${d})"><span class="day-num">${d}</span><span class="day-sum">${sumStr}</span></button>`;
   }
   strip.innerHTML=html;
 }
@@ -2809,6 +2863,7 @@ function fmtShort(n){
 function selectDay(d){
   haptic('light');
   selectedDay=d;
+  rememberPeriodDay(d);
   if(!days[d])days[d]=[];
   renderDayStrip();renderDayPanel();renderChart();
 }
@@ -2822,45 +2877,64 @@ function selectDayFromChart(d){
 // ══════════════════════════════════════════════
 //  DAY PANEL
 // ══════════════════════════════════════════════
+// Compact summaries remain visible; the editor opens only for the selected row.
+let editingWorkId=null;
+function workspaceWorkMarkup(w){
+  const id=Number(w.id),editing=String(w.id)===editingWorkId;
+  const icon=name=>window.workspaceIcon?.(name)||'';
+  const qty=parseFloat(w.qty)||0,price=parseFloat(w.price)||0;
+  return '<div class="day-work-row'+(editing?' is-editing':'')+'" data-work-id="'+esc(String(w.id))+'">'+
+    '<button type="button" class="work-summary" aria-expanded="'+editing+'" aria-controls="work-editor-'+id+'" onclick="workspaceToggleWork('+id+')">'+
+      '<span class="work-summary-heading"><span class="work-summary-name">'+esc(w.name||'Новая работа')+'</span><span class="work-summary-sum">'+M(qty*price)+'</span><span class="work-summary-chevron">'+icon('chevron')+'</span></span>'+
+      '<span class="work-summary-meta"><span>'+icon('box')+'<span class="work-summary-qty">'+qty.toLocaleString('ru')+' шт.</span></span><span>'+icon('coins')+'<span class="work-summary-price">'+M(price)+'/шт.</span></span></span>'+
+    '</button>'+
+    '<div class="work-editor" id="work-editor-'+id+'"'+(editing?'':' hidden')+'>'+
+      '<label class="work-name-field"><span class="work-field-label">Название работы</span><input class="dw-name" type="text" maxlength="160" placeholder="Вид работы" value="'+esc(w.name)+'" oninput="updateWork('+selectedDay+','+id+',\'name\',this.value)"></label>'+
+      '<label><span class="work-field-label">Количество</span><span class="dw-qty-wrap"><input type="number" min="0" step="any" inputmode="decimal" placeholder="0" value="'+esc(String(w.qty))+'" oninput="updateWork('+selectedDay+','+id+',\'qty\',this.value)"><span class="dw-suffix">шт.</span></span></label>'+
+      '<label><span class="work-field-label">За единицу</span><span class="dw-price-wrap"><input type="number" min="0" step="any" inputmode="decimal" placeholder="0" value="'+esc(String(w.price))+'" oninput="updateWork('+selectedDay+','+id+',\'price\',this.value)"><span class="dw-suffix">₽</span></span></label>'+
+      '<div class="work-editor-actions"><button type="button" class="dw-del workspace-icon-button" aria-label="Удалить работу" title="Удалить работу" onclick="delWork('+selectedDay+','+id+')">'+icon('trash')+'</button><button type="button" class="work-done" onclick="workspaceToggleWork('+id+')">'+icon('check')+'Готово</button></div>'+
+    '</div></div>';
+}
+function workspaceToggleWork(id){
+  const opening=editingWorkId!==String(id);
+  editingWorkId=opening?String(id):null;
+  renderDayPanel();
+  const row=[...document.querySelectorAll('#dayWorks .day-work-row')].find(el=>el.dataset.workId===String(id));
+  (row?.querySelector(opening?'.dw-name':'.work-summary'))?.focus({preventScroll:true});
+}
+function workspaceUpdateWorkSummary(w){
+  const row=[...document.querySelectorAll('#dayWorks .day-work-row')].find(el=>el.dataset.workId===String(w.id));
+  if(!row)return;
+  row.querySelector('.work-summary-name').textContent=w.name||'Новая работа';
+  row.querySelector('.work-summary-sum').textContent=M((parseFloat(w.qty)||0)*(parseFloat(w.price)||0));
+  row.querySelector('.work-summary-qty').textContent=(parseFloat(w.qty)||0).toLocaleString('ru')+' шт.';
+  row.querySelector('.work-summary-price').textContent=M(parseFloat(w.price)||0)+'/шт.';
+}
 function renderDayPanel(){
   const panel=document.getElementById('dayPanel');
   if(selectedDay===null){panel.style.display='none';return}
   panel.style.display='';
   const{month,year}=getPeriod();
   const date=new Date(year,month,selectedDay);
-  document.getElementById('dpTitle').textContent=`${selectedDay} ${MG[month]}, ${DOW[date.getDay()]}`;
+  document.getElementById('dpTitle').textContent=selectedDay+' '+MG[month]+', '+DOW[date.getDay()];
   const sum=daySum(selectedDay);
   document.getElementById('dpSum').textContent=sum>0?M(sum):'';
   const btn=document.getElementById('dayTypeBtn');
   if(btn){
-    const off=isDayOff(selectedDay,date);
-    btn.textContent=off?'В':'Р';
+    const off=isDayOff(selectedDay,date),label=off?'Выходной':'Рабочий день';
+    btn.innerHTML=window.workspaceIcon?workspaceIcon(off?'sun':'work'):label;
+    btn.setAttribute('aria-label',label+'. Изменить тип дня');
+    btn.title=label+'. Изменить тип дня';
     btn.className='day-type-btn '+(off?'is-off':'is-work');
   }
   const works=days[selectedDay]||[];
+  const qty=works.reduce((total,w)=>total+(parseFloat(w.qty)||0),0);
+  document.getElementById('dpMeta').textContent=works.length+' '+(works.length===1?'работа':works.length<5&&works.length>1?'работы':'работ')+' · '+qty.toLocaleString('ru')+' шт.';
   const container=document.getElementById('dayWorks');
-  if(!works.length){
-    container.innerHTML='<div class="empty" style="padding:14px 4px;font-size:12px">Нет работ — нажми «+» ниже</div>';
-  } else {
-    container.innerHTML=works.map(w=>`
-      <div class="day-work-row">
-        <input class="dw-name" type="text" placeholder="Вид работы" value="${esc(w.name)}"
-          oninput="updateWork(${selectedDay},${w.id},'name',this.value)">
-        <div class="dw-qty-wrap">
-          <input type="number" inputmode="decimal" placeholder="кол" value="${w.qty}"
-            oninput="updateWork(${selectedDay},${w.id},'qty',this.value)">
-          <span class="dw-suffix">шт</span>
-        </div>
-        <div class="dw-price-wrap">
-          <input type="number" inputmode="decimal" placeholder="ставка" value="${w.price}"
-            oninput="updateWork(${selectedDay},${w.id},'price',this.value)">
-          <span class="dw-suffix">₽</span>
-        </div>
-        <div class="dw-del" onclick="delWork(${selectedDay},${w.id})">✕</div>
-      </div>`).join('');
-  }
+  container.innerHTML=works.length?works.map(workspaceWorkMarkup).join(''):'<div class="journal-empty"><strong>Здесь начнётся рабочий день</strong><p>Добавьте работу, количество и цену — сумма посчитается сама.</p></div>';
   renderTodaySummary();
   renderDayPhotos();
+  window.workspaceOverview?.();
 }
 
 // ══════════════════════════════════════════════
@@ -2992,7 +3066,9 @@ function addWork(){
   if(selectedDay===null)return;
   haptic('medium');
   if(!days[selectedDay])days[selectedDay]=[];
-  days[selectedDay].push({id:Date.now(),name:'',qty:'',price:''});
+  const id=Date.now();
+  editingWorkId=String(id);
+  days[selectedDay].push({id,name:'',qty:'',price:''});
   save();
   renderDayPanel();renderDayStrip();renderTotal();renderChart();renderGoals();
   setTimeout(()=>{const inputs=document.querySelectorAll('.dw-name');if(inputs.length)inputs[inputs.length-1].focus()},50);
@@ -3009,6 +3085,7 @@ function updateWork(day,id,field,value){
   const w=(days[day]||[]).find(w=>w.id===id);
   if(!w)return;
   w[field]=value;save();
+  workspaceUpdateWorkSummary(w);
   const sum=daySum(day);
   document.getElementById('dpSum').textContent=sum>0?M(sum):'';
   renderDayStrip();renderTotal();renderChart();renderGoals();
@@ -3021,14 +3098,9 @@ function loadTemplates(){try{templates=JSON.parse(localStorage.getItem('salary_t
 function saveTemplates(){try{localStorage.setItem('salary_templates',JSON.stringify(templates))}catch(e){}saveSettingsToFirestore();}
 
 function renderTemplates(){
-  const list=document.getElementById('tplList');
-  if(!templates.length){list.innerHTML='<span class="tpl-empty">Шаблоны пусты</span>';return}
-  list.innerHTML=templates.map(t=>`
-    <div class="tpl-chip" onclick="applyTemplate(${t.id})">
-      <span>${esc(t.name)}</span>
-      <span class="tpl-price">${M(t.price)}</span>
-      <span class="tpl-del" onclick="deleteTpl(event,${t.id})">✕</span>
-    </div>`).join('');
+  const list=document.getElementById('tplList'),icon=name=>window.workspaceIcon?.(name)||'';
+  if(!templates.length){list.innerHTML='<span class="tpl-empty">Создайте шаблон, чтобы добавлять частые работы одним нажатием.</span>';return}
+  list.innerHTML=templates.map(t=>'<div class="tpl-chip"><button type="button" class="tpl-use" onclick="applyTemplate('+Number(t.id)+')">'+icon('box')+'<span>'+esc(t.name)+'</span><span class="tpl-price">'+M(t.price)+'</span></button><button type="button" class="tpl-del" aria-label="Удалить шаблон" title="Удалить шаблон" onclick="deleteTpl(event,'+Number(t.id)+')">'+icon('close')+'</button></div>').join('');
 }
 
 function openTplModal(){
@@ -3053,7 +3125,8 @@ function renderTplModal(){
 function saveTpl(){
   const name=document.getElementById('tplNameIn').value.trim();
   const price=parseFloat(document.getElementById('tplPriceIn').value)||0;
-  if(!name)return;
+  if(!name){toast('Введите название шаблона');document.getElementById('tplNameIn').focus();return;}
+  if(!Number.isFinite(price)||price<=0){toast('Укажите цену больше нуля');document.getElementById('tplPriceIn').focus();return;}
   templates.push({id:Date.now(),name,price});
   saveTemplates();haptic('light');
   document.getElementById('tplNameIn').value='';
@@ -3070,9 +3143,11 @@ function applyTemplate(id){
   if(selectedDay===null){alert('Сначала выбери день');return}
   const t=templates.find(t=>t.id===id);if(!t)return;
   if(!days[selectedDay])days[selectedDay]=[];
-  days[selectedDay].push({id:Date.now(),name:t.name,qty:'',price:String(t.price)});
+  const workId=Date.now();editingWorkId=String(workId);
+  days[selectedDay].push({id:workId,name:t.name,qty:'',price:String(t.price)});
   save();haptic('light');
   renderDayPanel();renderDayStrip();renderTotal();renderChart();
+  setTimeout(()=>document.querySelector('#dayWorks .is-editing .dw-qty-wrap input')?.focus(),50);
 }
 function applyTemplateFromModal(id){
   applyTemplate(id);
@@ -3228,7 +3303,7 @@ function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').repla
 function toggleTax(){
   haptic('light');
   taxEnabled=!taxEnabled;
-  document.getElementById('taxToggle').classList.toggle('on',taxEnabled);
+  renderTaxToggle();
   save();renderTotal();renderGoals();
 }
 
@@ -3609,15 +3684,18 @@ function nextPaydayInfo(){
   const today=new Date();
   const y=today.getFullYear(),m=today.getMonth(),d=today.getDate();
   const t=new Date(y,m,d);
-  // period 1 (1–15) pays on 22nd same month; period 2 (16–end) pays on 7th next month
-  let candidate=d<=15?new Date(y,m,22):new Date(y,m+1,7);
-  // if that date is already past, take the other one
-  if(candidate<t)candidate=d<=15?new Date(y,m+1,7):new Date(y,m+1,22);
-  const{date:payDate}=adjustPayDate(candidate);
-  const days=Math.round((payDate-t)/86400000);
-  // ~22nd = аванс, ~7th = зарплата
-  const label=payDate.getDate()>=20?'аванса':'зарплаты';
-  return{date:payDate,days,label};
+  // Pick the nearest actual payment, including the 7th early in the month.
+  // Adjust each candidate BEFORE comparing it with today.
+  const candidates=[];
+  for(let offset=0;offset<3;offset++){
+    for(const [day,label] of [[7,'зарплаты'],[22,'аванса']]){
+      const {date}=adjustPayDate(new Date(y,m+offset,day));
+      if(date>=t)candidates.push({date,label});
+    }
+  }
+  candidates.sort((a,b)=>a.date-b.date);
+  const next=candidates[0];
+  return{...next,days:Math.round((next.date-t)/86400000)};
 }
 function daysToNextPayday(){return nextPaydayInfo().days;}
 
@@ -3719,7 +3797,8 @@ function renderTotal(){
     tog.style.display='none';
   }
   const showNet=hasExp&&totalView==='net';
-  document.getElementById('totalLabel').textContent=showNet?'На руки':'К получению';
+  document.getElementById('totalLabel').textContent=showNet?'На руки':'Заработано';
+  document.getElementById('totalHint').textContent=(showNet?'После расходов':'До расходов')+' · '+(taxEnabled?'НДФЛ 13%':'налог выключен');
   const disp=showNet?net:total;
   const dispEl=document.getElementById('totalDisplay');
   const usd=currencyView==='usd'&&usdRate>0;
@@ -3734,22 +3813,13 @@ function renderTotal(){
   }
   const filledDays=Object.keys(days).filter(d=>daySum(parseInt(d))>0).length;
   const meta=[];
-  if(usd){
-    const fresh=usdRateAt?new Date(usdRateAt).toLocaleDateString('ru-RU',{day:'numeric',month:'short'}):'';
-    meta.push(`<div class="meta-item">Курс: <strong>1 $ = ${usdRate.toFixed(2).replace('.',',')} ₽</strong> <span style="font-weight:400;color:var(--muted)">${usdRateSource}${fresh?' · '+fresh:''}</span></div>`);
-  }
-  if(filledDays>0)meta.push(`<div class="meta-item">Дней: <strong>${filledDays}</strong></div>`);
-  if(base>0)meta.push(`<div class="meta-item">База: <strong>${M(base)}</strong></div>`);
-  if(filledDays>1)meta.push(`<div class="meta-item">Ср/день: <strong>${M(base/filledDays)}</strong></div>`);
-  if(hasExp)meta.push(`<div class="meta-item" style="color:var(--danger)">Расходы: <strong>−${M(expTotal)}</strong></div>`);
-  const days2pay=daysToNextPayday();
-  if(disp>0&&days2pay>0){
-    const perDay=Math.round(disp/days2pay);
-    meta.push(`<div class="meta-item" style="color:var(--accent2)">~${M(perDay)}/день <span style="font-weight:400;color:var(--muted)">до зп (${days2pay} дн.)</span></div>`);
-  }
+  meta.push('<div class="meta-item"><strong>'+filledDays+'</strong><span>'+plWD(filledDays)+'</span></div>');
+  meta.push('<div class="meta-item"><strong>'+M(filledDays?base/filledDays:0)+'</strong><span>в среднем / день</span></div>');
+  if(usd)meta.push('<div class="meta-rate">1 $ = '+usdRate.toFixed(2).replace('.',',')+' ₽</div>');
   document.getElementById('totalMeta').innerHTML=meta.join('');
   renderCompareBadge(disp);
   renderTodaySummary();
+  window.workspaceOverview?.();
 }
 
 function renderTodaySummary(){
@@ -3960,7 +4030,7 @@ function renderArchive(){
     }catch(e){return null;}
   }).filter(Boolean);
 
-  if(!items.length){list.innerHTML='<div style="opacity:.4;font-size:13px;padding:8px 4px">Нет сохранённых периодов</div>';return;}
+  if(!items.length){list.innerHTML='<div class="empty">Здесь появятся сохранённые периоды. Добавьте первую работу в дневнике.</div>';return;}
 
   // group by year+month
   const months=new Map();
@@ -3971,7 +4041,9 @@ function renderArchive(){
   });
 
   // sort months descending
-  const sorted=[...months.values()].sort((a,b)=>b.y-a.y||b.m-a.m);
+  const query=(document.getElementById('archiveSearch')?.value||'').trim().toLocaleLowerCase('ru');
+  const sorted=[...months.values()].filter(item=>(MN[item.m]+' '+item.y+' '+String(item.m+1).padStart(2,'0')+'.'+item.y).toLocaleLowerCase('ru').includes(query)).sort((a,b)=>b.y-a.y||b.m-a.m);
+  if(!sorted.length){list.innerHTML='<div class="empty">Периодов не найдено. Попробуйте название месяца или год.</div>';return;}
 
   list.innerHTML=sorted.map(({y,m,periods})=>{
     const endD=new Date(y,m+1,0).getDate();
@@ -3999,6 +4071,8 @@ function renderArchive(){
 }
 
 function goToHistory(monthVal,period){
+  const [year,month]=monthVal.split('-').map(Number);
+  ensureMonthOption(year,month);
   document.getElementById('monthSel').value=monthVal;
   document.getElementById('periodSel').value=String(period);
   onPeriodChange();
@@ -4359,7 +4433,7 @@ async function forceSyncToCloud(){
     const tpl=JSON.parse(localStorage.getItem('salary_templates')||'[]');
     const gl=JSON.parse(localStorage.getItem('salary_goals')||'{"period":0,"week":0,"month":0}');
     gl._counter=counter;  // carry the synced production counter (see goals._counter)
-    const th=localStorage.getItem('salary_theme')||'dark';
+    const th=localStorage.getItem('salary_theme')||'light';
     const r1=await sbClient.from('user_settings').upsert({user_id:currentUser.id,templates:tpl,goals:gl,theme:th,updated_at:new Date().toISOString()},{onConflict:'user_id'});
     if(r1.error)throw r1.error;
     // all periods
@@ -4617,11 +4691,51 @@ function restoreScroll(){
 
 // ── SHARE RANK CARD ──
 // ── PWA / SERVICE WORKER ──
+let pwaRegistration=null,pwaReloadPending=false;
+function pwaOperationBusy(){
+  return !!(window.msgV2Sending||window.msgV2CreatingGroup||window.msgV2Uploads||window.msgV2VoiceStarting||window.msgV2Recorder?.state==='recording');
+}
+function showPWAUpdate(){
+  let banner=document.getElementById('pwaUpdateBanner');
+  if(!banner){
+    banner=document.createElement('div');banner.id='pwaUpdateBanner';banner.className='pwa-update-banner';banner.setAttribute('role','status');
+    banner.innerHTML='<span>Доступна новая версия приложения</span><button type="button" class="ui-button primary" id="pwaUpdateBtn">Обновить</button><button type="button" class="ui-button" id="pwaUpdateLater">Позже</button>';
+    document.body.append(banner);
+    document.getElementById('pwaUpdateBtn').addEventListener('click',applyPWAUpdate);
+    document.getElementById('pwaUpdateLater').addEventListener('click',()=>{banner.hidden=true;});
+  }
+  banner.hidden=false;
+}
+function applyPWAUpdate(){
+  if(pwaOperationBusy()){toast('Дождитесь отправки или завершите запись перед обновлением.');return;}
+  if(window.msgV2SaveDraft&&!msgV2SaveDraft())return;
+  if(!pwaRegistration?.waiting)return;
+  const button=document.getElementById('pwaUpdateBtn');button.disabled=true;button.textContent='Обновляем…';
+  pwaRegistration.waiting.postMessage({type:'SKIP_WAITING'});
+}
+function watchPWARegistration(registration){
+  pwaRegistration=registration;
+  let controlled=!!navigator.serviceWorker.controller;
+  const notice=()=>{if(registration.waiting&&navigator.serviceWorker.controller)showPWAUpdate();};
+  const watchInstalling=()=>{
+    const worker=registration.installing;
+    worker?.addEventListener('statechange',()=>{if(worker.state==='installed')notice();});
+  };
+  registration.addEventListener('updatefound',watchInstalling);watchInstalling();notice();
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    if(!controlled){controlled=true;return;}
+    if(pwaReloadPending)return;pwaReloadPending=true;
+    const reloadWhenReady=()=>{
+      if(pwaOperationBusy()){setTimeout(reloadWhenReady,1000);return;}
+      if(window.msgV2SaveDraft&&!msgV2SaveDraft()){pwaReloadPending=false;showPWAUpdate();return;}
+      window.location.reload();
+    };
+    reloadWhenReady();
+  });
+}
 function initPWA(){
-  if('serviceWorker' in navigator){
-    navigator.serviceWorker.register('./sw.js').catch(()=>{});
-    // Reload page when a new SW takes control so users always get fresh HTML
-    navigator.serviceWorker.addEventListener('controllerchange',()=>window.location.reload());
+  if('serviceWorker' in navigator&&!['localhost','127.0.0.1'].includes(location.hostname)){
+    navigator.serviceWorker.register('./sw.js').then(watchPWARegistration).catch(()=>{});
   }
   checkDailyReminder();
 }
@@ -4664,7 +4778,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-06-24 #58';
+const BUILD_VER='2026-10-24 #63';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
@@ -5588,6 +5702,7 @@ function initSupabase(){
         // lets the lock release first.
         setTimeout(()=>enterApp(session.user),0);
       }else if(event==='SIGNED_OUT'){
+        window.msgV2ResetSession?.();
         currentUser=null;
         // Drop the messaging identity so the next account on this browser
         // doesn't inherit it.
@@ -5622,9 +5737,11 @@ function initSupabase(){
 // or kick the user back to the login screen.
 let _cloudLoaded=false;
 function enterApp(user){
+  if(currentUser?.id!==user.id)window.msgV2ResetSession?.();
   currentUser=user;
   showAuthOverlay(false);
   load();                 // local data first
+  selectedDay=preferredPeriodDay();
   renderAll();            // render immediately
   hideLoader();           // never wait on the network
   refreshAdminUI();       // show/hide the owner-only admin tab
@@ -5763,6 +5880,7 @@ async function doLogout(){
   // directly (data is synced; local data survives the logout).
   if(_loggingOut)return;
   _loggingOut=true;
+  window.msgV2ResetSession?.();
   // Instant visual feedback so a slow network can never look like a dead button.
   const btn=document.getElementById('logoutBtn');
   if(btn){btn.disabled=true;btn.textContent='Выхожу…';}
@@ -6407,9 +6525,19 @@ function toast(text,onUndo,ms){
   clearTimeout(_toastTimer);_toastTimer=setTimeout(close,dur);
 }
 // Snapshot the current period's editable state for a one-step undo.
-function periodSnapshot(){return JSON.parse(JSON.stringify({days,bonuses,taxEnabled,dayOverrides,expenses:expenseItems}));}
+function periodSnapshot(){return JSON.parse(JSON.stringify({period:getPeriod(),days,bonuses,taxEnabled,dayOverrides,expenses:expenseItems}));}
 function restorePeriodSnapshot(s){
+  if(s.period){
+    const {year,month,period}=s.period;
+    ensureMonthOption(year,month);
+    document.getElementById('monthSel').value=`${year}-${month}`;
+    document.getElementById('periodSel').value=String(period);
+    const {startDay,endDay}=getPeriod();
+    if(selectedDay===null||selectedDay<startDay||selectedDay>endDay)selectedDay=startDay;
+    renderPeriodCard();window.workspaceRefresh?.();
+  }
   days=s.days||{};bonuses=s.bonuses||[];taxEnabled=!!s.taxEnabled;dayOverrides=s.dayOverrides||{};expenseItems=s.expenses||[];
+  renderTaxToggle();rememberPeriodDay(selectedDay);
   save(); // persists the whole period payload (expenses included) + queues sync
   renderDayStrip();renderDayPanel();renderBonuses();renderTotal();renderChart();renderGoals();renderExpenses();
 }
@@ -6786,8 +6914,8 @@ function unreadSet(m){try{localStorage.setItem(UNREAD_KEY,JSON.stringify(m));}ca
 function bumpUnread(fid){const m=unreadGet();m[fid]=(m[fid]||0)+1;unreadSet(m);renderFriends();}
 function clearUnread(fid){const m=unreadGet();if(m[fid]){delete m[fid];unreadSet(m);}renderFriends();}
 function renderNavUnread(){
-  const dot=document.getElementById('navProfileDot');if(!dot)return;
-  const m=unreadGet();dot.style.display=Object.values(m).some(n=>n>0)?'block':'none';
+  const hasUnread=Object.values(unreadGet()).some(n=>n>0);
+  for(const id of ['navFriendsDot','navProfileDot']){const dot=document.getElementById(id);if(dot)dot.style.display=hasUnread?'block':'none';}
 }
 // Recount unread from the server against the last-read marks.
 async function recountUnread(){
@@ -6988,25 +7116,31 @@ if(kind === 'req'){
 } else if(kind === 'friend'){
   action = `<button class="friend-row-btn danger" onclick="event.stopPropagation();removeFriend('${id}')">Удалить</button>`;
 }
-  const click=kind==='friend'?`onclick="openChat('${id}')"`:'';
   const un=kind==='friend'?(unreadGet()[id]||0):0;
-  return `<div class="friend-row" ${click}>
-    <div class="friend-av">${esc(_avatar(id))}</div>
-    <div class="friend-info"><div class="friend-name">${esc(_pname(id))}</div><div class="friend-id">${_pseq(id)}</div></div>
+  const tag=kind==='friend'?'button':'div';
+  const open=kind==='friend'?`type="button" onclick="openChat('${id}')" aria-label="Открыть чат с ${esc(_pname(id))}"`:'';
+  return `<div class="friend-row">
+    <${tag} class="friend-open" ${open}>
+    <span class="friend-av">${esc(_avatar(id))}</span>
+    <span class="friend-info"><span class="friend-name">${esc(_pname(id))}</span><span class="friend-id">${_pseq(id)}</span></span>
     ${un?`<span class="friend-unread">${un>99?'99+':un}</span>`:''}
+    </${tag}>
     ${action}
   </div>`;
 }
 function renderFriends(){
+  window.msgV2RenderMembers?.();
   const reqWrap=document.getElementById('friendReqWrap'),reqEl=document.getElementById('friendRequests'),list=document.getElementById('friendsList');
   if(reqWrap&&reqEl){
     if(_reqCache.length){reqWrap.style.display='';reqEl.innerHTML=_reqCache.map(id=>friendRowHtml(id,'req')).join('');}
     else reqWrap.style.display='none';
   }
   if(list){
-    const rows=_friendsCache.map(id=>friendRowHtml(id,'friend')).join('')
-             +_outCache.map(id=>friendRowHtml(id,'out')).join('');
-    list.innerHTML=rows||'<div class="friend-empty">Пока нет друзей. Добавь по ID выше.</div>';
+    const query=(document.getElementById('friendSearch')?.value||'').trim().toLocaleLowerCase('ru');
+    const matches=id=>(_pname(id)+' '+_pseq(id)).toLocaleLowerCase('ru').includes(query);
+    const rows=_friendsCache.filter(matches).map(id=>friendRowHtml(id,'friend')).join('')
+             +_outCache.filter(matches).map(id=>friendRowHtml(id,'out')).join('');
+    list.innerHTML=rows||`<div class="friend-empty">${query?'Никого не найдено. Попробуйте другое имя или ID.':'Пока нет друзей. Добавьте друга по ID выше.'}</div>`;
   }
 }
 
@@ -7088,6 +7222,7 @@ async function openChat(fid){
   // stale if they rotated their key, and every message would silently fail.
   delete _profileCache[fid];delete _convKeys[fid];
   await loadProfiles([fid]);
+  if(typeof msgV2RequestedPeer!=='undefined'&&msgV2RequestedPeer!==fid)return;
   _chatFriend={id:fid,pubkey:(_profileCache[fid]||{}).pubkey};
   document.getElementById('chatTitle').textContent=_pname(fid);
   document.getElementById('chatSub').textContent='🔒 зашифровано '+_pseq(fid);
@@ -7096,6 +7231,7 @@ async function openChat(fid){
   markReadNow(fid);clearUnread(fid);
   switchPage('chat');
   await loadChatMessages();
+  if(!_chatFriend||_chatFriend.id!==fid||!document.getElementById('page-chat').classList.contains('active'))return;
   markReadNow(fid);   // everything shown is now read
   startChatPoll();
 }
@@ -7279,6 +7415,7 @@ function renderAll(){
   renderDayStrip();renderDayPanel();renderBonuses();renderTemplates();
   renderHistory();renderArchive();renderTodaySummary();renderAchievements();
   renderProfile();renderSyncStatus();
+  window.workspaceRefresh?.();
 }
 
 // ══════════════════════════════════════════════
@@ -7311,6 +7448,10 @@ autoBackupLocal();        // roll a local safety snapshot (~daily)
 renderSyncStatus();       // paint the header sync pill
 checkBackupReminder();    // nudge if a file backup is overdue
 </script>
-<script src="messenger-v2.js?v=7"></script>
+<script src="messenger-v2.js?v=9"></script>
+<script src="workspace.js?v=5"></script>
+<script src="workspace-avatar.js?v=1"></script>
 </body>
 </html>
+
+
