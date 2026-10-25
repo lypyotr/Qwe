@@ -4778,7 +4778,7 @@ function dismissNotifBanner(){
 //  SUPABASE AUTH + DATABASE
 // ══════════════════════════════════════════════
 let settingsSaveTimer=null;
-const BUILD_VER='2026-10-24 #63';
+const BUILD_VER='2026-10-25 #64';
 const SUPABASE_URL='https://mqjzhewgdegchnpjbiwb.supabase.co';
 const SUPABASE_KEY='sb_publishable_brun-J-gR1OldLck7v2auA_wZx_Pcaw';
 
@@ -5605,27 +5605,39 @@ window.addEventListener('unhandledrejection',ev=>{
 });
 
 async function fetchWithRetry(input,init){
-  // Balance two failure modes on DPI/throttled networks:
-  //  • reset connections fail fast → extra tries are cheap and help;
-  //  • SILENTLY HUNG connections wait the whole timeout, so keep the timeout
-  //    short and the try-count modest, otherwise a single request can stall for
-  //    over a minute and the sync indicator spins forever.
-  const tries=3,perTry=15000;
+  const tries=3,perTry=8000;
+  const callerSignal=init?.signal||(input instanceof Request?input.signal:null);
   let lastErr;
   for(let i=0;i<tries;i++){
+    if(callerSignal?.aborted)throw callerSignal.reason||new DOMException('Aborted','AbortError');
     const ctrl=new AbortController();
-    const timer=setTimeout(()=>ctrl.abort(),perTry);
-    // keepalive lets a write survive the tab being closed/backgrounded
-    // (pagehide flush) — but browsers cap keepalive bodies at ~64 KB, so
-    // only small payloads get it.
+    const cancel=()=>ctrl.abort(callerSignal.reason);
+    callerSignal?.addEventListener('abort',cancel,{once:true});
+    let timer;
+    const deadline=new Promise((_,reject)=>{
+      timer=setTimeout(()=>{
+        const error=new DOMException('Истекло время получения ответа','TimeoutError');
+        ctrl.abort(error);reject(error);
+      },perTry);
+    });
     const keep=document.visibilityState==='hidden'
       &&(!init||!init.body||(typeof init.body==='string'&&init.body.length<60000));
     try{
-      return await fetch(input,{...init,signal:ctrl.signal,...(keep?{keepalive:true}:{})});
+      // fetch() resolves at HEADERS. Keep the deadline active until the BODY
+      // arrives too: an idle HTTP/2 stream can stall or fail after headers.
+      return await Promise.race([(async()=>{
+        const response=await fetch(input,{...init,signal:ctrl.signal,...(keep?{keepalive:true}:{})});
+        if(!response.body)return response;
+        const body=await response.arrayBuffer();
+        return new Response(body,{status:response.status,statusText:response.statusText,headers:response.headers});
+      })(),deadline]);
     }catch(e){
+      if(callerSignal?.aborted)throw callerSignal.reason||e;
       lastErr=e;
-      if(i<tries-1)await new Promise(r=>setTimeout(r,500*(i+1)+Math.random()*300));
-    }finally{clearTimeout(timer);}
+    }finally{
+      clearTimeout(timer);callerSignal?.removeEventListener('abort',cancel);
+    }
+    if(i<tries-1)await new Promise(r=>setTimeout(r,500*(i+1)+Math.random()*300));
   }
   throw lastErr;
 }
@@ -5961,7 +5973,7 @@ async function loadAllUserData(){
   // A real read failure (network/RLS) is now visible instead of silently doing
   // nothing while the pill claims "synced".
   _syncError=!_pullOk;
-  if(!_pullOk)syncLog('err','не удалось прочитать из облака');
+  if(!_pullOk)syncLog('err','Не удалось прочитать из облака: соединение прервано или сервер отклонил запрос. Локальные записи сохранены.');
   // Cross-device detection: if the account's rows are encrypted but this device
   // didn't know yet, turn E2EE on and unlock (or lock) before reading anything.
   if(!e2eeOn){
@@ -6223,9 +6235,10 @@ async function refreshFromCloud(force){
   const now=Date.now();
   if(!force&&now-_lastRefresh<3000)return;
   _refreshing=true;_lastRefresh=now;renderSyncStatus();
-  // Watchdog: never let the "busy" state hang forever on a dead/slow network.
-  // If the whole cycle exceeds the cap, give up, surface an error, and free the
-  // flag so the next attempt (or a tap) can run.
+  // Transport deadlines cover complete responses. Keep this cycle exclusive
+  // until its work settles; abandoning it would allow late reads to overlap
+  // the next merge or upload. A long cycle gets a progress message, not a
+  // false timeout while its requests are still running.
   const work=(async()=>{
     await flushPending();
     await loadAllUserData();   // pull + timestamp merge (skips queued keys)
@@ -6233,10 +6246,11 @@ async function refreshFromCloud(force){
     await flushPending();      // upload legacy/local-only periods found in merge
     renderAll();
   })();
-  const guard=new Promise((_,rej)=>setTimeout(()=>rej(new Error('refresh timeout')),30000));
-  try{await Promise.race([work,guard]);}
-  catch(e){_syncError=true;syncLog('err','таймаут синхронизации (30с)');console.error('refreshFromCloud',e);}
+  const guard=setTimeout(()=>syncLog('net','Синхронизация ещё выполняется; ожидаем завершения запросов'),30000);
+  try{await work;}
+  catch(e){_syncError=true;syncLog('err','Ошибка синхронизации: '+(e?.name||'Error'));console.error('refreshFromCloud',e);}
   finally{
+    clearTimeout(guard);
     _refreshing=false;renderSyncStatus();
     if(_refreshQueued){_refreshQueued=false;setTimeout(()=>refreshFromCloud(true),300);}
   }

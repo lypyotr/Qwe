@@ -19,6 +19,9 @@ jobs:
       - name: Inline script static checks
         run: node scripts/check-inline-js.mjs
 
+      - name: Sync transport regression checks
+        run: node scripts/sync-test.mjs
+
       - name: Install Playwright
         run: |
           npm init -y >/dev/null
