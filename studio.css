@@ -453,3 +453,37 @@ body.studio.chat-open .bottom-nav{display:none}
 @media(prefers-reduced-motion:reduce){
   body.studio *,body.studio *::before,body.studio *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
 }
+
+/* Motion revision: visible orbital motion and tactile controls. */
+body.studio .studio-subtitle:empty,body.studio .studio-header-note:empty,
+body.studio .studio-auth-welcome:empty,body.studio .studio-hero-caption{display:none}
+body.studio .page{animation:none}
+body.studio .studio-orbit{opacity:.32}
+body.studio .studio-orbit svg{animation:studio-spin 14s linear infinite}
+body.studio .studio-auth-orbit{opacity:.25}
+body.studio .studio-auth-orbit svg{animation:studio-spin 18s linear infinite}
+body.studio .studio-rail-orbit svg{animation:studio-spin 16s linear infinite}
+body.studio .studio-asterisk{animation:studio-spin 8s linear infinite}
+body.studio :is(.studio-orbit,.studio-auth-orbit,.studio-rail-orbit) ellipse{
+  transform-box:fill-box;transform-origin:center;animation:studio-orbit-breathe 5s ease-in-out infinite alternate;
+}
+body.studio :is(.studio-orbit,.studio-auth-orbit,.studio-rail-orbit) ellipse:nth-child(2){animation-delay:-1.7s}
+body.studio :is(.studio-orbit,.studio-auth-orbit,.studio-rail-orbit) ellipse:nth-child(3){animation-delay:-3.3s}
+body.studio .total-card{isolation:isolate}
+body.studio .total-card::after{
+  content:"";position:absolute;inset:-60%;pointer-events:none;z-index:0;
+  background:linear-gradient(115deg,transparent 42%,#ffffff35 49%,transparent 56%);
+  animation:studio-light-pass 7s ease-in-out infinite;
+}
+body.studio :is(button,.day-cell,.work-summary){transition:background .2s,border-color .2s,box-shadow .25s,translate .3s}
+@media(hover:hover){
+  body.studio :is(.work-card,.hist-card,.calc-card){transition:translate .35s,box-shadow .35s}
+  body.studio :is(.work-card,.hist-card,.calc-card):hover{translate:0 -4px;box-shadow:0 12px 28px #0000000c}
+  body.studio .day-cell:hover{translate:0 -4px}
+  body.studio .nav-btn:hover .nav-icon{transform:rotate(-10deg) scale(1.12)}
+}
+@keyframes studio-orbit-breathe{from{scale:1 .65}to{scale:.85 1.15}}
+@keyframes studio-light-pass{0%,20%{transform:translateX(-45%) rotate(-8deg)}75%,100%{transform:translateX(45%) rotate(8deg)}}
+@media(prefers-reduced-motion:reduce){
+  body.studio *,body.studio *::before,body.studio *::after{animation:none!important;transition:none!important}
+}
