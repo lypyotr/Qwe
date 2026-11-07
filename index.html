@@ -2575,14 +2575,14 @@ function renderProfileDashboard(){
   set('profileDisplayName',name||'Работник');
   set('profileDisplayInfo',info||'Добавьте должность или короткий статус');
   set('profileAvatar',(name||'Р').charAt(0).toUpperCase());
-  set('profilePublicId',userSeq?'ID #'+userSeq:'ID назначается…');
+  set('profilePublicId',DEMO_MODE?'ДЕМО-ПРОФИЛЬ':(userSeq?'ID #'+userSeq:'ID назначается…'));
   set('profileEarned',M(calcNetTotal()));
   set('profileDays',String(calcWorkedDays()));
   const names=new Set();Object.values(days||{}).forEach(ws=>(ws||[]).forEach(w=>{const n=String(w.name||'').trim();if(n)names.add(n);}));
   set('profileWorks',String(names.size));
   const unread=Object.values(unreadGet()).reduce((a,n)=>a+(Number(n)||0),0);
   set('profileSocialSub',unread?unread+' непрочитанных · открыть':'Друзья и защищённые сообщения');
-  set('profileSyncChip',navigator.onLine?'☁ синхронизация':'○ офлайн-режим');
+  set('profileSyncChip',DEMO_MODE?'Локальная демонстрация':(navigator.onLine?'☁ синхронизация':'○ офлайн-режим'));
   window.workspaceRenderAvatar?.();
 }
 
@@ -2618,7 +2618,7 @@ function initProfilePage(){
   const ii=document.getElementById('profileInfoIn');
   if(ii&&document.activeElement!==ii)ii.value=p.info||'';
   const em=document.getElementById('profileEmail');
-  if(em)em.textContent=currentUser&&currentUser.email?currentUser.email:'—';
+  if(em)em.textContent=DEMO_MODE?'Примерный профиль — без регистрации':(currentUser&&currentUser.email?currentUser.email:'—');
   const ac=document.getElementById('profileAdminCard');
   if(ac)ac.style.display=isAdmin()?'':'none';
   const msg=document.getElementById('profileMsg');
@@ -6617,7 +6617,8 @@ function renderSyncStatus(){
   const pills=document.querySelectorAll('.sync-pill');
   if(!pills.length)return;
   let cls='',txt='';
-  if(!currentUser){cls='warn';txt='вход';}
+  if(DEMO_MODE){cls='ok';txt='Демо';}
+  else if(!currentUser){cls='warn';txt='вход';}
   else if(e2eeOn&&e2eeLocked){cls='off';txt='🔒';}
   else if(navigator.onLine===false){const n=pendingGet().length;cls='off';txt=n?('⚡'+n):'⚡';}
   else if(_flushing||_refreshing){cls='busy';txt='⟳';}

@@ -41,6 +41,7 @@ try{
   await page.screenshot({path:'artifacts/design/studio-mobile.png',fullPage:true});
   await page.locator('#themeBtn').click();
   check('dark theme remains available',await page.evaluate(()=>!document.body.classList.contains('light')));
+  check('demo status stays accurate after changing theme',await page.locator('.workspace-tools .sp-txt').textContent()==='Демо');
   check('reduced motion disables decorative animation',await page.evaluate(()=>getComputedStyle(document.querySelector('.studio-orbit svg')).animationName==='none'));
   check('demo made no project backend requests',backend.length===0);
   check('no uncaught browser errors',errors.length===0);
