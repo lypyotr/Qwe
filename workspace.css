@@ -191,7 +191,7 @@ body.chat-open{padding-bottom:0}.chat-open .workspace-topbar{display:none}
   .nav-btn .nav-lbl{font-size:9px}.day-panel-header{padding:12px}
 }
 @media(prefers-reduced-motion:reduce){
-  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
+  body:not(.motion-full) *,body:not(.motion-full) *::before,body:not(.motion-full) *::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
 }
 
 
@@ -661,3 +661,4 @@ body.workspace-app #page-friends .group-member-picker{display:flex;flex-directio
 }
 /* Keep the active navigation label readable on its mint background. */
 body.workspace-app .nav-btn.active .nav-lbl{color:inherit}
+
