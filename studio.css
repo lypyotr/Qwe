@@ -576,3 +576,9 @@ body.studio [style*="font-size:10px"],body.studio [style*="font-size:11px"],body
   body.studio .payday-timing{max-width:none}
   body.studio .auth-box{max-width:100%}
 }
+
+body.studio .tpl-use>span{grid-column:2}
+body.studio .tpl-use>svg{display:none}
+body.studio .tpl-use::before{content:'+';grid-column:1;grid-row:1/3;align-self:center;display:grid;place-items:center;width:26px;height:26px;border:1px solid var(--border);border-radius:8px;font-size:22px;font-weight:500}
+body.studio .tpl-del::before{content:'×';font:400 25px/1 'Nunito',sans-serif}
+body.studio .tpl-del>svg{display:none}
