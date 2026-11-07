@@ -1,0 +1,363 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   NOVA — «голографическая ночь».
+   Визуальный слой поверх studio.css: живое небо, стекло, голограмма.
+   Только оформление: разметка, данные и расчёты не меняются.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Палитра ─────────────────────────────────────────────────────────── */
+html:has(body.nova){background:#07060e}
+html:has(body.nova.light){background:#f3f0fa}
+body.studio.nova{
+  --violet:#8b6cff;--magenta:#ff5bd0;--cyan:#41e8ff;--lime:#c8ff52;--sun:#ffb35c;
+  --holo:linear-gradient(120deg,#8b6cff 0%,#ff5bd0 35%,#ffb35c 62%,#41e8ff 100%);
+  --holo-soft:linear-gradient(120deg,#8b6cff33,#ff5bd033 40%,#41e8ff33);
+  --bg:#07060e;--surface:rgba(23,20,40,.58);--surface2:rgba(255,255,255,.055);
+  --border:rgba(190,175,255,.13);--hairline:rgba(255,255,255,.07);
+  --text:#f5f2ff;--muted:#9d97bd;
+  --accent:#b9a4ff;--accent2:#41e8ff;--accent3:#c8ff52;
+  --accent-ink:#c9b8ff;--accent2-ink:#7eefff;
+  --danger:#ff7a9c;--warn:#ffc46b;--signal:#ff5bd0;
+  --ink:#0c0a1a;--paper:#f5f2ff;
+  --glow:0 0 0 1px rgba(185,164,255,.25),0 10px 40px -10px rgba(139,108,255,.55);
+  --lift:0 1px 0 rgba(255,255,255,.07) inset,0 30px 60px -30px rgba(0,0,0,.7);
+  --r-lg:26px;--r-md:18px;--r-sm:12px;
+  --ease-spring:cubic-bezier(.34,1.56,.64,1);--ease-out:cubic-bezier(.16,1,.3,1);
+  --font-display:'Unbounded','Onest',sans-serif;--font-body:'Onest','Manrope',sans-serif;
+  font-family:var(--font-body);letter-spacing:-.1px;background:transparent;color:var(--text);color-scheme:dark;
+}
+body.studio.nova.light{
+  --bg:#f3f0fa;--surface:rgba(255,255,255,.62);--surface2:rgba(110,80,220,.06);
+  --border:rgba(90,60,200,.13);--hairline:rgba(40,20,90,.07);
+  --text:#17122e;--muted:#6c6690;
+  --accent:#6d4aff;--accent2:#0aa5c4;--accent3:#5d8a00;
+  --accent-ink:#5a36f0;--accent2-ink:#06809a;
+  --danger:#e0335f;--warn:#a8650a;--signal:#e0339f;
+  --ink:#ffffff;--paper:#17122e;
+  --glow:0 0 0 1px rgba(109,74,255,.22),0 12px 34px -12px rgba(109,74,255,.45);
+  --lift:0 1px 0 rgba(255,255,255,.9) inset,0 24px 50px -30px rgba(60,30,140,.35);
+  color-scheme:light;
+}
+body.studio.nova::before{display:none}
+body.nova .bg-aurora{display:none!important}
+body.nova ::selection{background:#ff5bd055;color:inherit}
+
+/* ── Небо: звёзды (canvas), сияние, зерно ────────────────────────────── */
+.nova-sky{position:fixed;inset:0;z-index:-3;pointer-events:none;overflow:hidden;background:
+  radial-gradient(120% 80% at 50% -10%,#1a1240 0%,transparent 60%),
+  radial-gradient(90% 70% at 100% 100%,#1b0d2e 0%,transparent 60%),#07060e}
+body.light .nova-sky{background:
+  radial-gradient(120% 80% at 50% -10%,#e6ddff 0%,transparent 60%),
+  radial-gradient(90% 70% at 100% 100%,#ffe3f4 0%,transparent 60%),#f3f0fa}
+.nova-stars{position:absolute;inset:0;width:100%;height:100%;opacity:.9}
+body.light .nova-stars{opacity:.35;mix-blend-mode:multiply}
+.nova-blob{position:absolute;border-radius:50%;filter:blur(70px);opacity:.55;mix-blend-mode:screen;will-change:transform;
+  transform:translate3d(calc(var(--px,0) * var(--depth,30px)),calc(var(--py,0) * var(--depth,30px)),0)}
+body.light .nova-blob{mix-blend-mode:multiply;opacity:.42;filter:blur(80px)}
+.nova-blob i{position:absolute;inset:0;border-radius:inherit;background:var(--c);animation:nova-drift var(--t,26s) ease-in-out infinite alternate}
+.nova-blob.b1{--c:#6b3cff;--depth:-40px;--t:24s;width:52vmax;height:52vmax;left:-18vmax;top:-20vmax}
+.nova-blob.b2{--c:#ff3cb4;--depth:55px;--t:31s;width:40vmax;height:40vmax;right:-14vmax;top:8vh;opacity:.38}
+.nova-blob.b3{--c:#00c8ff;--depth:-25px;--t:28s;width:44vmax;height:44vmax;left:28vw;bottom:-26vmax;opacity:.35}
+.nova-blob.b4{--c:#9dff3c;--depth:35px;--t:36s;width:22vmax;height:22vmax;right:18vw;bottom:6vh;opacity:.16}
+body.light .nova-blob.b1{--c:#b7a2ff}body.light .nova-blob.b2{--c:#ffb0e2}body.light .nova-blob.b3{--c:#9fe9ff}body.light .nova-blob.b4{--c:#e2ff9e}
+@keyframes nova-drift{
+  0%{transform:translate3d(0,0,0) scale(1) rotate(0)}
+  50%{transform:translate3d(6vw,-4vh,0) scale(1.15) rotate(40deg)}
+  100%{transform:translate3d(-5vw,5vh,0) scale(.92) rotate(-30deg)}
+}
+.nova-grain{position:fixed;inset:-50%;z-index:9998;pointer-events:none;opacity:.07;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation:nova-grain 1.2s steps(6) infinite}
+body.light .nova-grain{opacity:.05;mix-blend-mode:multiply}
+@keyframes nova-grain{0%{transform:translate(0,0)}20%{transform:translate(-3%,2%)}40%{transform:translate(2%,-4%)}60%{transform:translate(-4%,-1%)}80%{transform:translate(3%,3%)}100%{transform:translate(0,0)}}
+
+/* Курсор-ореол (только мышь) */
+.nova-cursor{position:fixed;left:0;top:0;width:420px;height:420px;margin:-210px 0 0 -210px;border-radius:50%;pointer-events:none;z-index:-1;
+  background:radial-gradient(closest-side,rgba(139,108,255,.16),rgba(255,91,208,.07) 50%,transparent);
+  transform:translate3d(var(--cx,-999px),var(--cy,-999px),0);transition:opacity .4s}
+body.light .nova-cursor{background:radial-gradient(closest-side,rgba(109,74,255,.13),rgba(255,91,208,.06) 50%,transparent)}
+.nova-dot{position:fixed;left:0;top:0;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;pointer-events:none;z-index:9999;
+  border:1.5px solid rgba(255,255,255,.55);mix-blend-mode:difference;
+  transform:translate3d(var(--dx,-999px),var(--dy,-999px),0) scale(var(--ds,1));transition:width .25s var(--ease-out),height .25s,margin .25s,background .25s,border-color .25s}
+.nova-dot.hot{--ds:1.6;border-color:rgba(255,255,255,.9);background:rgba(255,255,255,.08)}
+@media (hover:none),(pointer:coarse){.nova-cursor,.nova-dot{display:none}}
+
+/* ── Типографика ─────────────────────────────────────────────────────── */
+body.nova :is(button,input,textarea,select){font-family:var(--font-body)}
+body.nova :is(.total-amount,.section-title,.modal-title,.day-panel-title,.period-title,.goals-title,.expenses-title,
+  .workspace-title,.workspace-heading,.profile-display-name,.stat-value,.hist-total,.profile-metric-value,.chart-title,.auth-title,.studio-auth-heading){
+  font-family:var(--font-display);letter-spacing:-.04em}
+body.nova .workspace-brandbar{font-family:var(--font-display)!important;letter-spacing:.06em}
+
+/* ── Карточки: стекло + прожектор под курсором ───────────────────────── */
+body.studio.nova :is(.day-strip-wrap,.day-panel,.workspace-payday,.workspace-settings,.templates-section,.period-card,.chart-wrap,.goals-card,.expenses-card,
+  .calc-card,.profile-hero,.stat-hero,.stat-card,.level-banner,.messenger-card,.message-card,.messenger-hero,.period-premium-row,.hist-card,.archive-item,
+  .stat-tile,.tw-row,.profile-snapshot,.profile-metric,.profile-action,.stats-summary,.stat-summary-card,.stat-metric,.today-summary,.friend-row,.bonus-item,.expense-item,.tpl-item){
+  position:relative;border:1px solid var(--border);border-radius:var(--r-lg);
+  background:
+    radial-gradient(520px circle at var(--mx,-600px) var(--my,-600px),rgba(185,164,255,.13),transparent 42%),
+    var(--surface);
+  -webkit-backdrop-filter:blur(22px) saturate(160%);backdrop-filter:blur(22px) saturate(160%);
+  box-shadow:var(--lift);
+  transition:border-color .35s,box-shadow .45s var(--ease-out),transform .45s var(--ease-out)}
+body.studio.nova.light :is(.day-strip-wrap,.day-panel,.workspace-payday,.workspace-settings,.templates-section,.period-card,.chart-wrap,.goals-card,.expenses-card,
+  .calc-card,.profile-hero,.stat-hero,.stat-card,.level-banner,.messenger-card,.message-card,.messenger-hero,.period-premium-row,.hist-card,.archive-item,
+  .stat-tile,.tw-row,.profile-snapshot,.profile-metric,.profile-action,.stats-summary,.stat-summary-card,.stat-metric,.today-summary,.friend-row,.bonus-item,.expense-item,.tpl-item){
+  background:radial-gradient(520px circle at var(--mx,-600px) var(--my,-600px),rgba(109,74,255,.10),transparent 42%),var(--surface)}
+body.studio.nova :is(.bonus-item,.expense-item,.hist-card,.archive-item,.friend-row,.tpl-item,.stat-tile,.profile-metric,.profile-action){border-radius:var(--r-md)}
+@media (hover:hover){
+  body.studio.nova :is(.hist-card,.archive-item,.friend-row,.profile-action,.stat-tile,.workspace-payday,.tpl-chip,.profile-metric):hover{
+    transform:translateY(-3px);border-color:rgba(185,164,255,.35);box-shadow:var(--lift),var(--glow)}
+}
+body.studio.nova .hist-card.current{border-color:var(--accent);box-shadow:var(--lift),var(--glow)}
+
+/* ── Шапка ────────────────────────────────────────────────────────────── */
+body.studio.nova .workspace-topbar{border-bottom:1px solid var(--hairline)}
+body.studio.nova .workspace-brand-icon{color:var(--text);filter:drop-shadow(0 0 10px rgba(185,164,255,.6))}
+body.studio.nova .studio-brand-period,body.nova .nav-brand .studio-brand-period{background:var(--holo);-webkit-background-clip:text;background-clip:text;color:transparent}
+body.studio.nova :is(.workspace-icon-button,.workspace-search-button,.sync-pill){
+  border-radius:16px;border:1px solid var(--border);background:var(--surface);
+  -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);color:var(--text);
+  transition:transform .4s var(--ease-spring),border-color .3s,box-shadow .3s}
+body.studio.nova :is(.workspace-icon-button,.workspace-search-button):hover{border-color:rgba(185,164,255,.45);box-shadow:var(--glow)}
+body.studio.nova .workspace-avatar-button{border-radius:16px;background:var(--holo);background-size:200% 200%;animation:nova-holo-shift 6s ease infinite;border:0;box-shadow:var(--glow)}
+body.studio.nova .workspace-tools .sp-dot{background:var(--lime);box-shadow:0 0 0 0 #c8ff52aa;animation:nova-ping 2.4s infinite}
+@keyframes nova-ping{0%{box-shadow:0 0 0 0 #c8ff5299}80%,100%{box-shadow:0 0 0 9px #c8ff5200}}
+body.studio.nova .studio-demo-strip{background:linear-gradient(90deg,#140f2c,#2a0f33 50%,#0f1f33);color:#e9e4ff;border-bottom:1px solid rgba(255,255,255,.08)}
+body.studio.nova .studio-demo-strip :is(a,span){color:inherit}
+
+/* Переключатель периода */
+body.studio.nova .workspace-period{border-color:var(--hairline)}
+body.studio.nova .workspace-period .ui-icon{border-radius:14px;background:var(--surface);border:1px solid var(--border);color:var(--text);
+  transition:transform .35s var(--ease-spring),box-shadow .3s}
+body.studio.nova .workspace-period .ui-icon:hover{transform:scale(1.12);box-shadow:var(--glow)}
+body.studio.nova #workspacePeriodLabel{font-family:var(--font-display);letter-spacing:-.02em;font-size:18px}
+
+/* ── Навигация: стеклянная панель ─────────────────────────────────────── */
+body.studio.nova .bottom-nav{background:rgba(14,12,28,.55);-webkit-backdrop-filter:blur(26px) saturate(170%);backdrop-filter:blur(26px) saturate(170%);
+  border-color:var(--hairline)}
+body.studio.nova.light .bottom-nav{background:rgba(255,255,255,.55)}
+body.studio.nova .nav-brand{font-family:var(--font-display);letter-spacing:-.03em}
+body.studio.nova .nav-brand :is(.brand-mark,svg){color:var(--text)}
+body.studio.nova .nav-brand .brand-mark{background:var(--holo)!important;background-size:220% 220%!important;animation:nova-holo-shift 8s ease infinite;color:#0c0a1a!important;border-radius:22px!important;box-shadow:var(--glow)}
+body.studio.nova .nav-btn{position:relative;border-radius:18px;transition:color .3s,background .3s,transform .4s var(--ease-spring);isolation:isolate}
+body.studio.nova .nav-btn:hover{transform:translateX(4px);background:var(--surface2)}
+body.studio.nova .nav-btn.active{color:#fff!important;background:transparent!important;box-shadow:none}
+body.studio.nova .nav-btn.active::before{content:'';position:absolute;inset:0;z-index:-1;opacity:1;border-radius:inherit;background:linear-gradient(120deg,#5b3cf0,#a43ad8 45%,#e2449e 75%,#5b3cf0);background-size:220% 220%;
+  animation:nova-holo-shift 7s ease infinite,nova-pop .55s var(--ease-spring);box-shadow:0 10px 30px -8px rgba(255,91,208,.55),0 0 0 1px rgba(255,255,255,.15) inset}
+body.studio.nova .nav-btn.active::after{display:none}
+body.studio.nova .nav-btn.active :is(.nav-icon,.nav-lbl,svg){color:#fff!important}
+body.studio.nova.light .nav-btn.active{color:#fff!important}
+@keyframes nova-pop{0%{transform:scale(.6);opacity:0}100%{transform:scale(1);opacity:1}}
+@keyframes nova-holo-shift{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+
+/* Плавающий док на телефоне */
+@media (max-width:899px){
+  body.studio.nova .bottom-nav{left:12px!important;right:12px!important;bottom:calc(10px + env(safe-area-inset-bottom))!important;width:auto!important;
+    border-radius:26px!important;border:1px solid var(--border)!important;padding:7px!important;box-shadow:0 20px 50px -12px rgba(0,0,0,.6)}
+  body.studio.nova.light .bottom-nav{box-shadow:0 20px 50px -18px rgba(60,30,140,.45)}
+  body.studio.nova .nav-btn{border-radius:19px}
+  body.studio.nova .nav-btn:hover{transform:none}
+  body.studio.nova .nav-btn.active{transform:translateY(-2px)}
+}
+
+/* ── Главная голографическая карта ───────────────────────────────────── */
+body.studio.nova .work-overview .total-card{
+  --ink:#ffffff;--muted:rgba(255,255,255,.72);--text:#fff;--accent:#fff;
+  color:#fff;border-radius:30px;border:1px solid rgba(255,255,255,.16);padding:28px;
+  background:
+    radial-gradient(140% 120% at var(--sx,30%) var(--sy,0%),rgba(255,255,255,.22),transparent 45%),
+    radial-gradient(80% 90% at 0% 100%,#ff5bd0aa,transparent 60%),
+    radial-gradient(70% 80% at 100% 0%,#41e8ff99,transparent 60%),
+    radial-gradient(90% 90% at 100% 100%,#ffb35c88,transparent 55%),
+    linear-gradient(135deg,#2b1a7a,#5b2bd6 45%,#1b1450);
+  box-shadow:0 1px 0 rgba(255,255,255,.35) inset,0 40px 80px -30px rgba(91,43,214,.75),0 18px 40px -20px rgba(255,91,208,.45);
+  transform:perspective(1100px) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg));transform-style:preserve-3d;
+  transition:transform .6s var(--ease-out),box-shadow .6s}
+body.studio.nova .work-overview .total-card.nova-tilting{transition:transform .08s linear}
+/* Переливающаяся голограмма + блик */
+body.studio.nova .work-overview .total-card::before{content:'';position:absolute;inset:0;z-index:-1;border-radius:inherit;pointer-events:none;mix-blend-mode:color-dodge;opacity:.45;
+  background:repeating-linear-gradient(115deg,transparent 0 6%,rgba(255,91,208,.35) 9%,rgba(65,232,255,.35) 13%,rgba(200,255,82,.3) 17%,transparent 21% 30%);
+  background-size:220% 220%;background-position:var(--hx,50%) var(--hy,50%);transition:background-position .2s}
+body.studio.nova .work-overview .total-card::after{content:'';position:absolute;inset:-40%;z-index:-1;pointer-events:none;
+  background:linear-gradient(105deg,transparent 42%,rgba(255,255,255,.28) 50%,transparent 58%);
+  transform:translateX(-60%);animation:nova-sheen 6.5s var(--ease-out) infinite 1.2s}
+@keyframes nova-sheen{0%,62%{transform:translateX(-60%)}100%{transform:translateX(60%)}}
+body.studio.nova .total-card .studio-orbit{color:#fff;opacity:.35;z-index:0}
+body.studio.nova .total-card .studio-asterisk{color:#fff;filter:drop-shadow(0 0 8px #fff)}
+body.studio.nova .total-card .total-label,body.studio.nova .total-card .studio-hero-top{color:rgba(255,255,255,.8)}
+body.studio.nova .total-card .total-hint{color:rgba(255,255,255,.78)}
+body.studio.nova .total-card .workspace-balance-stats{border-radius:50%;border-color:rgba(255,255,255,.35);color:#fff;opacity:1}
+body.studio.nova .total-card .total-amount{font-size:clamp(46px,6.2vw,84px);font-weight:600;line-height:1;color:#fff;
+  text-shadow:0 0 40px rgba(255,255,255,.35),0 2px 0 rgba(0,0,0,.1);transform:translateZ(40px)}
+body.studio.nova .total-card .total-view-toggle{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);border-radius:999px;
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+body.studio.nova .total-card .tvt-opt{color:rgba(255,255,255,.85);border-radius:999px;transition:background .35s var(--ease-out),color .3s}
+body.studio.nova .total-card .tvt-opt.active{background:#fff;color:#2b1a7a;box-shadow:0 6px 18px -6px rgba(0,0,0,.4)}
+body.studio.nova .total-card .total-meta{border-top-color:rgba(255,255,255,.22)}
+body.studio.nova .total-card .meta-item{color:#fff}
+body.studio.nova .total-card .workspace-icon-button{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.25);color:#fff}
+/* Смена суммы — перелистывание с размытием */
+body.nova .nova-flip{animation:nova-flip .7s var(--ease-out)}
+@keyframes nova-flip{0%{opacity:0;filter:blur(12px);transform:translateY(18px) scale(.96)}100%{opacity:1;filter:none;transform:none}}
+
+/* ── Кнопки ───────────────────────────────────────────────────────────── */
+body.studio.nova :is(.workspace-add-button,.add-work-btn,.auth-btn,.friend-add-btn,.modal-btn:not(.secondary):not(.danger)){
+  position:relative;overflow:hidden;isolation:isolate;border:0!important;border-radius:999px!important;color:#fff!important;font-weight:600;letter-spacing:.01em;
+  background:var(--holo)!important;background-size:220% 220%!important;animation:nova-holo-shift 8s ease infinite;
+  box-shadow:0 14px 34px -14px rgba(255,91,208,.7),0 0 0 1px rgba(255,255,255,.18) inset!important;
+  transition:transform .45s var(--ease-spring),box-shadow .35s!important}
+body.studio.nova .calc-result{border:0!important;border-radius:var(--r-lg)!important;color:#fff!important;overflow:hidden;
+  background:radial-gradient(80% 120% at 0% 100%,#ff5bd0bb,transparent 60%),radial-gradient(70% 100% at 100% 0%,#41e8ffaa,transparent 60%),linear-gradient(135deg,#2b1a7a,#5b2bd6 50%,#1b1450)!important;
+  box-shadow:0 30px 60px -30px rgba(91,43,214,.8),0 1px 0 rgba(255,255,255,.3) inset!important}
+body.studio.nova .calc-result *{color:#fff!important}
+body.studio.nova .calc-result>:last-child{background:rgba(255,255,255,.12)!important;border-radius:0 0 var(--r-lg) var(--r-lg)}
+body.studio.nova :is(.workspace-add-button,.add-work-btn,.auth-btn,.modal-btn):hover{box-shadow:0 18px 40px -12px rgba(255,91,208,.85),0 0 0 1px rgba(255,255,255,.3) inset!important}
+body.studio.nova :is(.workspace-add-button,.add-work-btn,.auth-btn,.modal-btn):active{transform:scale(.96)!important}
+body.studio.nova :is(.workspace-add-button,.add-work-btn,.auth-btn)::after{content:'';position:absolute;inset:0;z-index:-1;
+  background:linear-gradient(105deg,transparent 35%,rgba(255,255,255,.45) 50%,transparent 65%);transform:translateX(-120%);transition:transform .9s var(--ease-out)}
+body.studio.nova :is(.workspace-add-button,.add-work-btn,.auth-btn):hover::after{transform:translateX(120%)}
+body.studio.nova :is(.btn-secondary,.ui-button,.copy-day-btn,.photo-add-btn,.section-shortcuts button,.section-shortcuts a){
+  border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--text);
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);transition:transform .4s var(--ease-spring),border-color .3s,box-shadow .3s}
+body.studio.nova :is(.btn-secondary,.ui-button,.copy-day-btn,.photo-add-btn,.section-shortcuts button,.section-shortcuts a):hover{border-color:rgba(185,164,255,.5);box-shadow:var(--glow)}
+/* Волна от нажатия */
+.nova-ripple{position:absolute;border-radius:50%;pointer-events:none;background:radial-gradient(circle,rgba(255,255,255,.55),rgba(255,255,255,0) 70%);
+  transform:scale(0);animation:nova-ripple .7s var(--ease-out) forwards;z-index:2}
+@keyframes nova-ripple{to{transform:scale(1);opacity:0}}
+
+/* Тумблеры */
+body.studio.nova .toggle{border-radius:999px;background:var(--surface2);border:1px solid var(--border)}
+body.studio.nova .toggle.on,body.studio.nova.light .toggle.on{background:var(--holo);background-size:200% 200%;animation:nova-holo-shift 6s ease infinite;border-color:transparent;box-shadow:0 0 18px -4px rgba(255,91,208,.7)}
+
+/* ── Календарь ────────────────────────────────────────────────────────── */
+body.studio.nova #workspaceCalendarMonth{font-family:var(--font-display);letter-spacing:-.04em}
+body.studio.nova .day-grid{gap:6px}
+body.studio.nova .day-cell{border-radius:16px!important;border:1px solid transparent!important;background:transparent;
+  transition:transform .4s var(--ease-spring),background .3s,border-color .3s,box-shadow .3s}
+body.studio.nova .day-cell .day-num{font-family:var(--font-display);font-weight:500;letter-spacing:-.04em}
+body.studio.nova .day-cell.has-data{background:var(--surface2)}
+body.studio.nova .day-cell.has-data .day-sum{background:var(--holo);-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:700}
+@media (hover:hover){body.studio.nova .day-cell:hover{transform:translateY(-3px) scale(1.04);border-color:var(--border)!important;background:var(--surface2)}}
+body.studio.nova .day-cell.active{color:#fff!important;border-color:transparent!important;background:var(--holo)!important;background-size:220% 220%!important;
+  animation:nova-holo-shift 7s ease infinite,nova-pop .5s var(--ease-spring);box-shadow:0 12px 30px -10px rgba(255,91,208,.75)}
+body.studio.nova .day-cell.active :is(.day-num,.day-sum){color:#fff!important;-webkit-text-fill-color:#fff;border-color:rgba(255,255,255,.4)!important}
+body.studio.nova .day-cell.today-mark:not(.active){box-shadow:0 0 0 1.5px var(--accent) inset}
+body.studio.nova .day-cell.day-off:not(.active) .day-num{color:var(--magenta)}
+body.studio.nova.light .day-cell.day-off:not(.active) .day-num{color:#d6338f}
+
+/* ── Строки работ и шаблоны ───────────────────────────────────────────── */
+body.studio.nova .day-panel-header{border-bottom-color:var(--hairline)}
+body.studio.nova .day-work-row{border-color:var(--hairline);transition:background .3s,transform .4s var(--ease-out)}
+body.studio.nova .day-work-row:hover{background:var(--surface2)}
+body.studio.nova .work-summary-sum{font-family:var(--font-display);letter-spacing:-.04em}
+body.studio.nova .tpl-chip{border-radius:var(--r-md);border:1px solid var(--border);background:var(--surface2);transition:transform .4s var(--ease-spring),border-color .3s,box-shadow .3s}
+body.studio.nova .tpl-price{background:var(--holo);-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:700}
+body.studio.nova .tpl-use{border-radius:50%;background:var(--holo);color:#fff;border:0}
+
+/* ── Графики, цели, статистика ────────────────────────────────────────── */
+body.studio.nova :is(.chart-bar-fill,.stat-bar-fill){background:linear-gradient(0deg,#8b6cff,#ff5bd0 60%,#ffb35c)!important;border-radius:10px 10px 4px 4px!important;
+  box-shadow:0 0 22px -4px rgba(255,91,208,.6);transform-origin:bottom;animation:nova-grow .9s var(--ease-spring) both}
+body.studio.nova .chart-bar{max-width:22px;border-radius:999px 999px 6px 6px!important;background:var(--surface2)!important;transform-origin:bottom}
+body.studio.nova .chart-bar.has-data{background:linear-gradient(0deg,#6d4aff,#c04de0 55%,#ff8ad8)!important;box-shadow:0 0 18px -4px rgba(255,91,208,.65);animation:nova-grow .9s var(--ease-spring) both}
+body.studio.nova .chart-bar.active{background:linear-gradient(0deg,#41e8ff,#c8ff52)!important;box-shadow:0 0 22px -2px rgba(65,232,255,.8)}
+@keyframes nova-grow{from{transform:scaleY(0)}}
+body.studio.nova :is(.goal-bar-bg,.goal-bar){height:8px;border-radius:999px;background:var(--surface2);overflow:hidden}
+body.studio.nova :is(.goal-fill,.goal-bar-fill){border-radius:999px;background:var(--holo)!important;background-size:200% 100%!important;animation:nova-holo-shift 5s ease infinite;
+  box-shadow:0 0 16px -2px rgba(255,91,208,.7)}
+body.studio.nova :is(.chart-stat,.countdown-pill){border-radius:var(--r-sm);background:var(--surface2)}
+body.studio.nova :is(.stat-value,.hist-total,.profile-metric-value){background:linear-gradient(120deg,var(--text),var(--accent));-webkit-background-clip:text;background-clip:text;color:transparent}
+
+/* ── Поля ввода ───────────────────────────────────────────────────────── */
+body.studio.nova :is(.modal-input,.auth-input,.calc-input,.sel-wrap select,input[type=text],input[type=number],input[type=date],textarea,select){
+  border-radius:14px;border:1px solid var(--border);background:var(--surface2);color:var(--text);transition:border-color .3s,box-shadow .3s,background .3s}
+body.studio.nova :is(.modal-input,.auth-input,.calc-input,.sel-wrap select,input,textarea,select):focus{outline:none;border-color:var(--accent);
+  box-shadow:0 0 0 4px rgba(139,108,255,.22),0 0 24px -6px rgba(255,91,208,.55);background:var(--surface)}
+body.studio.nova :is(button,[role=button],a):focus-visible{outline:2px solid var(--magenta)!important;outline-offset:3px}
+
+/* ── Модальные окна ───────────────────────────────────────────────────── */
+body.studio.nova .modal-overlay{background:rgba(5,3,14,.55);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+body.studio.nova.light .modal-overlay{background:rgba(40,20,90,.25)}
+body.studio.nova :is(.modal,.workspace-dialog){border:1px solid var(--border);background:color-mix(in srgb,var(--bg) 82%,transparent);
+  -webkit-backdrop-filter:blur(30px) saturate(170%);backdrop-filter:blur(30px) saturate(170%);box-shadow:0 40px 100px -30px rgba(0,0,0,.75),0 0 0 1px rgba(255,255,255,.05) inset}
+body.studio.nova .modal-overlay.open .modal,body.studio.nova .modal-overlay.show .modal{animation:nova-rise .55s var(--ease-spring)}
+@keyframes nova-rise{from{transform:translateY(40px) scale(.97);opacity:0}}
+body.studio.nova .modal-handle{background:var(--holo);height:5px;width:44px;border-radius:9px}
+
+/* ── Сообщения ────────────────────────────────────────────────────────── */
+body.studio.nova .chat-bubble{border-radius:6px 20px 20px 20px;background:var(--surface);border:1px solid var(--border);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+body.studio.nova .chat-msg.me .chat-bubble{border-radius:20px 6px 20px 20px;background:linear-gradient(135deg,#7a5cff,#d94fd0)!important;color:#fff!important;border:0;
+  box-shadow:0 10px 26px -12px rgba(217,79,208,.8)}
+body.studio.nova .chat-msg.me .chat-bubble *{color:inherit}
+body.studio.nova :is(.friend-avatar,.profile-avatar){background:var(--holo)!important;background-size:200% 200%!important;color:#fff!important;animation:nova-holo-shift 9s ease infinite}
+body.studio.nova .messenger-tabs{border-radius:999px;background:var(--surface2);border:1px solid var(--border);padding:4px}
+body.studio.nova .messenger-tabs button{border-radius:999px;background:transparent;color:var(--muted);transition:background .35s var(--ease-out),color .3s}
+body.studio.nova .messenger-tabs button.active{background:linear-gradient(120deg,#5b3cf0,#a43ad8 55%,#e2449e)!important;color:#fff!important;box-shadow:0 8px 22px -10px rgba(226,68,158,.8)}
+body.studio.nova .message-card-icon{border-radius:14px;background:var(--holo-soft);border:1px solid var(--border);color:var(--text)}
+body.studio.nova .studio-demo-social{position:relative;overflow:hidden;isolation:isolate;border-radius:30px;color:#fff;border:1px solid rgba(255,255,255,.16);
+  background:radial-gradient(60% 120% at 100% 0%,#41e8ff88,transparent 60%),radial-gradient(70% 120% at 0% 100%,#ff5bd0aa,transparent 60%),linear-gradient(135deg,#2b1a7a,#5b2bd6 50%,#1b1450);
+  box-shadow:0 40px 80px -40px rgba(91,43,214,.8)}
+body.studio.nova .studio-demo-social::after{content:'';position:absolute;inset:-40%;z-index:-1;background:linear-gradient(105deg,transparent 42%,rgba(255,255,255,.22) 50%,transparent 58%);animation:nova-sheen 7s var(--ease-out) infinite}
+body.studio.nova .studio-demo-social :is(h2,p,span){color:#fff}
+body.studio.nova .studio-demo-social h2{font-family:var(--font-display);letter-spacing:-.04em}
+body.studio.nova .studio-demo-link{border-radius:999px;background:#fff;color:#2b1a7a!important;border:0;box-shadow:0 14px 30px -14px rgba(0,0,0,.6);transition:transform .4s var(--ease-spring)}
+body.studio.nova .studio-demo-link span{color:#2b1a7a}
+body.studio.nova .studio-demo-link:hover{transform:translateY(-2px) scale(1.02)}
+body.studio.nova #studioMotionToggle{white-space:nowrap;padding:11px 20px;width:auto}
+body.studio.nova .stat-trend-bar{background:linear-gradient(0deg,#6d4aff,#c04de0 55%,#ff8ad8)!important;border-radius:14px 14px 6px 6px!important;box-shadow:0 0 22px -6px rgba(255,91,208,.6);transform-origin:bottom;animation:nova-grow .9s var(--ease-spring) both}
+
+/* ── Экран входа и загрузка ───────────────────────────────────────────── */
+body.studio.nova .auth-overlay{background:
+  radial-gradient(55% 60% at 15% 20%,#6b3cff55,transparent 70%),radial-gradient(50% 60% at 95% 85%,#ff3cb440,transparent 70%),
+  radial-gradient(40% 50% at 70% 10%,#00c8ff30,transparent 70%),var(--bg)}
+body.studio.nova.light .auth-overlay{background:
+  radial-gradient(55% 60% at 15% 20%,#b7a2ff88,transparent 70%),radial-gradient(50% 60% at 95% 85%,#ffb0e288,transparent 70%),
+  radial-gradient(40% 50% at 70% 10%,#9fe9ff77,transparent 70%),var(--bg)}
+body.studio.nova .auth-box{border:1px solid var(--border);border-radius:32px;background:var(--surface);-webkit-backdrop-filter:blur(30px) saturate(170%);backdrop-filter:blur(30px) saturate(170%);box-shadow:var(--lift),0 0 120px -40px rgba(139,108,255,.6)}
+body.studio.nova #appLoader{background:#07060e!important}
+body.studio.nova.light #appLoader{background:#f3f0fa!important}
+body.studio.nova .studio-loader-mark{border:0;background:var(--holo);background-size:200% 200%;color:#fff;font-family:var(--font-display);
+  animation:nova-holo-shift 2s ease infinite,nova-breathe 1.6s ease-in-out infinite;box-shadow:0 0 60px -6px rgba(255,91,208,.8)}
+@keyframes nova-breathe{50%{transform:scale(1.08)}}
+
+/* Тосты / баннеры */
+body.studio.nova :is(.toast,.undo-toast,.workspace-toast){border-radius:999px;border:1px solid var(--border);background:color-mix(in srgb,var(--bg) 70%,transparent);
+  -webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);color:var(--text);box-shadow:var(--glow)}
+body.studio.nova .notif-banner{background:var(--holo);color:#fff}
+body.studio.nova .notif-banner-ok{background:#fff;color:#2b1a7a;border-radius:999px}
+
+/* Полоса прокрутки */
+body.nova{scrollbar-color:#8b6cff55 transparent}
+body.nova ::-webkit-scrollbar{width:10px;height:10px}
+body.nova ::-webkit-scrollbar-thumb{background:linear-gradient(#8b6cff88,#ff5bd088);border-radius:9px;border:3px solid transparent;background-clip:padding-box}
+body.nova ::-webkit-scrollbar-track{background:transparent}
+
+/* ── Появление экрана: каскад ─────────────────────────────────────────── */
+body.nova .nova-enter{animation:nova-in .8s var(--ease-out) both;animation-delay:calc(var(--i,0) * 60ms)}
+@keyframes nova-in{from{opacity:0;transform:translateY(26px) scale(.985);filter:blur(8px)}to{opacity:1;transform:none;filter:none}}
+
+/* Искры при добавлении */
+.nova-spark{position:fixed;left:0;top:0;width:8px;height:8px;border-radius:2px;pointer-events:none;z-index:10000;background:var(--c);
+  box-shadow:0 0 10px var(--c);animation:nova-spark .9s var(--ease-out) forwards}
+@keyframes nova-spark{0%{transform:translate(var(--x0),var(--y0)) rotate(0) scale(1);opacity:1}
+  100%{transform:translate(var(--x1),var(--y1)) rotate(var(--r)) scale(.2);opacity:0}}
+
+/* ── Без анимаций ─────────────────────────────────────────────────────── */
+body.nova.motion-off :is(.nova-grain,.nova-cursor,.nova-dot){display:none}
+body.nova.motion-off .nova-blob i{animation:none}
+body.nova.motion-off .work-overview .total-card{transform:none!important}
+@media (max-width:899px){
+  /* Телефон: меньше размытия — быстрее прокрутка и меньше расход батареи. */
+  body.studio.nova :is(.day-strip-wrap,.day-panel,.workspace-payday,.workspace-settings,.templates-section,.period-card,.chart-wrap,.goals-card,.expenses-card,.calc-card,.profile-hero,.messenger-card,.hist-card,.archive-item,.friend-row,.bonus-item,.expense-item,.stat-tile,.profile-metric,.profile-action){
+    -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+  .nova-blob{filter:blur(50px)}
+  .nova-grain{display:none}
+  body.studio.nova .work-overview .total-card{border-radius:26px;padding:24px}
+}
+body.studio.nova .work-done{border-radius:999px;border:0;color:#fff;background:linear-gradient(120deg,#5b3cf0,#a43ad8 55%,#e2449e);box-shadow:0 10px 24px -12px rgba(226,68,158,.8);transition:transform .4s var(--ease-spring)}
+body.studio.nova .work-done:active{transform:scale(.95)}
+body.studio.nova .work-editor{background:var(--surface2);border-color:var(--hairline)}
+/* Заголовок экрана входа */
+body.studio.nova .studio-auth-heading>h1{font-family:var(--font-display);font-weight:600;letter-spacing:-.06em}
+body.studio.nova .studio-auth-heading em{font-family:var(--font-display);font-weight:400;font-style:normal;letter-spacing:-.06em;
+  background:var(--holo);background-size:220% 220%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:nova-holo-shift 6s ease infinite}
+body.studio.nova .studio-auth-orbit{color:var(--accent);opacity:.5}
