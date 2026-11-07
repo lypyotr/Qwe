@@ -451,7 +451,7 @@ body.studio.chat-open .bottom-nav{display:none}
 @keyframes studio-spin{to{transform:rotate(360deg)}}
 @keyframes studio-arrive{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 @media(prefers-reduced-motion:reduce){
-  body.studio *,body.studio *::before,body.studio *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+  body.studio:not(.motion-full) *,body.studio:not(.motion-full) *::before,body.studio:not(.motion-full) *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
 }
 
 /* Motion revision: visible orbital motion and tactile controls. */
@@ -485,5 +485,8 @@ body.studio :is(button,.day-cell,.work-summary){transition:background .2s,border
 @keyframes studio-orbit-breathe{from{scale:1 .65}to{scale:.85 1.15}}
 @keyframes studio-light-pass{0%,20%{transform:translateX(-45%) rotate(-8deg)}75%,100%{transform:translateX(45%) rotate(8deg)}}
 @media(prefers-reduced-motion:reduce){
-  body.studio *,body.studio *::before,body.studio *::after{animation:none!important;transition:none!important}
+  body.studio:not(.motion-full) *,body.studio:not(.motion-full) *::before,body.studio:not(.motion-full) *::after{animation:none!important;transition:none!important}
 }
+
+body.studio.motion-off *,body.studio.motion-off *::before,body.studio.motion-off *::after{animation:none!important;transition:none!important}
+#studioMotionToggle{margin-top:10px;min-height:44px}
