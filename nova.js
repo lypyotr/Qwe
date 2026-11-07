@@ -73,21 +73,17 @@
 
   // ── Курсор, параллакс, прожектор на карточках ─────────────────────────
   const CARD = '.day-strip-wrap,.day-panel,.workspace-payday,.workspace-settings,.templates-section,.period-card,.chart-wrap,.goals-card,.expenses-card,.calc-card,.profile-hero,.stat-hero,.stat-card,.level-banner,.messenger-card,.message-card,.messenger-hero,.period-premium-row,.hist-card,.archive-item,.stat-tile,.tw-row,.profile-snapshot,.profile-metric,.profile-action,.stats-summary,.stat-summary-card,.stat-metric,.today-summary,.friend-row,.bonus-item,.expense-item,.tpl-item,.auth-box';
-  const HOT = 'button,a,[role=button],.nav-btn,.day-cell,.tpl-chip,.tvt-opt,input,select,textarea,label,summary';
-  let glow, dot;
+  let glow;
   if (fine) {
     glow = document.createElement('div'); glow.className = 'nova-cursor';
-    dot = document.createElement('div'); dot.className = 'nova-dot';
-    body.append(glow, dot);
+    body.append(glow);
   }
   let lastCard = null;
   addEventListener('pointermove', e => {
     tx = e.clientX / innerWidth - .5; ty = e.clientY / innerHeight - .5;
     if (!fine) return;
     glow.style.setProperty('--cx', e.clientX + 'px'); glow.style.setProperty('--cy', e.clientY + 'px');
-    dot.style.setProperty('--dx', e.clientX + 'px'); dot.style.setProperty('--dy', e.clientY + 'px');
     const el = e.target instanceof Element ? e.target : null;
-    dot.classList.toggle('hot', !!el?.closest(HOT));
     const card = el?.closest(CARD);
     if (card) {
       const r = card.getBoundingClientRect();
@@ -97,7 +93,6 @@
     if (lastCard && lastCard !== card) { lastCard.style.removeProperty('--mx'); lastCard.style.removeProperty('--my'); }
     lastCard = card;
   }, { passive: true });
-  document.addEventListener('pointerleave', () => fine && dot.style.setProperty('--dx', '-999px'));
 
   // ── Голографическая карта: наклон и перелив ───────────────────────────
   const tiltCard = document.getElementById('totalCard');

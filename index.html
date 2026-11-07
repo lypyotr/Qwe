@@ -1329,7 +1329,7 @@ body:not(.light) #page-chat .chat-input{background:#2a2a2e;color:#f5f5f7}
 <link rel="stylesheet" href="workspace.css?v=5">
 <link rel="stylesheet" href="studio.css?v=1">
 <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Unbounded:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="nova.css?v=1">
+<link rel="stylesheet" href="nova.css?v=3">
 </head>
 <body class="workspace-app">
 
@@ -3476,7 +3476,8 @@ function counterStatus(){
   else if(behind){text='Нужно ускориться';icon='⚡';cls='warn';}
   else{text='Идёшь в темпе';icon='✅';cls='ok';}
   const n1=x=>!isFinite(x)?'∞':(Math.round(x*10)/10).toLocaleString('ru-RU');
-  const leftStr=hoursLeft>=1?Math.floor(hoursLeft)+'ч '+Math.round((hoursLeft%1)*60)+'м':Math.max(0,Math.round(hoursLeft*60))+'м';
+  const minsLeft=Math.max(0,Math.round(hoursLeft*60));
+  const leftStr=minsLeft>=60?Math.floor(minsLeft/60)+'ч '+(minsLeft%60)+'м':minsLeft+'м';
   return{cls,text,icon,behind,done,
     reqStr:n1(reqPerH),curStr:n1(curPerH),leftStr,
     expectMark:counter.target>0?Math.min(100,expected/counter.target*100):0};
@@ -3493,30 +3494,65 @@ function renderCounter(){
   else renderCounterConfig(card);
 }
 function renderCounterConfig(card){
-  const opts=templates.length
-    ? templates.map(t=>`<option value="${t.id}"${String(t.id)===String(counter.tplId)?' selected':''}>${esc(t.name)} · ${fmt(t.price)} ₽</option>`).join('')
-    : '<option value="">Нет шаблонов — создай ниже</option>';
+  const tpls=templates.map(t=>{
+    const on=String(t.id)===String(counter.tplId);
+    return`<button type="button" class="cnt-tpl${on?' on':''}" role="radio" aria-checked="${on}" onclick="cntPick('${esc(String(t.id))}')">
+      <span class="cnt-tpl-name">${esc(t.name)}</span><span class="cnt-tpl-price">${fmt(t.price)} ₽<small>/шт</small></span></button>`;}).join('');
+  const quick=[50,100,150,200].map(n=>`<button type="button" class="cnt-chip${counter.target===n?' on':''}" onclick="cntSetTarget(${n})">${n}</button>`).join('');
+  const ends=[2,4,8,12].map(h=>`<button type="button" class="cnt-chip" onclick="cntEndIn(${h})">через ${h} ч</button>`).join('');
   card.innerHTML=`
-    <div class="cnt-title">📦 Новый отсчёт</div>
-    <div class="cnt-sub">Выбери изделие и план до конца смены — покажу темп в реальном времени.</div>
-    <div class="cnt-field"><label>Изделие</label>
-      <select class="cnt-input" onchange="cntSet('tplId',this.value)">${opts}</select></div>
-    <div class="cnt-row2">
-      <div class="cnt-field"><label>План, шт</label>
-        <input class="cnt-input" type="number" inputmode="numeric" min="1" placeholder="0" value="${counter.target||''}" oninput="cntSet('target',this.value)"></div>
-      <div class="cnt-field"><label>Конец смены</label>
-        <input class="cnt-input" type="time" value="${counter.endTime||''}" onchange="cntSet('endTime',this.value)"></div>
+    <div class="cnt-hero">
+      <span class="cnt-badge" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 7v10l8 4 8-4V7z"/><path d="m4 7 8 4 8-4M12 11v10"/></svg></span>
+      <div><div class="cnt-title">Новый отсчёт</div>
+      <div class="cnt-sub">Выбери изделие, план и конец смены — покажу темп в реальном времени.</div></div>
     </div>
-    <div class="cnt-field"><label>Начало отсчёта</label>
-      <div class="cnt-seg">
-        <div class="cnt-seg-opt${counter.startMode==='now'?' active':''}" onclick="cntSetStartMode('now')">Сейчас</div>
-        <div class="cnt-seg-opt${counter.startMode==='time'?' active':''}" onclick="cntSetStartMode('time')">С времени</div>
-      </div>
+    <div class="cnt-step"><span class="cnt-step-n">1</span><span class="cnt-step-t">Изделие</span></div>
+    ${templates.length?`<div class="cnt-tpls" role="radiogroup" aria-label="Изделие">${tpls}</div>`:'<div class="cnt-empty">Пока нет шаблонов работ. Добавьте их в разделе «Дневник» → «Шаблоны».</div>'}
+    <div class="cnt-step"><span class="cnt-step-n">2</span><span class="cnt-step-t">План на смену</span></div>
+    <div class="cnt-stepper">
+      <button type="button" class="cnt-sbtn" onclick="cntStep(-10)" aria-label="Уменьшить на 10">−</button>
+      <label class="cnt-stepper-val"><input id="cntTargetIn" type="number" inputmode="numeric" min="1" placeholder="0" value="${counter.target||''}" oninput="cntSet('target',this.value);cntPreview()" aria-label="План, штук"><span>шт</span></label>
+      <button type="button" class="cnt-sbtn" onclick="cntStep(10)" aria-label="Увеличить на 10">+</button>
     </div>
-    ${counter.startMode==='time'?`<div class="cnt-field"><label>Время начала</label>
-      <input class="cnt-input" type="time" value="${counter.startTime||''}" onchange="cntSet('startTime',this.value)"></div>`:''}
-    <button class="cnt-start-btn" onclick="startCounter()">▶ Начать счёт</button>
-    <div class="cnt-msg" id="cntMsg"></div>`;
+    <div class="cnt-chips" id="cntTargetChips">${quick}</div>
+    <div class="cnt-step"><span class="cnt-step-n">3</span><span class="cnt-step-t">Время смены</span></div>
+    <div class="cnt-seg" role="radiogroup" aria-label="Начало отсчёта">
+      <span class="cnt-seg-glider" style="transform:translateX(${counter.startMode==='time'?100:0}%)"></span>
+      <button type="button" class="cnt-seg-opt${counter.startMode!=='time'?' active':''}" onclick="cntSetStartMode('now')">Начать сейчас</button>
+      <button type="button" class="cnt-seg-opt${counter.startMode==='time'?' active':''}" onclick="cntSetStartMode('time')">С определённого времени</button>
+    </div>
+    <div class="cnt-times">
+      ${counter.startMode==='time'?`<label class="cnt-time"><span>Начало</span><input type="time" value="${counter.startTime||''}" onchange="cntSet('startTime',this.value);cntPreview()"></label>`:''}
+      <label class="cnt-time"><span>Конец смены</span><input id="cntEndIn" type="time" value="${counter.endTime||''}" onchange="cntSet('endTime',this.value);cntPreview()"></label>
+    </div>
+    <div class="cnt-chips">${ends}</div>
+    <div class="cnt-preview" id="cntPreview"></div>
+    <button class="cnt-start-btn" onclick="startCounter()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg>Начать счёт</button>
+    <div class="cnt-msg" id="cntMsg" role="alert"></div>`;
+  cntPreview();
+}
+function cntPick(id){counter.tplId=String(id);saveCounter();haptic('light');renderCounter();}
+function cntSetTarget(n){counter.target=Math.max(0,n);saveCounter();haptic('light');
+  const inp=document.getElementById('cntTargetIn');if(inp)inp.value=counter.target||'';
+  document.querySelectorAll('#cntTargetChips .cnt-chip').forEach(c=>c.classList.toggle('on',+c.textContent===counter.target));cntPreview();}
+function cntStep(d){cntSetTarget(Math.max(0,(counter.target||0)+d));}
+function cntEndIn(h){
+  const base=counter.startMode==='time'&&counter.startTime?new Date(todayTs(counter.startTime)):new Date();
+  const e=new Date(base.getTime()+h*3600000);
+  counter.endTime=String(e.getHours()).padStart(2,'0')+':'+String(e.getMinutes()).padStart(2,'0');
+  saveCounter();haptic('light');const inp=document.getElementById('cntEndIn');if(inp)inp.value=counter.endTime;cntPreview();
+}
+// Live summary before start: hours, required pace and expected earnings.
+function cntPreview(){
+  const el=document.getElementById('cntPreview');if(!el)return;
+  document.querySelectorAll('#cntTargetChips .cnt-chip').forEach(c=>c.classList.toggle('on',+c.textContent===counter.target));
+  const tpl=templates.find(t=>String(t.id)===String(counter.tplId));
+  if(!(counter.target>0)||!counter.endTime){el.innerHTML='<span class="cnt-preview-hint">Укажите план и конец смены — здесь появится нужный темп.</span>';return;}
+  const startTs=counter.startMode==='time'&&counter.startTime?todayTs(counter.startTime):Date.now();
+  const hours=(shiftEndTs(startTs,counter.endTime)-startTs)/3600000;
+  const pace=hours>0?counter.target/hours:0,price=tpl?parseFloat(tpl.price)||0:0;
+  const mins=Math.round(hours*60),dur=mins>=60?Math.floor(mins/60)+' ч '+(mins%60)+' мин':mins+' мин';
+  el.innerHTML=`<div><b>${dur}</b><span>на смену</span></div><div><b>${(Math.round(pace*10)/10).toLocaleString('ru-RU')}</b><span>шт в час</span></div>${price?`<div><b>${M(counter.target*price)}</b><span>за план</span></div>`:''}`;
 }
 function renderCounterActive(card){
   if(!card)return;
@@ -3530,11 +3566,12 @@ function renderCounterActive(card){
         <div class="cnt-title-sm">${tpl?esc(tpl.name):'Изделие'}</div>
         <div class="cnt-sub2">до ${counter.endTime||'—'} · план ${fmt(counter.target)} шт</div>
       </div>
-      <div class="cnt-edit" onclick="counterEdit()" title="Изменить">✎</div>
+      <button type="button" class="cnt-edit" onclick="counterEdit()" title="Изменить" aria-label="Изменить отсчёт">✎</button>
     </div>
     <div class="cnt-count-row">
       <button class="cnt-btn minus" onclick="cntInc(-1)">−</button>
-      <div class="cnt-count" id="cntCountWrap" onclick="editCounterCount()" title="Нажми, чтобы ввести число"><span class="cnt-now">${fmt(counter.count)}</span><span class="cnt-of">/ ${fmt(counter.target)}</span></div>
+      <div class="cnt-ring" style="--p:${pct}"><svg viewBox="0 0 120 120" aria-hidden="true"><circle class="cnt-ring-bg" cx="60" cy="60" r="52"/><circle class="cnt-ring-fg" cx="60" cy="60" r="52" pathLength="100"/></svg>
+      <div class="cnt-count" id="cntCountWrap" onclick="editCounterCount()" title="Нажми, чтобы ввести число"><span class="cnt-now">${fmt(counter.count)}</span><span class="cnt-of">из ${fmt(counter.target)} · ${pct}%</span></div></div>
       <button class="cnt-btn plus" onclick="cntInc(1)">+</button>
     </div>
     <div class="cnt-bar">
@@ -6756,9 +6793,10 @@ function checkBackupReminder(){
 // ══════════════════════════════════════════════
 //  STATISTICS
 // ══════════════════════════════════════════════
-// Aggregate every saved period into per-period figures (same formula as History).
+// Aggregate every saved period: totals (same formula as History), per-day and per-work detail.
 function collectPeriodStats(){
   const items=[];
+  const daySum=list=>(list||[]).reduce((s,w)=>s+(parseFloat(w.qty)||0)*(parseFloat(w.price)||0),0);
   for(let i=0;i<localStorage.length;i++){
     const k=localStorage.key(i);
     if(!k||!/^salary_\d+_\d+_\d+$/.test(k))continue;
@@ -6766,50 +6804,181 @@ function collectPeriodStats(){
       const parts=k.replace('salary_','').split('_');
       const y=parseInt(parts[0]),m=parseInt(parts[1]),p=parseInt(parts[2]);
       const d=JSON.parse(localStorage.getItem(k)||'{}');
-      const base=[].concat.apply([],Object.values(d.days||{})).reduce((s,w)=>s+(parseFloat(w.qty)||0)*(parseFloat(w.price)||0),0);
+      const days=[],works={};
+      Object.keys(d.days||{}).forEach(day=>{
+        const list=d.days[day]||[],sum=daySum(list);
+        if(sum>0)days.push({day:parseInt(day),sum});
+        list.forEach(w=>{
+          const name=String(w.name||'Без названия').trim()||'Без названия';
+          const v=(parseFloat(w.qty)||0)*(parseFloat(w.price)||0);if(v<=0)return;
+          const o=works[name]||(works[name]={sum:0,qty:0});o.sum+=v;o.qty+=parseFloat(w.qty)||0;
+        });
+      });
+      const base=days.reduce((s,x)=>s+x.sum,0);
       const bonus=sumBonuses(d.bonuses||[],base);
-      const expenses=(d.expenses||[]).reduce((s,e)=>e&&e.disabled?s:s+(parseFloat(e.amount)||0),0);
+      const worked=days.length;
+      // Same rules as calcExpensesTotal: per-day items × worked days, monthly items split in half.
+      const expenses=(d.expenses||[]).reduce((s,e)=>{
+        if(!e||e.disabled)return s;const a=parseFloat(e.amount)||0;
+        return s+(e.mode==='day'?a*worked:e.mode==='month'?a/2:a);
+      },0);
       let total=base+bonus;if(d.taxEnabled)total*=0.87;total=Math.max(0,total);
-      const worked=Object.keys(d.days||{}).filter(day=>(d.days[day]||[]).reduce((s,w)=>s+(parseFloat(w.qty)||0)*(parseFloat(w.price)||0),0)>0).length;
-      items.push({k,y,m,p,total,base,bonus,expenses,worked});
+      items.push({k,y,m,p,total,base,bonus,expenses,worked,days,works,tax:!!d.taxEnabled});
     }catch(e){}
   }
   return items.sort((a,b)=>a.y-b.y||a.m-b.m||a.p-b.p);
 }
+let statsRange='all';
+function setStatsRange(r){statsRange=r;renderStats();}
 function renderStats(){
   const body=document.getElementById('statsBody');if(!body)return;
-  const items=collectPeriodStats();
-  const withData=items.filter(x=>x.total>0||x.worked>0);
-  if(!withData.length){body.innerHTML='<div class="calc-card"><div class="stat-empty">Пока нет данных.<br>Заполните хотя бы один период.</div></div>';return;}
+  const all=collectPeriodStats().filter(x=>x.total>0||x.worked>0);
+  if(!all.length){body.innerHTML='<div class="calc-card"><div class="stat-empty">Пока нет данных.<br>Заполните хотя бы один период.</div></div>';return;}
+  const years=[...new Set(all.map(x=>x.y))].sort((a,b)=>b-a);
+  if(statsRange!=='all'&&!years.includes(+statsRange))statsRange='all';
+  const list=statsRange==='all'?all:all.filter(x=>x.y===+statsRange);
   const sum=a=>a.reduce((s,x)=>s+x,0);
-  const totalEarned=sum(withData.map(x=>x.total));
-  const totalWorked=sum(withData.map(x=>x.worked));
-  const totalBonus=sum(withData.map(x=>x.bonus));
-  const totalExp=sum(withData.map(x=>x.expenses));
-  const avgPeriod=Math.round(totalEarned/withData.length);
-  const avgDay=totalWorked?Math.round(totalEarned/totalWorked):0;
-  const best=withData.reduce((a,b)=>b.total>a.total?b:a,withData[0]);
-  const pLbl=x=>`${MS[x.m]} ${x.y} · ${x.p===1?'аванс':'зп'}`;
-  // last up to 12 periods for the trend
-  const trend=withData.slice(-12);
-  const maxT=Math.max(...trend.map(x=>x.total),1);
-  const bars=trend.map(x=>{
-    const h=Math.max(3,Math.round(x.total/maxT*64));
-    return`<div class="stat-trend-bar"><div class="stat-tb-col"><div class="stat-tb-fill" style="height:${h}px" title="${M(x.total)}"></div></div><div class="stat-tb-lbl">${MS[x.m].slice(0,3)}${x.p===1?'¹':'²'}</div></div>`;
-  }).join('');
+  const pct=(a,b)=>b?Math.round(a/b*100):0;
+  const rub=curSym()==='₽';
+  const short=n=>{if(!rub)return M(n);const a=Math.abs(n);
+    return a>=1e6?(n/1e6).toFixed(1).replace('.',',')+'М':a>=1e4?Math.round(n/1e3)+'к':a>=1e3?(n/1e3).toFixed(1).replace('.',',')+'к':String(Math.round(n));};
+  const lastDay=x=>new Date(x.y,x.m+1,0).getDate();
+  const range=x=>x.p===1?'1–15':'16–'+lastDay(x);
+  const pName=x=>`${range(x)} ${MS[x.m]} ${x.y}`;
+  const earned=sum(list.map(x=>x.total)),worked=sum(list.map(x=>x.worked));
+  const bonus=sum(list.map(x=>x.bonus)),exp=sum(list.map(x=>x.expenses)),net=earned-exp;
+  const avgPeriod=earned/list.length,avgDay=worked?earned/worked:0;
+  const best=list.reduce((a,b)=>b.total>a.total?b:a,list[0]);
+  const now=new Date(),today={y:now.getFullYear(),m:now.getMonth(),p:now.getDate()<=15?1:2};
+  const cur=list.find(x=>x.y===today.y&&x.m===today.m&&x.p===today.p)||null;
+  const done=list.filter(x=>x!==cur);
+  const last=list[list.length-1],prev=list[list.length-2];
+  const lastDone=done[done.length-1];
+  const doneAvg=done.length?sum(done.map(x=>x.total))/done.length:avgPeriod;
+  const anyTax=list.some(x=>x.tax);
+  // Growth is green; for expenses (inverse=true) growth is red.
+  const delta=(a,b,inverse)=>{if(!b)return'';const d=Math.round((a-b)/b*100);
+    const cls=d===0?'':(d>0)!==!!inverse?'up':'down';
+    return`<span class="st-delta ${cls}">${d>0?'▲':d<0?'▼':'•'} ${Math.abs(d)}%</span>`;};
+
+  // Chart: every period of the range, stacked works + bonuses, average line.
+  const maxT=Math.max(...list.map(x=>Math.max(x.total,x.base+x.bonus)),1);
+  const avgPos=Math.min(100,avgPeriod/maxT*100);
+  const cols=list.map(x=>{
+    const gross=x.base+x.bonus||1,h=x.total/maxT*100;
+    const bonusPart=x.bonus>0?Math.max(4,x.bonus/gross*100):0;
+    const tip=`${pName(x)}: ${M(x.total)} · ${x.worked} ${dayWord(x.worked)}${x.bonus>0?' · доплаты '+M(x.bonus):''}`;
+    return`<button type="button" class="st-col${x===best?' best':''}${x===cur?' cur':''}" onclick="goToHistory('${x.y}-${x.m}',${x.p});switchPage('work')" title="${esc(tip)}" aria-label="${esc(tip)}">
+      <span class="st-col-plot"><span class="st-col-bar" style="height:${Math.max(1,h)}%"><span class="st-col-val">${short(x.total)}</span><i style="height:${bonusPart}%"></i></span></span>
+      <span class="st-col-lbl"><b>${MS[x.m]}</b>${range(x)}</span>
+    </button>`;}).join('');
+
+  // Weekdays (Mon-first): average per worked day and number of shifts.
+  const WD=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'],wd=WD.map(()=>({sum:0,n:0}));
+  list.forEach(x=>x.days.forEach(d=>{const i=(new Date(x.y,x.m,d.day).getDay()+6)%7;wd[i].sum+=d.sum;wd[i].n++;}));
+  const wdAvg=wd.map(o=>o.n?o.sum/o.n:0),wdMax=Math.max(...wdAvg,1),wdTop=wdAvg.indexOf(Math.max(...wdAvg));
+  const wdHtml=wd.map((o,i)=>`<div class="st-wd${i===wdTop&&o.n?' top':''}" title="${WD[i]}: в среднем ${M(wdAvg[i])} · смен: ${o.n}">
+      <span class="st-wd-val">${o.n?short(wdAvg[i]):'—'}</span>
+      <span class="st-wd-track"><span class="st-wd-bar" style="height:${wdAvg[i]/wdMax*100}%"></span></span>
+      <span class="st-wd-lbl">${WD[i]}</span><span class="st-wd-n">${o.n}</span></div>`).join('');
+  const bestDay=list.flatMap(x=>x.days.map(d=>({...d,x}))).reduce((a,b)=>!a||b.sum>a.sum?b:a,null);
+
+  // Works ranking.
+  const wmap={};list.forEach(x=>Object.entries(x.works).forEach(([n,o])=>{const t=wmap[n]||(wmap[n]={sum:0,qty:0});t.sum+=o.sum;t.qty+=o.qty;}));
+  const works=Object.entries(wmap).sort((a,b)=>b[1].sum-a[1].sum);
+  const worksTotal=sum(works.map(w=>w[1].sum))||1,wTop=works.length?works[0][1].sum:1;
+  const worksHtml=works.slice(0,6).map(([n,o],i)=>`<div class="st-work">
+      <div class="st-work-head"><span class="st-work-rank">${i+1}</span><span class="st-work-name">${esc(n)}</span><span class="st-work-sum">${M(o.sum)}</span></div>
+      <div class="st-work-track"><span style="width:${o.sum/wTop*100}%"></span></div>
+      <div class="st-work-meta">${pct(o.sum,worksTotal)}% заработка · ${Math.round(o.qty).toLocaleString('ru-RU')} шт. · ≈ ${M(o.sum/(o.qty||1))}/шт.</div></div>`).join('')
+    +(works.length>6?`<div class="st-more">и ещё ${works.length-6} ${works.length-6===1?'вид':'видов'} работ</div>`:'');
+
+  // Months table, newest first.
+  const months={};list.forEach(x=>{const key=x.y*12+x.m,o=months[key]||(months[key]={y:x.y,m:x.m,total:0,exp:0,worked:0});o.total+=x.total;o.exp+=x.expenses;o.worked+=x.worked;});
+  const mRows=Object.values(months).sort((a,b)=>(b.y*12+b.m)-(a.y*12+a.m));
+  const MF=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+  const tableHtml=mRows.map(o=>`<tr>
+      <th scope="row">${MF[o.m]}<small>${o.y}</small></th>
+      <td class="st-num"><b>${M(o.total)}</b></td>
+      <td class="st-num st-neg">${o.exp?'−'+M(o.exp):'—'}</td>
+      <td class="st-num"><b>${M(o.total-o.exp)}</b></td>
+      <td class="st-num">${o.worked}</td>
+      <td class="st-num">${o.worked?M(o.total/o.worked):'—'}</td></tr>`).join('');
+
+  const first=list[0];
+  const chips=['all',...years].map(r=>`<button type="button" class="st-chip${String(r)===String(statsRange)?' on':''}" onclick="setStatsRange('${r}')">${r==='all'?'Всё время':r}</button>`).join('');
+  const netShare=earned>0?Math.max(0,Math.min(100,net/earned*100)):0;
+
   body.innerHTML=`
-    <div class="stat-grid">
-      <div class="stat-box wide"><div class="stat-box-lbl">Заработано всего</div><div class="stat-box-val">${M(totalEarned)}</div><div class="stat-box-sub">${withData.length} ${_periodWord(withData.length)} · ${totalWorked} ${dayWord(totalWorked)}</div></div>
-      <div class="stat-box"><div class="stat-box-lbl">Средний период</div><div class="stat-box-val">${M(avgPeriod)}</div></div>
-      <div class="stat-box"><div class="stat-box-lbl">Средний день</div><div class="stat-box-val">${M(avgDay)}</div></div>
-      <div class="stat-box"><div class="stat-box-lbl">Доплаты</div><div class="stat-box-val">${M(totalBonus)}</div></div>
-      <div class="stat-box"><div class="stat-box-lbl">Расходы</div><div class="stat-box-val">${M(totalExp)}</div></div>
-      <div class="stat-box wide"><div class="stat-box-lbl">🏆 Лучший период</div><div class="stat-box-val">${M(best.total)}</div><div class="stat-box-sub">${pLbl(best)}</div></div>
+  <div class="st">
+    <div class="st-chips" role="group" aria-label="Период статистики">${chips}</div>
+
+    <section class="st-hero">
+      <div class="st-hero-main">
+        <div class="st-eyebrow">Заработано ${statsRange==='all'?'за всё время':'в '+statsRange+' году'}</div>
+        <div class="st-hero-val">${M(earned)}</div>
+        <div class="st-hero-sub">${list.length} ${_periodWord(list.length)} · ${worked} ${dayWord(worked)} · ${range(first)} ${MS[first.m]} ${first.y} — ${range(last)} ${MS[last.m]} ${last.y}</div>
+      </div>
+      <div class="st-hero-split">
+        <div class="st-split-row"><span>На руки после расходов</span><b>${M(net)}</b></div>
+        <div class="st-split-bar" title="На руки ${Math.round(netShare)}% · расходы ${100-Math.round(netShare)}%"><span style="width:${netShare}%"></span></div>
+        <div class="st-split-legend"><span><i class="k-net"></i>На руки ${Math.round(netShare)}%</span><span><i class="k-exp"></i>Расходы ${M(exp)}</span></div>
+      </div>
+    </section>
+
+    <div class="st-kpis">
+      <div class="st-kpi"><div class="st-kpi-lbl">Средний период</div><div class="st-kpi-val">${M(avgPeriod)}</div><div class="st-kpi-sub">${lastDone&&done.length>1?'прошлый '+delta(lastDone.total,doneAvg)+' к среднему':'по '+list.length+' '+_periodWord(list.length)}</div></div>
+      <div class="st-kpi"><div class="st-kpi-lbl">Средний рабочий день</div><div class="st-kpi-val">${M(avgDay)}</div><div class="st-kpi-sub">${bestDay?'рекорд '+M(bestDay.sum)+' · '+bestDay.day+' '+MS[bestDay.x.m]:''}</div></div>
+      <div class="st-kpi"><div class="st-kpi-lbl">Доплаты и премии</div><div class="st-kpi-val">${M(bonus)}</div><div class="st-kpi-sub">${pct(bonus,earned)}% от заработка</div></div>
+      <div class="st-kpi"><div class="st-kpi-lbl">Расходы</div><div class="st-kpi-val">${M(exp)}</div><div class="st-kpi-sub">${pct(exp,earned)}% от заработка</div></div>
     </div>
-    <div class="calc-card">
-      <div class="calc-card-title">Динамика (последние ${trend.length})</div>
-      <div class="stat-trend">${bars}</div>
-    </div>`;
+
+    <section class="calc-card st-card">
+      <div class="st-card-head">
+        <div><h3 class="calc-card-title">По периодам</h3><div class="st-hint">Нажмите на столбик, чтобы открыть период</div></div>
+        <div class="st-legend"><span><i class="k-work"></i>Работы</span><span><i class="k-bonus"></i>Доплаты</span><span><i class="k-avg"></i>Среднее ${short(avgPeriod)}</span></div>
+      </div>
+      <div class="st-chart-scroll"><div class="st-chart" style="--n:${list.length}">
+        <div class="st-avg" style="--a:${avgPos/100}"></div>${cols}
+      </div></div>
+      <div class="st-best">🏆 Лучший период — <b>${pName(best)}</b>: ${M(best.total)}${cur?' · <span class="st-cur-key"></span> текущий период ещё идёт':''}</div>
+    </section>
+
+    <div class="st-two">
+      <section class="calc-card st-card">
+        <h3 class="calc-card-title">${last===cur?'Текущий период':'Последний период'}</h3>
+        <div class="st-hint">${pName(last)}${prev?' в сравнении с '+pName(prev):''}${last===cur?' · период ещё идёт':''}</div>
+        <div class="st-cmp">
+          <div><span>Заработано</span><b>${M(last.total)}</b>${prev?delta(last.total,prev.total):''}</div>
+          <div><span>Рабочих дней</span><b>${last.worked}</b>${prev?delta(last.worked,prev.worked):''}</div>
+          <div><span>В среднем за день</span><b>${M(last.worked?last.total/last.worked:0)}</b>${prev&&prev.worked?delta(last.total/(last.worked||1),prev.total/prev.worked):''}</div>
+          <div><span>Расходы</span><b>${M(last.expenses)}</b>${prev&&prev.expenses?delta(last.expenses,prev.expenses,true):''}</div>
+        </div>
+      </section>
+      <section class="calc-card st-card">
+        <h3 class="calc-card-title">Дни недели</h3>
+        <div class="st-hint">Средний заработок за смену${wd[wdTop].n?' · самый доходный — '+['понедельник','вторник','среда','четверг','пятница','суббота','воскресенье'][wdTop]:''}</div>
+        <div class="st-wds">${wdHtml}</div>
+        <div class="st-hint st-wd-foot">Цифра под днём — число смен</div>
+      </section>
+    </div>
+
+    <div class="st-two">
+      <section class="calc-card st-card">
+        <h3 class="calc-card-title">Что приносит больше всего</h3>
+        <div class="st-hint">Виды работ по сумме${anyTax?' (до налога)':''}</div>
+        <div class="st-works">${worksHtml||'<div class="st-more">Нет данных о работах</div>'}</div>
+      </section>
+      <section class="calc-card st-card">
+        <h3 class="calc-card-title">По месяцам</h3>
+        <div class="st-hint">Аванс и зарплата вместе</div>
+        <div class="st-table-wrap"><table class="st-table">
+          <thead><tr><th scope="col">Месяц</th><th scope="col" class="st-num">Заработано</th><th scope="col" class="st-num">Расходы</th><th scope="col" class="st-num">На руки</th><th scope="col" class="st-num">Дней</th><th scope="col" class="st-num">В день</th></tr></thead>
+          <tbody>${tableHtml}</tbody></table></div>
+      </section>
+    </div>
+  </div>`;
+  const sc=body.querySelector('.st-chart-scroll');if(sc)sc.scrollLeft=sc.scrollWidth;
 }
 function _periodWord(n){const a=n%10,b=n%100;return a===1&&b!==11?'период':a>=2&&a<=4&&(b<10||b>=20)?'периода':'периодов';}
 
@@ -7513,7 +7682,7 @@ if(!DEMO_MODE)checkBackupReminder(); // real accounts only; demo is disposable
 <script src="workspace.js?v=5"></script>
 <script src="workspace-avatar.js?v=1"></script>
 <script src="studio.js?v=1"></script>
-<script src="nova.js?v=1"></script>
+<script src="nova.js?v=2"></script>
 </body>
 </html>
 
