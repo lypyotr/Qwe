@@ -1,12 +1,12 @@
 {
-  "name": "Калькулятор зарплаты",
+  "name": "Зарплата — личный учёт труда",
   "short_name": "Зарплата",
-  "description": "Калькулятор зарплаты по периодам",
+  "description": "Твой труд. В ясных цифрах. Работы, премии, расходы и планы.",
   "start_url": "/Qwe/",
   "scope": "/Qwe/",
   "display": "standalone",
-  "background_color": "#101816",
-  "theme_color": "#101816",
+  "background_color": "#efeee7",
+  "theme_color": "#efeee7",
   "orientation": "portrait",
   "icons": [
     {
@@ -16,3 +16,4 @@
     }
   ]
 }
+
