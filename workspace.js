@@ -64,7 +64,7 @@
 
   const settings = document.createElement('details');
   settings.className = 'workspace-settings';
-  settings.innerHTML = '<summary><span>Параметры расчёта<small>Налог и счётчик изделий</small></span><span class="settings-status" id="workspaceTaxStatus"></span><span class="settings-chevron" aria-hidden="true">⌄</span></summary><div class="workspace-settings-body"></div>';
+  settings.innerHTML = '<summary><span>Параметры расчёта<small>Налог и счётчик изделий</small></span><span class="settings-status" id="workspaceTaxStatus"></span><span class="settings-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span></summary><div class="workspace-settings-body"></div>';
   const counterRow = document.getElementById('counterToggleRow');
   counterRow.before(settings);
   const settingsBody = settings.querySelector('.workspace-settings-body');
@@ -349,5 +349,6 @@
   if (selectedDay === null) selectDay(preferredPeriodDay());
   else renderDayPanel();
 })();
+
 
 

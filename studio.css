@@ -1,5 +1,5 @@
 /* ЗАРПЛАТА. — an editorial instrument for the value of everyday work. */
-.studio-loader-mark{display:grid;place-items:center;border:1px solid currentColor;border-radius:50%;height:90px;width:90px;font:500 44px 'Onest',sans-serif;letter-spacing:-4px;animation:studio-arrive .5s ease}
+.studio-loader-mark{display:grid;place-items:center;border:1px solid currentColor;border-radius:50%;height:90px;width:90px;font:500 44px 'Nunito',sans-serif;letter-spacing:-4px;animation:studio-arrive .5s ease}
 html:has(body.studio){background:#161a18}
 html:has(body.studio.light){background:#efeee7}
 body.studio{
@@ -7,7 +7,7 @@ body.studio{
   --text:#f2f1e8;--muted:#acb09e;--accent:#d5fa45;--accent2:#a6beed;--accent3:#d5fa45;
   --accent-ink:#d5fa45;--accent2-ink:#a6beed;--danger:#ff9473;--warn:#e5c36a;
   --card-shadow:none;--app-max:1660px;--paper:#edece2;--ink:#20251d;--signal:#ed6845;
-  font-family:'Onest','Manrope',sans-serif;letter-spacing:-.3px;background:var(--bg);color:var(--text);
+  font-family:'Nunito','Manrope',sans-serif;letter-spacing:-.3px;background:var(--bg);color:var(--text);
 }
 body.studio.light{--bg:#efeee7;--surface:#faf9f3;--surface2:#e7e7dd;--border:#d3d4c7;--text:#25291f;--muted:#707364;--accent-ink:#38411f;--accent2-ink:#3f5e92;--danger:#b34225;--accent3:#617b16;--warn:#8e6420;color-scheme:light}
 body.studio::before{content:'';position:fixed;inset:0;z-index:-1;background-image:radial-gradient(var(--muted) .45px,transparent .45px);background-size:5px 5px;opacity:.045;pointer-events:none}
@@ -17,29 +17,29 @@ body.studio :is(button,[role=button],a){touch-action:manipulation}
 body.studio :is(button,[role=button],a):focus-visible{outline:2px solid var(--signal)!important;outline-offset:4px}
 body.studio :is(.ui-button,.modal-btn,.auth-btn,.add-btn,.add-work-btn,.workspace-add-button){transition:background .2s,color .2s,transform .2s,border-color .2s}
 body.studio [hidden]{display:none!important}
-body.studio .notif-banner{position:relative;inset:auto;left:auto;right:auto;top:auto;bottom:auto;transform:none;z-index:1;width:auto;max-width:none;margin:0;padding:12px 20px;min-height:44px;box-sizing:border-box;border:0;border-bottom:1px solid #20251d30;border-radius:0;background:var(--accent);color:var(--ink);box-shadow:none;font-size:11px;gap:14px}
-body.studio .notif-banner-ok{background:var(--ink);color:var(--accent);border:0;border-radius:2px;font:9px 'IBM Plex Mono',monospace;padding:8px 12px;flex:none}
-.studio-small,.studio-eyebrow,.studio-journal-label,.studio-hero-top,.studio-hero-caption,.studio-footer,.studio-header-note{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.6px;font-weight:400}
+body.studio .notif-banner{position:relative;inset:auto;left:auto;right:auto;top:auto;bottom:auto;transform:none;z-index:1;width:auto;max-width:none;margin:0;padding:12px 20px;min-height:44px;box-sizing:border-box;border:0;border-bottom:1px solid #20251d30;border-radius:0;background:var(--accent);color:var(--ink);box-shadow:none;font-size:14px;gap:14px}
+body.studio .notif-banner-ok{background:var(--ink);color:var(--accent);border:0;border-radius:2px;font:14px 'Nunito',sans-serif;padding:8px 12px;flex:none}
+.studio-small,.studio-eyebrow,.studio-journal-label,.studio-hero-top,.studio-hero-caption,.studio-footer,.studio-header-note{font-family:'Nunito',sans-serif;font-size:14px;letter-spacing:.6px;font-weight:400}
 .studio-brand-period{color:var(--signal)}
 
 /* The shared masthead deliberately feels like the first page of a journal. */
 body.studio .workspace-topbar{display:grid;grid-template-areas:'brand tools' 'heading heading' 'account account';grid-template-columns:1fr auto;gap:24px 16px;align-items:center;margin:0 20px;padding:28px 0 14px;border-bottom:1px solid var(--border)}
-body.studio .workspace-brandbar{grid-area:brand;display:flex!important;visibility:visible;gap:9px;font:600 12px 'Onest',sans-serif;letter-spacing:.1px}
+body.studio .workspace-brandbar{grid-area:brand;display:flex!important;visibility:visible;gap:9px;font:600 14px 'Nunito',sans-serif;letter-spacing:.1px}
 body.studio .workspace-brand-icon{width:28px;height:28px;color:var(--text)}
 body.studio .workspace-brand-icon svg{width:28px;height:28px}
 body.studio .workspace-tools{grid-area:tools;display:flex;gap:5px;align-items:center}
 body.studio .workspace-heading{grid-area:heading;min-width:0}
-body.studio .workspace-title{font-family:'Onest',sans-serif;font-size:clamp(34px,4.4vw,65px);line-height:1.03;font-weight:500;letter-spacing:-2.6px;margin:14px 0 0;max-width:100%}
+body.studio .workspace-title{font-family:'Nunito',sans-serif;font-size:clamp(34px,4.4vw,65px);line-height:1.03;font-weight:500;letter-spacing:-2.6px;margin:14px 0 0;max-width:100%}
 .studio-eyebrow{display:flex;gap:8px;align-items:center;color:var(--muted)}
 .studio-live-dot{width:6px;height:6px;border-radius:50%;background:var(--signal);box-shadow:0 0 0 3px color-mix(in srgb,var(--signal) 10%,transparent)}
 .studio-page-index{margin-left:auto;color:var(--muted)}
-.studio-subtitle{font-family:'Prata',Georgia,serif;font-size:18px;letter-spacing:-.4px;margin:14px 0 0;color:var(--muted);line-height:1.5}
+.studio-subtitle{font-family:'Nunito',sans-serif;font-size:18px;letter-spacing:-.4px;margin:14px 0 0;color:var(--muted);line-height:1.5}
 body.studio .workspace-account{grid-area:account;display:flex;justify-content:space-between;align-items:center;margin:0;gap:12px}
-body.studio .workspace-date{font:10px 'IBM Plex Mono',monospace;color:var(--muted)}
-.studio-header-note{font-size:8px;letter-spacing:.3px;color:var(--muted)}
+body.studio .workspace-date{font:14px 'Nunito',sans-serif;color:var(--muted)}
+.studio-header-note{font-size:14px;letter-spacing:.3px;color:var(--muted)}
 body.studio .workspace-tools :is(.workspace-icon-button,.workspace-search-button,.workspace-avatar-button){background:transparent;border:1px solid var(--border);border-radius:50%;height:38px;width:38px;min-height:38px;min-width:38px;padding:10px;color:var(--text);box-shadow:none}
-body.studio .workspace-tools .workspace-avatar-button{padding:0;background:var(--text);color:var(--bg);font-size:13px}
-body.studio .workspace-tools .sync-pill{background:transparent;border:0;color:var(--muted);padding:4px 6px;min-height:32px;font:9px 'IBM Plex Mono',monospace;max-width:100px}
+body.studio .workspace-tools .workspace-avatar-button{padding:0;background:var(--text);color:var(--bg);font-size:14px}
+body.studio .workspace-tools .sync-pill{background:transparent;border:0;color:var(--muted);padding:4px 6px;min-height:32px;font:14px 'Nunito',sans-serif;max-width:100px}
 body.studio .workspace-tools .sp-dot{background:var(--accent);width:5px;height:5px}
 body.studio .workspace-tools svg{width:17px;height:17px}
 body.studio .page{animation:studio-arrive .45s cubic-bezier(.2,.65,.2,1);min-width:0}
@@ -48,108 +48,108 @@ body.studio .page>.synbar{display:none}
 body.studio .workspace-period{display:grid;grid-template-columns:38px minmax(0,1fr) 38px auto;gap:6px;align-items:center;padding:0 0 14px;margin:22px 20px 0;background:transparent;border:0;border-bottom:1px solid var(--border);border-radius:0}
 body.studio .workspace-period .ui-icon{background:var(--surface);border:1px solid var(--border);border-radius:50%;height:36px;width:36px;min-height:36px;min-width:36px;font-size:25px}
 body.studio .workspace-period-label{font-size:14px;text-align:center;font-weight:500;letter-spacing:-.3px}
-body.studio .workspace-period-label small{font:8px 'IBM Plex Mono',monospace;color:var(--muted);margin-top:4px}
+body.studio .workspace-period-label small{font:14px 'Nunito',sans-serif;color:var(--muted);margin-top:4px}
 body.studio .work-layout{margin:18px 20px 30px;gap:22px;display:grid;grid-template-columns:minmax(0,1fr)}
 body.studio .work-overview,body.studio .work-journal{display:grid;gap:16px;min-width:0;align-content:start}
 
 /* An acid paper object, with a slowly moving, pointer-reactive orbital seal. */
 body.studio .work-overview .total-card{background:var(--accent);color:var(--ink);border:0;border-radius:3px;padding:24px;box-shadow:none;min-height:304px;display:flex;flex-direction:column;position:relative;overflow:hidden;isolation:isolate;--muted:#566128;--accent2:#273818;--danger:#9f341e}
-.studio-hero-top{display:flex;align-items:center;justify-content:space-between;gap:12px;position:relative;z-index:1;font-size:8px;letter-spacing:.5px;margin-bottom:30px;line-height:1.5}
+.studio-hero-top{display:flex;align-items:center;justify-content:space-between;gap:12px;position:relative;z-index:1;font-size:14px;letter-spacing:.5px;margin-bottom:30px;line-height:1.5}
 .studio-asterisk{font-size:24px;line-height:1;animation:studio-spin 32s linear infinite}
-body.studio .total-card .total-label{font:11px 'IBM Plex Mono',monospace;color:#455027;letter-spacing:0;text-transform:none;margin-bottom:8px;max-width:100%;z-index:1;position:relative}
-body.studio .total-card .total-amount{font:500 clamp(45px,9vw,82px)/1.05 'Onest',sans-serif;letter-spacing:-3px;font-variant-numeric:tabular-nums;color:var(--ink);position:relative;z-index:1;overflow-wrap:anywhere}
+body.studio .total-card .total-label{font:14px 'Nunito',sans-serif;color:#455027;letter-spacing:0;text-transform:none;margin-bottom:8px;max-width:100%;z-index:1;position:relative}
+body.studio .total-card .total-amount{font:500 clamp(45px,9vw,82px)/1.05 'Nunito',sans-serif;letter-spacing:-3px;font-variant-numeric:tabular-nums;color:var(--ink);position:relative;z-index:1;overflow-wrap:anywhere}
 body.studio .total-card .total-amount span{font-size:.48em;font-weight:400;opacity:.75;letter-spacing:-2px}
-body.studio .total-card .total-hint{color:#505a32;font-size:9px;opacity:1;margin-top:10px;position:relative;z-index:1;line-height:1.6;max-width:100%}
+body.studio .total-card .total-hint{color:#505a32;font-size:14px;opacity:1;margin-top:10px;position:relative;z-index:1;line-height:1.6;max-width:100%}
 body.studio .total-card .total-meta{display:flex;gap:20px;flex-wrap:wrap;align-items:start;border-top:1px solid #20251d33;padding-top:18px;margin-top:28px;position:relative;z-index:1}
-body.studio .total-card .meta-item{background:transparent!important;border:0;padding:0;display:grid;gap:3px;font-size:9px;color:#596334;line-height:1.5;border-radius:0}
-body.studio .total-card .meta-item strong{font:500 23px 'Onest',sans-serif;color:var(--ink);letter-spacing:-.9px}
-.studio-hero-caption{border-top:1px solid #20251d33;margin-top:auto;padding-top:14px;display:flex;align-items:center;justify-content:space-between;font-size:8px;letter-spacing:.5px;position:relative;z-index:1}
+body.studio .total-card .meta-item{background:transparent!important;border:0;padding:0;display:grid;gap:3px;font-size:14px;color:#596334;line-height:1.5;border-radius:0}
+body.studio .total-card .meta-item strong{font:500 23px 'Nunito',sans-serif;color:var(--ink);letter-spacing:-.9px}
+.studio-hero-caption{border-top:1px solid #20251d33;margin-top:auto;padding-top:14px;display:flex;align-items:center;justify-content:space-between;font-size:14px;letter-spacing:.5px;position:relative;z-index:1}
 .studio-hero-caption>span:last-child{font-size:22px;line-height:1}
 .studio-orbit{position:absolute;right:-46px;top:45px;width:210px;color:#43551c;opacity:.16;z-index:0;pointer-events:none;transform:translate(var(--orbit-x,0px),var(--orbit-y,0px));transition:transform .5s cubic-bezier(.2,.7,.2,1)}
 .studio-orbit svg{width:100%;animation:studio-spin 65s linear infinite}
 body.studio .total-card .cur-toggle{position:static;margin:0!important;padding:0;background:transparent;border:0;color:var(--ink)}
 body.studio .total-card .workspace-balance-stats{position:absolute;top:52px;right:18px;width:30px;height:30px;min-height:30px;min-width:30px;opacity:.7;color:var(--ink);z-index:2;padding:7px;border:1px solid #20251d40;border-radius:50%;background:transparent}
 body.studio .total-card .total-view-toggle{background:#20251d12;border:1px solid #20251d25;border-radius:30px;margin:0 0 12px;padding:2px;z-index:2}
-body.studio .total-card .tvt-opt{border-radius:20px;padding:5px 11px;font-size:10px;color:var(--ink)}
+body.studio .total-card .tvt-opt{border-radius:20px;padding:5px 11px;font-size:14px;color:var(--ink)}
 body.studio .total-card .tvt-opt.active{background:var(--ink);color:var(--accent)}
-body.studio .total-card .compare-badge{margin-top:10px;border:0;background:transparent;padding:0;color:#425027;font:9px 'IBM Plex Mono',monospace}
+body.studio .total-card .compare-badge{margin-top:10px;border:0;background:transparent;padding:0;color:#425027;font:14px 'Nunito',sans-serif}
 body.studio .workspace-payday{border-radius:3px;border:1px solid var(--border);background:var(--surface);padding:18px;gap:14px;position:relative}
 body.studio .payday-icon{width:38px;height:38px;border-radius:50%;border:1px solid var(--border);background:transparent;color:var(--text)}
-body.studio .payday-description small{font:8px 'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
-body.studio .payday-description strong{font:400 23px 'Prata',Georgia,serif;letter-spacing:-.6px;color:var(--text)}
-body.studio .payday-timing{font:9px/1.5 'IBM Plex Mono',monospace;max-width:110px;color:var(--muted)}
-body.studio .work-overview>.workspace-add-button{width:100%;justify-content:space-between;min-height:60px;border-radius:3px;background:var(--text);color:var(--bg);padding:16px 20px;font-size:13px;font-weight:500;box-shadow:none}
+body.studio .payday-description small{font:14px 'Nunito',sans-serif;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
+body.studio .payday-description strong{font:400 23px 'Nunito',sans-serif;letter-spacing:-.6px;color:var(--text)}
+body.studio .payday-timing{font:14px/1.5 'Nunito',sans-serif;max-width:110px;color:var(--muted)}
+body.studio .work-overview>.workspace-add-button{width:100%;justify-content:space-between;min-height:60px;border-radius:3px;background:var(--text);color:var(--bg);padding:16px 20px;font-size:14px;font-weight:500;box-shadow:none}
 body.studio .work-overview>.workspace-add-button .button-label{display:inline}
 body.studio .work-overview>.workspace-add-button svg{order:1;width:24px;height:24px}
 body.studio .workspace-settings{border-radius:3px;border-color:var(--border);background:transparent}
-body.studio .workspace-settings>summary{min-height:62px;padding:15px 18px;font-size:12px;font-weight:500;gap:8px}
-body.studio .workspace-settings summary small{font-size:9px;color:var(--muted)}
-body.studio .settings-status{font:8px 'IBM Plex Mono',monospace;border:0;padding:0;color:var(--muted)}
+body.studio .workspace-settings>summary{min-height:62px;padding:15px 18px;font-size:14px;font-weight:500;gap:8px}
+body.studio .workspace-settings summary small{font-size:14px;color:var(--muted)}
+body.studio .settings-status{font:14px 'Nunito',sans-serif;border:0;padding:0;color:var(--muted)}
 body.studio .workspace-settings .tax-row{background:transparent!important}
-body.studio .workspace-currency-row{font-size:10px}
+body.studio .workspace-currency-row{font-size:14px}
 body.studio .toggle.on,body.studio.light .toggle.on{background:var(--accent)}
 body.studio .toggle{background:var(--border)}
 
 /* Calendar and daily entries read as numbered pages, not a grid of widgets. */
 body.studio .day-strip-wrap{background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:20px}
-.studio-journal-label{display:flex;justify-content:space-between;gap:10px;color:var(--muted);font-size:8px;padding-bottom:17px;border-bottom:1px solid var(--border);margin-bottom:18px}
-.studio-journal-label span:last-child{font-size:7px;text-align:right}
+.studio-journal-label{display:flex;justify-content:space-between;gap:10px;color:var(--muted);font-size:14px;padding-bottom:17px;border-bottom:1px solid var(--border);margin-bottom:18px}
+.studio-journal-label span:last-child{font-size:14px;text-align:right}
 body.studio .day-strip-label{align-items:center;margin:0 0 8px;gap:12px;line-height:1.4}
-body.studio #workspaceCalendarMonth{font:400 23px 'Prata',Georgia,serif;letter-spacing:-.6px}
+body.studio #workspaceCalendarMonth{font:400 23px 'Nunito',sans-serif;letter-spacing:-.6px}
 body.studio .calendar-actions{display:flex;gap:4px}
 body.studio .calendar-actions .workspace-icon-button{background:transparent;border:1px solid var(--border);border-radius:50%;width:28px;height:28px;min-height:28px;min-width:28px;padding:7px}
-body.studio .calendar-hint{font:8px/1.6 'IBM Plex Mono',monospace;text-align:left;max-width:none;margin:0 0 17px;color:var(--muted)}
+body.studio .calendar-hint{font:14px/1.6 'Nunito',sans-serif;text-align:left;max-width:none;margin:0 0 17px;color:var(--muted)}
 body.studio .day-grid{gap:3px;grid-template-columns:repeat(7,minmax(0,1fr))}
 body.studio .day-grid .day-cell{height:52px;min-height:52px;padding:4px 0;border:1px solid transparent;border-bottom-color:var(--border);border-radius:0;background:transparent;box-shadow:none;aspect-ratio:auto}
 body.studio .day-grid .day-cell.empty{border:0;background:transparent;height:0;min-height:0}
 body.studio .day-cell .day-num{font-size:20px;font-weight:400;letter-spacing:-.8px;color:var(--text)}
-body.studio .day-cell .day-sum{font:8px 'IBM Plex Mono',monospace;color:var(--muted);max-width:100%;overflow:hidden}
+body.studio .day-cell .day-sum{font:14px 'Nunito',sans-serif;color:var(--muted);max-width:100%;overflow:hidden}
 body.studio .day-cell.day-off:not(.active) .day-num{color:var(--signal)}
 body.studio .day-grid .day-cell.active{background:var(--text);border-color:var(--text);color:var(--bg);border-radius:2px}
 body.studio .day-cell.active .day-num,body.studio .day-cell.active .day-sum{color:var(--bg)}
 body.studio .day-grid .day-cell.today-mark:not(.active){border:1px solid var(--signal);background:transparent}
-body.studio .day-grid .dow-label{font:8px 'IBM Plex Mono',monospace;letter-spacing:.3px;color:var(--muted)}
+body.studio .day-grid .dow-label{font:14px 'Nunito',sans-serif;letter-spacing:.3px;color:var(--muted)}
 body.studio .day-grid .day-dot{background:var(--signal)}
 body.studio .day-panel{border-radius:3px;border:1px solid var(--border);background:var(--surface);overflow:hidden}
 body.studio .day-panel-header{padding:20px;border-bottom:1px solid var(--border);align-items:start;background:transparent;gap:10px}
 body.studio .day-panel-title{font-size:21px;font-weight:500;letter-spacing:-.7px}
-body.studio .day-panel-meta{font:9px 'IBM Plex Mono',monospace;margin-top:6px;color:var(--muted)}
+body.studio .day-panel-meta{font:14px 'Nunito',sans-serif;margin-top:6px;color:var(--muted)}
 body.studio .day-type-btn,body.studio .copy-day-btn{border-radius:50%;background:transparent;border:1px solid var(--border);width:32px;height:32px;min-width:32px;min-height:32px;padding:7px;color:var(--muted)}
 body.studio .work-summary{padding:17px 20px;border:0;border-bottom:1px solid var(--border);border-radius:0;background:transparent;min-height:76px;gap:12px}
 body.studio .work-summary-name{font-size:14px;font-weight:500;letter-spacing:-.25px}
-body.studio .work-summary-detail{font:9px 'IBM Plex Mono',monospace;color:var(--muted);line-height:1.6;margin-top:6px}
+body.studio .work-summary-detail{font:14px 'Nunito',sans-serif;color:var(--muted);line-height:1.6;margin-top:6px}
 body.studio .work-summary-sum{font-size:22px;font-weight:500;letter-spacing:-.8px;color:var(--text)}
 body.studio .work-item{border:0;border-radius:0;background:transparent;margin:0;box-shadow:none}
 body.studio .work-editor{padding:16px 20px;background:var(--surface2);border-bottom:1px solid var(--border)}
 body.studio .work-done{border-radius:2px;background:var(--text);color:var(--bg)}
-body.studio #dayPanel .add-work-btn{margin:16px 20px;width:calc(100% - 40px);background:transparent;border:1px dashed var(--border);border-radius:2px;color:var(--text);min-height:48px;font-size:11px;font-weight:400;box-shadow:none}
+body.studio #dayPanel .add-work-btn{margin:16px 20px;width:calc(100% - 40px);background:transparent;border:1px dashed var(--border);border-radius:2px;color:var(--text);min-height:48px;font-size:14px;font-weight:400;box-shadow:none}
 body.studio .photo-section{padding:0 20px 18px;border:0}
-body.studio .photo-header{margin:0;font-size:9px;color:var(--muted)}
-body.studio .photo-title{font:9px 'IBM Plex Mono',monospace;opacity:1;color:var(--muted)}
+body.studio .photo-header{margin:0;font-size:14px;color:var(--muted)}
+body.studio .photo-title{font:14px 'Nunito',sans-serif;opacity:1;color:var(--muted)}
 body.studio .photo-add-btn{background:transparent;color:var(--muted);border-radius:50%;border:1px solid var(--border)}
 body.studio .templates-section{padding:20px;border-radius:3px;background:transparent;border:1px solid var(--border)}
 body.studio .templates-header{margin-bottom:12px}
-body.studio .templates-header .section-title{font:11px 'IBM Plex Mono',monospace;text-transform:none;letter-spacing:0;color:var(--text);opacity:1}
+body.studio .templates-header .section-title{font:14px 'Nunito',sans-serif;text-transform:none;letter-spacing:0;color:var(--text);opacity:1}
 body.studio .tpl-item{border-radius:2px;background:var(--surface);border-color:var(--border);box-shadow:none}
-body.studio .tpl-name{font-size:12px;font-weight:500}.studio .tpl-price{font-family:'IBM Plex Mono',monospace;font-size:10px}
+body.studio .tpl-name{font-size:14px;font-weight:500}.studio .tpl-price{font-family:'Nunito',sans-serif;font-size:14px}
 body.studio .tpl-use{background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:50%}
 body.studio .today-summary{border-radius:3px;border:1px solid var(--border);background:var(--surface2);padding:18px}
 body.studio .ts-amount{font-size:25px;font-weight:500;color:var(--text)}
-body.studio .ts-date{font:9px 'IBM Plex Mono',monospace;color:var(--muted);opacity:1}
-body.studio .ts-works{font-size:11px;color:var(--text)}
+body.studio .ts-date{font:14px 'Nunito',sans-serif;color:var(--muted);opacity:1}
+body.studio .ts-works{font-size:14px;color:var(--text)}
 
 /* The rest of the workspace uses the same paper, rules, type and ink. */
 body.studio :is(.period-card,.chart-wrap,.goals-card,.expenses-card,.calc-card,.profile-hero,.stat-hero,.stat-card,.level-banner,.messenger-card,.message-card){border:1px solid var(--border);border-radius:3px;background:var(--surface);box-shadow:none;backdrop-filter:none}
 body.studio :is(.period-card,.chart-wrap,.goals-card,.expenses-card,.calc-card){padding:22px}
-body.studio :is(.section-title,.period-title,.chart-title,.goals-title,.expenses-title,.calc-card-title,.profile-section-label){font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:400;letter-spacing:.3px;text-transform:none;color:var(--text);opacity:1}
+body.studio :is(.section-title,.period-title,.chart-title,.goals-title,.expenses-title,.calc-card-title,.profile-section-label){font-family:'Nunito',sans-serif;font-size:14px;font-weight:400;letter-spacing:.3px;text-transform:none;color:var(--text);opacity:1}
 body.studio .section-shortcuts{margin:22px 20px 18px;gap:8px}
-body.studio .ui-button{background:transparent;border:1px solid var(--border);border-radius:30px;color:var(--text);padding:9px 16px;font-weight:400;font-size:11px}
+body.studio .ui-button{background:transparent;border:1px solid var(--border);border-radius:30px;color:var(--text);padding:9px 16px;font-weight:400;font-size:14px}
 body.studio .section{margin-inline:20px}
-body.studio .period-badge,body.studio .profile-chip{font:9px 'IBM Plex Mono',monospace;border:1px solid var(--border);border-radius:30px;background:transparent;color:var(--text);padding:6px 9px}
-body.studio .sel-label,body.studio .paydate-label{font:8px 'IBM Plex Mono',monospace;letter-spacing:.5px;color:var(--muted);opacity:1}
-body.studio .sel-wrap select{border-radius:2px;background:var(--surface2);border:1px solid var(--border);font-weight:500;font-size:13px;padding:13px 12px;color:var(--text)}
+body.studio .period-badge,body.studio .profile-chip{font:14px 'Nunito',sans-serif;border:1px solid var(--border);border-radius:30px;background:transparent;color:var(--text);padding:6px 9px}
+body.studio .sel-label,body.studio .paydate-label{font:14px 'Nunito',sans-serif;letter-spacing:.5px;color:var(--muted);opacity:1}
+body.studio .sel-wrap select{border-radius:2px;background:var(--surface2);border:1px solid var(--border);font-weight:500;font-size:14px;padding:13px 12px;color:var(--text)}
 body.studio .paydate-box{border:0;border-top:1px solid var(--border);background:transparent;padding:22px 0 0;border-radius:0}
-body.studio .paydate-date{font-family:'Prata',Georgia,serif;font-size:24px;font-weight:400;letter-spacing:-.7px;color:var(--text)}
+body.studio .paydate-date{font-family:'Nunito',sans-serif;font-size:24px;font-weight:400;letter-spacing:-.7px;color:var(--text)}
 body.studio .paydate-period-name{font-weight:500;color:var(--text)}
 body.studio .period-countdown{border-color:var(--border)}
 body.studio .countdown-item{background:transparent;border-radius:0;border-color:var(--border)}
@@ -160,45 +160,45 @@ body.studio .chart-stat{background:var(--surface2);border-radius:2px}
 body.studio .chart-stat-val{font-weight:500;font-size:18px;color:var(--text)}
 body.studio .chart-bar.has-data{background:var(--text);border-radius:1px;box-shadow:none}
 body.studio .chart-bar.active{background:var(--signal)}
-body.studio .chart-val{font:9px 'IBM Plex Mono',monospace;color:var(--muted)}
-body.studio .chart-stat-label{font:8px 'IBM Plex Mono',monospace;color:var(--muted);letter-spacing:.3px}
+body.studio .chart-val{font:14px 'Nunito',sans-serif;color:var(--muted)}
+body.studio .chart-stat-label{font:14px 'Nunito',sans-serif;color:var(--muted);letter-spacing:.3px}
 body.studio .countdown-pill{border-radius:2px;background:var(--surface2);border:0}
 body.studio .countdown-pill .cp-val{font-weight:500;font-size:28px;color:var(--text)}
 body.studio .goal-bar-fill{background:var(--text);border-radius:0}
 body.studio .goal-bar-bg{height:5px;border-radius:0;background:var(--surface2)}
 body.studio .goal-name,body.studio .goal-nums strong{font-weight:500}
 body.studio :is(.calc-wrap,#statsBody,#goalsBody,.stats-section) [style*="color:var(--accent)"]{color:var(--accent-ink)!important}
-body.studio .goals-edit-btn,body.studio .expenses-add-btn{background:transparent;border:1px solid var(--border);border-radius:30px;padding:6px 10px;font-size:10px;color:var(--text)}
+body.studio .goals-edit-btn,body.studio .expenses-add-btn{background:transparent;border:1px solid var(--border);border-radius:30px;padding:6px 10px;font-size:14px;color:var(--text)}
 body.studio .goal-fill{background:var(--accent);box-shadow:none}
 body.studio .goal-bar{height:5px;background:var(--surface2);border-radius:0}
 body.studio .goal-amount{color:var(--text);font-weight:500}
-body.studio .goal-label{font-weight:500;font-size:13px}
+body.studio .goal-label{font-weight:500;font-size:14px}
 body.studio .bonus-item,body.studio .expense-item{background:var(--surface);border:1px solid var(--border);border-radius:2px;box-shadow:none}
 body.studio .period-premium-row{border:1px solid var(--border);background:var(--surface);border-radius:3px;padding:22px;margin-inline:0}
 body.studio #periodPremiumLabel{font-size:17px;font-weight:500;letter-spacing:-.5px}
-body.studio #periodPremiumHint{font:9px/1.7 'IBM Plex Mono',monospace;max-width:270px;margin-top:5px}
-body.studio #periodPremiumAmount{color:var(--accent-ink);font-weight:500;font-size:12px;margin-top:7px}
-body.studio .add-btn{background:transparent;border:1px dashed var(--border);border-radius:2px;color:var(--text);font-size:12px;font-weight:400;min-height:48px}
+body.studio #periodPremiumHint{font:14px/1.7 'Nunito',sans-serif;max-width:270px;margin-top:5px}
+body.studio #periodPremiumAmount{color:var(--accent-ink);font-weight:500;font-size:14px;margin-top:7px}
+body.studio .add-btn{background:transparent;border:1px dashed var(--border);border-radius:2px;color:var(--text);font-size:14px;font-weight:400;min-height:48px}
 body.studio .history-cards{gap:8px}
 body.studio .hist-card{border:1px solid var(--border);border-radius:2px;background:var(--surface);box-shadow:none}
 body.studio .hist-card.current{background:var(--surface2);border-color:var(--text)}
 body.studio .hist-total{font-size:20px;font-weight:500;letter-spacing:-.7px;color:var(--text)}
-body.studio .hist-month{font-size:11px;font-weight:500}
-body.studio .hist-period{font:8px 'IBM Plex Mono',monospace;line-height:1.5}
+body.studio .hist-month{font-size:14px;font-weight:500}
+body.studio .hist-period{font:14px 'Nunito',sans-serif;line-height:1.5}
 body.studio .archive-item{border-radius:2px;background:var(--surface);border-color:var(--border)}
-body.studio .archive-month-name{font-family:'Prata',Georgia,serif;font-size:20px;font-weight:400;letter-spacing:-.5px}
+body.studio .archive-month-name{font-family:'Nunito',sans-serif;font-size:20px;font-weight:400;letter-spacing:-.5px}
 body.studio .archive-total{font-weight:500;color:var(--text)}
 body.studio :is(.stat-tile,.tw-row,.profile-snapshot,.profile-metric,.profile-action){border:1px solid var(--border);border-radius:3px;background:var(--surface);box-shadow:none}
 body.studio .level-banner{background:var(--text);color:var(--bg);border:0}
 body.studio .level-name,body.studio .level-hint{color:var(--bg)}
-body.studio .stat-tile-num{font-family:'Onest',sans-serif;font-weight:500;letter-spacing:-1px;color:var(--text)}
+body.studio .stat-tile-num{font-family:'Nunito',sans-serif;font-weight:500;letter-spacing:-1px;color:var(--text)}
 body.studio .profile-hero{padding:28px}
-body.studio .profile-display-name{font-family:'Prata',Georgia,serif;font-size:30px;font-weight:400;letter-spacing:-.8px}
+body.studio .profile-display-name{font-family:'Nunito',sans-serif;font-size:30px;font-weight:400;letter-spacing:-.8px}
 body.studio .profile-avatar{background:var(--accent);color:var(--ink);border-radius:50%;border:0}
 body.studio .profile-action{border-radius:3px;padding:18px;color:var(--text)}
 body.studio .profile-action-icon{border-radius:50%;background:var(--surface2);color:var(--text)}
-body.studio .profile-action-title{font-size:13px;font-weight:500}
-body.studio .profile-action-sub{font-size:10px;color:var(--muted)}
+body.studio .profile-action-title{font-size:14px;font-weight:500}
+body.studio .profile-action-sub{font-size:14px;color:var(--muted)}
 body.studio .profile-metric-value{font-size:29px;font-weight:500;letter-spacing:-1px;color:var(--text)}
 body.studio .calc-input{border-radius:3px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-weight:500}
 body.studio .calc-result{border-radius:3px;background:var(--accent);color:var(--ink);box-shadow:none;border:0}
@@ -221,10 +221,10 @@ body.studio .chat-send{border-radius:50%;background:var(--accent);color:var(--in
 /* Dialogs and entry forms share the visual language, without changing their flow. */
 body.studio :is(.modal,.workspace-dialog,.synclog-card){border:1px solid var(--border);border-radius:5px;background:var(--surface);box-shadow:0 30px 100px #0003}
 body.studio .workspace-dialog::backdrop{background:#10160fcc;backdrop-filter:blur(6px)}
-body.studio .workspace-dialog-head h2{font-family:'Prata',Georgia,serif;font-weight:400;font-size:25px;letter-spacing:-.5px}
+body.studio .workspace-dialog-head h2{font-family:'Nunito',sans-serif;font-weight:400;font-size:25px;letter-spacing:-.5px}
 body.studio :is(.modal-input,.auth-input,.workspace-search){background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:2px;font-weight:400}
 body.studio .modal-btn,body.studio .auth-btn{background:var(--text);color:var(--bg);border:1px solid transparent;border-radius:2px;font-weight:500}
-body.studio .toast{border:1px solid var(--border);border-radius:3px;background:var(--text);color:var(--bg);box-shadow:0 10px 30px #0002;font-size:12px}
+body.studio .toast{border:1px solid var(--border);border-radius:3px;background:var(--text);color:var(--bg);box-shadow:0 10px 30px #0002;font-size:14px}
 body.studio .toast-undo{color:var(--accent);background:transparent}
 body.studio .workspace-destination{border-radius:2px;border-color:var(--border);background:transparent}
 body.studio .workspace-destination:hover{background:var(--surface2)}
@@ -232,45 +232,45 @@ body.studio .auth-overlay{background:var(--bg);padding:24px;overflow-y:auto;disp
 body.studio .auth-box{background:var(--surface);border:1px solid var(--border);border-radius:3px;box-shadow:none;width:100%;max-width:390px;padding:32px;position:relative;margin:24px 0}
 body.studio .auth-logo{display:flex;align-items:center;width:44px;height:44px;margin:0 0 32px;color:var(--text)}
 body.studio .auth-logo svg{width:44px;height:44px}
-body.studio .auth-title{font:400 28px 'Prata',Georgia,serif;text-align:left;letter-spacing:-.8px;margin:0;color:var(--text)}
-.studio-auth-welcome{font-size:11px;color:var(--muted);line-height:1.7;margin:12px 0 28px}
-body.studio .auth-input{height:50px;padding:14px;font-size:13px;margin-bottom:10px}
-body.studio .auth-btn{height:50px;margin-top:10px;font-size:13px;letter-spacing:.1px}
-body.studio .auth-link{text-align:center;font-size:10px;color:var(--muted);line-height:1.7;margin-top:16px}
+body.studio .auth-title{font:400 28px 'Nunito',sans-serif;text-align:left;letter-spacing:-.8px;margin:0;color:var(--text)}
+.studio-auth-welcome{font-size:14px;color:var(--muted);line-height:1.7;margin:12px 0 28px}
+body.studio .auth-input{height:50px;padding:14px;font-size:14px;margin-bottom:10px}
+body.studio .auth-btn{height:50px;margin-top:10px;font-size:14px;letter-spacing:.1px}
+body.studio .auth-link{text-align:center;font-size:14px;color:var(--muted);line-height:1.7;margin-top:16px}
 body.studio .auth-link span{color:var(--text);text-decoration:underline;text-underline-offset:3px}
-body.studio .auth-show-password{font-size:10px;color:var(--muted);margin:6px 0 18px}
-.studio-auth-demo{display:block;border-top:1px solid var(--border);text-align:center;padding:22px 0 0;margin-top:26px;font:10px 'IBM Plex Mono',monospace;color:var(--text)}
+body.studio .auth-show-password{font-size:14px;color:var(--muted);margin:6px 0 18px}
+.studio-auth-demo{display:block;border-top:1px solid var(--border);text-align:center;padding:22px 0 0;margin-top:26px;font:14px 'Nunito',sans-serif;color:var(--text)}
 .studio-auth-story{display:none}
 .studio-auth-brand{display:flex;align-items:center;gap:12px;font-size:16px;letter-spacing:-.4px;font-weight:600}
 .studio-auth-brand>svg{width:40px;height:40px}
-.studio-auth-brand>.studio-small{margin-left:auto;font-size:9px}
+.studio-auth-brand>.studio-small{margin-left:auto;font-size:14px}
 .studio-auth-heading{position:relative;padding:60px 0 50px;isolation:isolate}
-.studio-auth-heading>h1{font:500 clamp(70px,7.7vw,128px)/.93 'Onest',sans-serif;letter-spacing:-7px;margin:25px 0 0;color:var(--text);position:relative;z-index:1}
-.studio-auth-heading em{font:400 1em/.95 'Prata',Georgia,serif;letter-spacing:-6px;color:var(--signal)}
+.studio-auth-heading>h1{font:500 clamp(70px,7.7vw,128px)/.93 'Nunito',sans-serif;letter-spacing:-7px;margin:25px 0 0;color:var(--text);position:relative;z-index:1}
+.studio-auth-heading em{font:400 1em/.95 'Nunito',sans-serif;letter-spacing:-6px;color:var(--signal)}
 .studio-auth-orbit{position:absolute;right:-10px;top:110px;width:300px;z-index:0;color:var(--text);opacity:.13}
 .studio-auth-orbit svg{animation:studio-spin 60s linear infinite;width:100%}
 .studio-auth-bottom{display:flex;align-items:end;justify-content:space-between;gap:24px;border-top:1px solid var(--border);padding-top:24px}
-.studio-auth-bottom p{font-size:12px;line-height:1.7;color:var(--muted);margin:0}
-.studio-demo-link{display:flex;justify-content:space-between;gap:30px;align-items:center;background:var(--accent);color:var(--ink)!important;border:1px solid transparent;border-radius:2px;min-height:52px;padding:15px 22px;font-size:12px}
+.studio-auth-bottom p{font-size:14px;line-height:1.7;color:var(--muted);margin:0}
+.studio-demo-link{display:flex;justify-content:space-between;gap:30px;align-items:center;background:var(--accent);color:var(--ink)!important;border:1px solid transparent;border-radius:2px;min-height:52px;padding:15px 22px;font-size:14px}
 .studio-demo-link span{font-size:24px}
-.studio-demo-strip{display:flex;align-items:center;justify-content:space-between;gap:15px;background:var(--text);color:var(--bg);padding:11px 20px;font:8px/1.5 'IBM Plex Mono',monospace;margin:0}
+.studio-demo-strip{display:flex;align-items:center;justify-content:space-between;gap:15px;background:var(--text);color:var(--bg);padding:11px 20px;font:14px/1.5 'Nunito',sans-serif;margin:0}
 .studio-demo-strip>span{display:flex;gap:8px;align-items:center;min-width:0}
 .studio-demo-strip i{width:5px;height:5px;flex:none;background:var(--accent);border-radius:50%}
-.studio-demo-strip small{font-family:'Onest',sans-serif;font-size:9px;opacity:.65}
+.studio-demo-strip small{font-family:'Nunito',sans-serif;font-size:14px;opacity:.65}
 .studio-demo-strip a{white-space:nowrap;text-decoration:underline;text-underline-offset:3px}
 .studio-demo-social{padding:35px;background:var(--accent);color:var(--ink);border-radius:3px;margin-bottom:25px;grid-column:1/-1}
 .studio-demo-social h2{font-size:34px;line-height:1.15;font-weight:500;letter-spacing:-1.2px;margin:22px 0}
-.studio-demo-social h2 em{font:400 1em 'Prata',serif;letter-spacing:-1px}
-.studio-demo-social p{max-width:500px;font-size:12px;line-height:1.8}
+.studio-demo-social h2 em{font:400 1em 'Nunito',sans-serif;letter-spacing:-1px}
+.studio-demo-social p{max-width:500px;font-size:14px;line-height:1.8}
 .studio-demo-social .studio-demo-link{background:var(--ink);color:var(--accent)!important;max-width:330px;margin-top:25px}
-.studio-footer{display:flex;justify-content:space-between;gap:25px;margin:30px 20px 100px;padding-top:20px;border-top:1px solid var(--border);font-size:8px;color:var(--muted);line-height:1.7}
-.studio-footer>span:last-child{font-family:'Prata',Georgia,serif;font-size:12px;text-align:right;letter-spacing:-.2px}
+.studio-footer{display:flex;justify-content:space-between;gap:25px;margin:30px 20px 100px;padding-top:20px;border-top:1px solid var(--border);font-size:14px;color:var(--muted);line-height:1.7}
+.studio-footer>span:last-child{font-family:'Nunito',sans-serif;font-size:14px;text-align:right;letter-spacing:-.2px}
 
 /* Navigation is a physical rail on desktop and a floating ink dock on mobile. */
 body.studio .bottom-nav,body.studio.light .bottom-nav{display:flex;position:fixed;inset:auto 12px 12px;left:12px;right:12px;bottom:12px;width:auto;max-width:none;height:auto;min-height:64px;padding:7px 5px calc(7px + env(safe-area-inset-bottom));background:var(--text);color:var(--bg);border:0;border-radius:3px;transform:none;box-shadow:0 8px 40px #0002;backdrop-filter:none;gap:2px}
 body.studio .nav-btn{border-radius:2px;min-height:50px;color:var(--bg);opacity:.5;gap:5px;padding:7px 2px;flex:1;justify-content:center;position:relative}
 body.studio .nav-btn.active{background:var(--accent);color:var(--ink);opacity:1}
-body.studio .nav-btn .nav-lbl{color:inherit;font-size:8px;font-weight:400;line-height:1.3;white-space:nowrap;letter-spacing:-.1px}
+body.studio .nav-btn .nav-lbl{color:inherit;font-size:14px;font-weight:400;line-height:1.3;white-space:nowrap;letter-spacing:-.1px}
 body.studio .nav-btn .nav-icon svg{height:19px;width:19px}
 body.studio .nav-brand,body.studio .studio-rail-note,body.studio .desktop-nav{display:none}
 body.studio.chat-open .bottom-nav{display:none}
@@ -292,7 +292,7 @@ body.studio.chat-open .bottom-nav{display:none}
   body.studio .work-layout{margin-inline:36px;gap:24px}
   body.studio .work-overview .total-card{min-height:350px;padding:32px}
   body.studio .total-card .total-amount{font-size:80px}
-  .studio-hero-top{font-size:9px;margin-bottom:40px}
+  .studio-hero-top{font-size:14px;margin-bottom:40px}
   .studio-orbit{width:280px;right:15px;top:32px}
   .studio-footer{margin-inline:36px}
 }
@@ -301,49 +301,49 @@ body.studio.chat-open .bottom-nav{display:none}
   body.studio .workspace-topbar{margin:0;padding:26px 0 16px;grid-template-areas:'brand tools' 'heading heading' 'account account';gap:20px}
   body.studio .workspace-title{font-size:clamp(44px,3.8vw,60px);letter-spacing:-3px;margin-top:14px}
   .studio-subtitle{font-size:19px;margin-top:10px}
-  .studio-eyebrow{font-size:10px}
-  .studio-page-index{margin-left:auto;font-size:10px}
+  .studio-eyebrow{font-size:14px}
+  .studio-page-index{margin-left:auto;font-size:14px}
   body.studio .workspace-tools :is(.workspace-icon-button,.workspace-search-button,.workspace-avatar-button){width:40px;height:40px;min-width:40px;min-height:40px}
   body.studio .workspace-tools{gap:8px}
-  body.studio .workspace-brandbar{font-size:13px}
+  body.studio .workspace-brandbar{font-size:14px}
   body.studio .workspace-brand-icon{width:30px;height:30px}
-  body.studio .workspace-date,.studio-header-note{font-size:9px}
+  body.studio .workspace-date,.studio-header-note{font-size:14px}
   body.studio .workspace-period{margin:26px 0 0;padding:0 0 18px;grid-template-columns:38px minmax(0,1fr) 38px auto}
   body.studio .workspace-period-label{font-size:15px}
-  body.studio .workspace-period-label small{font-size:9px}
+  body.studio .workspace-period-label small{font-size:14px}
   body.studio .work-layout{margin:24px 0 30px;grid-template-columns:minmax(0,1fr) minmax(0,1.06fr);gap:24px;align-items:start}
   body.studio .work-overview .total-card{min-height:362px;padding:27px}
   body.studio .total-card .total-amount{font-size:clamp(48px,5.2vw,84px);letter-spacing:-3px}
   body.studio .total-card .total-meta{margin-top:28px;padding-top:20px}
-  .studio-hero-top{margin-bottom:38px;font-size:8px}
-  .studio-hero-caption{margin-top:25px;font-size:8px}
+  .studio-hero-top{margin-bottom:38px;font-size:14px}
+  .studio-hero-caption{margin-top:25px;font-size:14px}
   .studio-orbit{width:240px;top:54px;right:-25px}
   body.studio .day-strip-wrap{padding:24px}
   body.studio #workspaceCalendarMonth{font-size:26px}
   body.studio .day-grid .day-cell{height:58px;min-height:58px}
   body.studio .day-cell .day-num{font-size:22px}
-  body.studio .day-cell .day-sum{font-size:8px}
+  body.studio .day-cell .day-sum{font-size:14px}
   body.studio .bottom-nav,body.studio.light .bottom-nav,body.studio.chat-open .bottom-nav{display:flex;position:fixed;inset:0 auto 0 max(0px,calc((100vw - 1660px)/2));width:208px;max-width:208px;min-height:0;height:100dvh;padding:34px 18px 22px;gap:3px;overflow-y:auto;flex-direction:column;box-shadow:none;border:0;border-right:1px solid var(--border);border-radius:0;background:var(--bg);color:var(--text)}
   body.studio .nav-brand{display:flex;align-items:start;flex-direction:column;gap:18px;margin:0 0 30px;padding:0;color:var(--text)}
   body.studio .brand-mark{display:grid;place-items:center;height:64px;width:64px;background:var(--accent);border-radius:50%;color:var(--ink);padding:10px;box-sizing:border-box}
   body.studio .brand-mark svg{width:44px;height:44px}
   body.studio .nav-brand>div{font-size:22px;font-weight:500;letter-spacing:-.8px}
-  body.studio .nav-brand small{display:block;font:6.5px 'IBM Plex Mono',monospace;letter-spacing:.2px;margin-top:7px;color:var(--muted);line-height:1.6}
+  body.studio .nav-brand small{display:block;font:14px 'Nunito',sans-serif;letter-spacing:.2px;margin-top:7px;color:var(--muted);line-height:1.6}
   body.studio .nav-btn{display:flex;flex:none;flex-direction:row;justify-content:start;min-height:46px;padding:12px 10px;gap:10px;color:var(--text);opacity:.7;border-radius:2px}
-  body.studio .nav-btn::before{content:attr(data-index);font:8px 'IBM Plex Mono',monospace;opacity:.55;flex:none}
+  body.studio .nav-btn::before{content:attr(data-index);font:14px 'Nunito',sans-serif;opacity:.55;flex:none}
   body.studio .nav-btn .nav-icon{margin-left:auto;order:1;width:18px;flex:none}
   body.studio .nav-btn .nav-icon svg{width:17px;height:17px}
-  body.studio .nav-btn .nav-lbl{font-size:11px;letter-spacing:-.15px;font-weight:400}
+  body.studio .nav-btn .nav-lbl{font-size:14px;letter-spacing:-.15px;font-weight:400}
   body.studio .nav-btn.active{background:var(--text);color:var(--bg);opacity:1}
   body.studio .nav-btn.active::after{content:'';position:absolute;right:-22px;top:50%;height:6px;width:6px;background:var(--signal);border-radius:50%}
   body.studio .nav-btn.desktop-nav{display:flex}
   body.studio #navProfile{margin-top:12px}
   body.studio .studio-rail-note{display:block;margin-top:auto;padding-top:20px}
-  .studio-rail-note>.studio-small{font-size:7px;letter-spacing:.3px;color:var(--muted)}
+  .studio-rail-note>.studio-small{font-size:14px;letter-spacing:.3px;color:var(--muted)}
   .studio-rail-orbit{width:98px;height:98px;color:var(--text);opacity:.45;margin:15px 0 15px 12px}
   .studio-rail-orbit svg{animation:studio-spin 70s linear infinite}
-  .studio-rail-note p{font:400 18px/1.4 'Onest',sans-serif;letter-spacing:-.6px;margin:15px 0 23px}
-  .studio-rail-note p em{font-family:'Prata',Georgia,serif;font-style:normal;font-size:19px;color:var(--muted)}
+  .studio-rail-note p{font:400 18px/1.4 'Nunito',sans-serif;letter-spacing:-.6px;margin:15px 0 23px}
+  .studio-rail-note p em{font-family:'Nunito',sans-serif;font-style:normal;font-size:19px;color:var(--muted)}
   body.studio #page-period.active{padding-top:24px;gap:20px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
   body.studio #page-period>:is(.period-card,.chart-wrap,.goals-card,.section,.history-wrap,.expenses-card){margin:0;min-width:0}
   body.studio #page-period>.section-shortcuts{margin:0 0 3px;grid-column:1/-1}
@@ -360,7 +360,7 @@ body.studio.chat-open .bottom-nav{display:none}
   body.studio .auth-overlay{gap:7vw;padding:60px;align-items:center;justify-content:center}
   .studio-auth-story{display:block;width:min(55vw,740px);flex:none}
   body.studio .auth-box{flex:none;width:340px;max-width:340px;padding:36px 30px}
-  .studio-auth-demo{font-size:9px}
+  .studio-auth-demo{font-size:14px}
   .studio-demo-strip{margin:0 -30px 0 -30px;padding:10px 30px}
 }
 @media(min-width:1450px){
@@ -378,34 +378,34 @@ body.studio.chat-open .bottom-nav{display:none}
 @media(max-width:699px){
   body.studio{max-width:100%;padding-bottom:0}
   body.studio .workspace-topbar{gap:24px 8px}
-  body.studio .workspace-brandbar{font-size:10px;gap:6px}
+  body.studio .workspace-brandbar{font-size:14px;gap:6px}
   body.studio .workspace-brand-icon{height:23px;width:23px}
   body.studio .workspace-brand-icon svg{height:23px;width:23px}
-  body.studio .workspace-tools .sync-pill{max-width:50px;font-size:8px;padding-inline:2px}
+  body.studio .workspace-tools .sync-pill{max-width:50px;font-size:14px;padding-inline:2px}
   body.studio .workspace-tools :is(.workspace-search-button,.workspace-icon-button,.workspace-avatar-button){width:31px;height:31px;min-width:31px;min-height:31px;padding:7px}
   body.studio .workspace-tools .workspace-avatar-button{padding:0}
   body.studio .workspace-title{font-size:36px;letter-spacing:-1.8px}
   .studio-subtitle{font-size:16px;margin-top:12px}
-  .studio-eyebrow{font-size:8px;gap:6px}
-  .studio-page-index{font-size:8px}
-  .studio-header-note{font-size:6px;letter-spacing:0;max-width:140px;line-height:1.6}
-  body.studio .workspace-date{font-size:8px}
+  .studio-eyebrow{font-size:14px;gap:6px}
+  .studio-page-index{font-size:14px}
+  .studio-header-note{font-size:14px;letter-spacing:0;max-width:140px;line-height:1.6}
+  body.studio .workspace-date{font-size:14px}
   body.studio .work-overview .total-card{min-height:306px;padding:23px}
   body.studio .total-card .total-amount{font-size:clamp(48px,13vw,74px);letter-spacing:-2.7px}
   .studio-hero-caption{margin-top:20px}
   body.studio .total-card .total-meta{gap:24px;margin-top:24px;padding-top:16px}
   body.studio .total-card .meta-item strong{font-size:22px}
   .studio-orbit{width:190px;right:-30px;top:42px}
-  body.studio .studio-hero-top{font-size:7px;letter-spacing:0;margin-bottom:30px}
+  body.studio .studio-hero-top{font-size:14px;letter-spacing:0;margin-bottom:30px}
   body.studio .day-strip-wrap{padding:20px 16px}
   body.studio .day-cell .day-num{font-size:19px}
-  .studio-journal-label{font-size:7px}.studio-journal-label span:last-child{font-size:6px}
+  .studio-journal-label{font-size:14px}.studio-journal-label span:last-child{font-size:14px}
   body.studio .day-panel-header{padding:18px 16px}
   body.studio .day-panel-title{font-size:20px}
   body.studio .work-summary{padding:17px 16px}
-  body.studio .work-summary-name{font-size:12px}
+  body.studio .work-summary-name{font-size:14px}
   body.studio .work-summary-sum{font-size:21px}
-  body.studio .work-summary-detail{font-size:8px}
+  body.studio .work-summary-detail{font-size:14px}
   body.studio .work-editor{padding:15px}
   body.studio .section-shortcuts{margin-top:20px}
   body.studio :is(.period-card,.chart-wrap,.goals-card,.expenses-card,.calc-card){padding:19px;margin-left:20px;margin-right:20px}
@@ -413,17 +413,17 @@ body.studio.chat-open .bottom-nav{display:none}
   body.studio #page-period>.section{margin-left:20px;margin-right:20px}
   body.studio .period-premium-row{padding:18px}
   body.studio #periodPremiumLabel{font-size:16px}
-  body.studio #periodPremiumHint{font-size:8px;max-width:205px}
+  body.studio #periodPremiumHint{font-size:14px;max-width:205px}
   body.studio .hist-card{padding:12px}
   body.studio .hist-total{font-size:18px}
   body.studio .profile-display-name{font-size:25px}
   body.studio .profile-hero{padding:20px}
   body.studio .profile-action{padding:15px}
   body.studio .profile-metric-value{font-size:23px}
-  .studio-demo-strip{padding:10px 16px;font-size:7px;gap:10px}
+  .studio-demo-strip{padding:10px 16px;font-size:14px;gap:10px}
   .studio-demo-strip small{display:none}
   .studio-footer{flex-direction:column;gap:8px;padding-top:15px}
-  .studio-footer>span:last-child{text-align:left;font-size:12px}
+  .studio-footer>span:last-child{text-align:left;font-size:14px}
   .studio-demo-social{padding:26px 20px}
   .studio-demo-social h2{font-size:28px}
 }
@@ -440,13 +440,13 @@ body.studio.chat-open .bottom-nav{display:none}
   body.studio .total-card .meta-item strong{font-size:21px}
   body.studio .day-grid .day-cell{height:48px;min-height:48px}
   body.studio .day-cell .day-num{font-size:17px}
-  body.studio .day-cell .day-sum{font-size:7px}
+  body.studio .day-cell .day-sum{font-size:14px}
   body.studio .day-panel-title{font-size:18px}
   body.studio .work-summary-sum{font-size:18px}
-  body.studio .work-summary-name{font-size:11px}
+  body.studio .work-summary-name{font-size:14px}
   body.studio .workspace-payday{padding:15px;gap:10px}
   body.studio .payday-description strong{font-size:19px}
-  body.studio .payday-timing{font-size:8px;max-width:78px}
+  body.studio .payday-timing{font-size:14px;max-width:78px}
 }
 @keyframes studio-spin{to{transform:rotate(360deg)}}
 @keyframes studio-arrive{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
@@ -490,3 +490,89 @@ body.studio :is(button,.day-cell,.work-summary){transition:background .2s,border
 
 body.studio.motion-off *,body.studio.motion-off *::before,body.studio.motion-off *::after{animation:none!important;transition:none!important}
 #studioMotionToggle{margin-top:10px;min-height:44px}
+
+/* Readable, functional workspace: no editorial captions or numbered navigation. */
+body.studio{font-family:'Nunito','Manrope',sans-serif;font-size:16px;line-height:1.5;letter-spacing:0}
+body.studio .workspace-heading,body.studio .studio-subtitle,body.studio .studio-rail-note,
+body.studio .studio-journal-label,body.studio .studio-footer{display:none!important}
+body.studio .workspace-topbar{grid-template-areas:'brand tools' 'account account';gap:12px;padding-top:20px}
+body.studio .workspace-date{font-size:14px}
+body.studio .nav-btn::before{content:none}
+body.studio .nav-btn .nav-lbl{font-size:18px;font-weight:700;letter-spacing:0;white-space:normal}
+body.studio .nav-btn{min-height:54px;border-radius:12px;opacity:.85}
+body.studio .nav-btn .nav-icon{order:0;margin:0;width:22px}
+body.studio .nav-btn .nav-icon svg{width:22px;height:22px}
+body.studio .nav-brand{margin-bottom:24px}
+body.studio .nav-brand>div{font-size:26px;font-weight:800;letter-spacing:0}
+body.studio .workspace-brandbar{font-size:18px;font-weight:800}
+body.studio .workspace-tools>.sync-pill{
+  display:inline-flex;gap:9px;min-height:44px;max-width:190px;padding:9px 13px;
+  border:1px solid var(--border);border-radius:12px;background:var(--surface);
+  font:600 15px/1.2 'Nunito',sans-serif;color:var(--muted);cursor:pointer;
+}
+body.studio .workspace-tools .sync-pill .sp-dot{width:8px;height:8px;background:currentColor}
+body.studio .workspace-tools .sync-pill.ok{color:var(--accent-ink)}
+body.studio .workspace-tools .sync-pill.busy{color:var(--accent2-ink)}
+body.studio .workspace-tools .sync-pill.off{color:var(--danger)}
+body.studio .workspace-tools .sync-pill.warn{color:var(--warn)}
+body.studio .workspace-tools :is(.workspace-icon-button,.workspace-search-button,.workspace-avatar-button){height:44px;width:44px;min-height:44px;min-width:44px;border-radius:12px}
+body.studio .workspace-tools{gap:8px}
+body.studio :is(.section-title,.period-title,.chart-title,.goals-title,.expenses-title,.calc-card-title,.photo-title){font:700 18px/1.4 'Nunito',sans-serif;letter-spacing:0;text-transform:none}
+body.studio :is(input,select,textarea,.work-summary-name,.ui-button,.auth-input,.auth-btn,.modal-btn){font-size:16px}
+body.studio .work-summary-name{font-size:19px;font-weight:700}
+body.studio .work-summary-detail{font-size:15px}
+body.studio .day-panel-title{font-size:24px;font-weight:700}
+body.studio .work-summary-sum{font-size:25px;letter-spacing:-.4px}
+body.studio .work-summary{padding:20px;min-height:90px;flex-wrap:wrap}
+body.studio .photo-section{padding:16px 20px 20px;border-top:1px solid var(--border)}
+body.studio .photo-header{gap:12px}
+body.studio .photo-add-btn{width:44px;height:44px;min-width:44px;border-radius:12px}
+body.studio .templates-section{padding:20px;background:var(--surface);border-radius:16px}
+body.studio .templates-header{gap:12px;align-items:center;flex-wrap:wrap}
+body.studio .templates-header .section-title{font:700 20px/1.4 'Nunito',sans-serif}
+body.studio .tpl-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:10px}
+body.studio .tpl-chip{border:1px solid var(--border);border-radius:12px;background:var(--surface2);overflow:hidden;align-items:stretch;min-height:64px}
+body.studio .tpl-use{flex:1;display:grid;grid-template-columns:24px minmax(0,1fr);column-gap:12px;row-gap:2px;text-align:left;border:0;border-radius:0;background:transparent;padding:14px;font-size:18px;font-weight:700;min-width:0}
+body.studio .tpl-use>svg{width:23px;height:23px;grid-row:1/3;align-self:center}
+body.studio .tpl-chip .tpl-price{display:block;grid-column:2;font:600 14px/1.4 'Nunito',sans-serif;color:var(--muted)}
+body.studio .tpl-chip .tpl-del{width:44px;min-width:44px;border-left:1px solid var(--border);padding:12px;color:var(--muted)}
+body.studio .tpl-del svg{height:18px;width:18px}
+body.studio .tpl-use:hover{background:var(--surface)}
+body.studio .tpl-del:hover{background:var(--surface);color:var(--danger)}
+body.studio .workspace-settings>summary{font-size:17px;min-height:72px;gap:12px}
+body.studio .workspace-settings summary small{font-size:14px;line-height:1.5}
+body.studio .settings-chevron{display:grid;place-items:center;width:36px;height:36px;flex:none;margin-left:auto;background:var(--surface2);border:1px solid var(--border);border-radius:10px}
+body.studio .settings-chevron svg{width:20px;height:20px}
+body.studio .workspace-settings[open] .settings-chevron{transform:rotate(180deg)}
+body.studio .total-card .total-hint,body.studio .total-card .meta-item{font-size:14px;line-height:1.5}
+body.studio .total-card .total-label{font-size:17px}
+body.studio .total-card .tvt-opt{font-size:15px;min-height:40px}
+body.studio .total-card .total-meta{gap:20px}
+body.studio .day-grid .day-cell{min-height:68px;height:auto}
+body.studio .day-cell .day-sum{font-size:12px;letter-spacing:-.2px}
+body.studio .day-cell .day-num{font-family:'Nunito',sans-serif;font-size:24px;font-weight:600;letter-spacing:0}
+body.studio .day-grid .dow-label{font-size:14px}
+body.studio .work-overview>.workspace-add-button,body.studio #dayPanel .add-work-btn{font-size:17px}
+body.studio [style*="font-size:10px"],body.studio [style*="font-size:11px"],body.studio [style*="font-size:12px"],body.studio [style*="font-size:13px"]{font-size:14px!important}
+@media(max-width:999px){
+  body.studio{padding-bottom:100px}
+  body.studio .bottom-nav{overflow-x:auto;justify-content:flex-start;scrollbar-width:thin;border-radius:18px}
+  body.studio .nav-btn{flex:1 0 78px;min-width:78px;min-height:62px;padding:8px 5px}
+  body.studio .nav-btn .nav-lbl{font-size:13px;font-weight:700;white-space:nowrap}
+}
+@media(max-width:699px){
+  body.studio .workspace-topbar{grid-template-areas:'brand' 'tools' 'account';grid-template-columns:minmax(0,1fr);gap:12px}
+  body.studio .workspace-tools{justify-content:flex-end;flex-wrap:wrap}
+  body.studio .workspace-tools>.sync-pill{margin-right:auto;max-width:155px;font-size:14px}
+  body.studio .work-summary{padding:16px;gap:8px}
+  body.studio .work-summary-sum{font-size:22px}
+  body.studio .work-summary-name{font-size:18px}
+  body.studio .day-strip-wrap{padding:16px 10px}
+  body.studio .day-grid{gap:2px}
+  body.studio .day-cell .day-sum{font-size:11px}
+  body.studio .workspace-period-label{font-size:17px}
+  body.studio .workspace-period-label small{font-size:14px}
+  body.studio .workspace-payday{flex-wrap:wrap}
+  body.studio .payday-timing{max-width:none}
+  body.studio .auth-box{max-width:100%}
+}

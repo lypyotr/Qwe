@@ -24,31 +24,14 @@
   const orbit='<svg viewBox="0 0 300 300" fill="none" aria-hidden="true"><g stroke="currentColor" stroke-width="1"><ellipse cx="150" cy="150" rx="131" ry="43" transform="rotate(-45 150 150)"/><ellipse cx="150" cy="150" rx="131" ry="43" transform="rotate(15 150 150)"/><ellipse cx="150" cy="150" rx="131" ry="43" transform="rotate(75 150 150)"/><circle cx="150" cy="150" r="92"/><path d="M150 0v22M150 278v22M0 150h22M278 150h22"/></g><circle cx="216" cy="84" r="9" fill="currentColor"/><circle cx="150" cy="150" r="5" fill="currentColor"/></svg>';
   document.querySelectorAll('.brand-mark,.workspace-brand-icon,.auth-logo').forEach(el=>el.innerHTML=mark);
   const brand=document.querySelector('.nav-brand>div');
-  if(brand)brand.innerHTML='Зарплата<span class="studio-brand-period">.</span><small>УЧЁТ РАБОТЫ И ВЫПЛАТ</small>';
+  if(brand)brand.innerHTML='Зарплата<span class="studio-brand-period">.</span>';
   document.querySelector('.workspace-brandbar>span:last-child').innerHTML='ЗАРПЛАТА<span class="studio-brand-period">.</span>';
 
   const nav=document.querySelector('.bottom-nav');
-  const rail=document.createElement('div');rail.className='studio-rail-note';
-  rail.innerHTML='<span class="studio-small">ЛИЧНЫЙ УЧЁТ / 01</span><div class="studio-rail-orbit">'+orbit+'</div>';
-  nav.append(rail);
-  document.querySelectorAll('.nav-btn').forEach((el,i)=>el.dataset.index=String(i+1).padStart(2,'0'));
-
-  const heading=document.querySelector('.workspace-heading');
-  const eyebrow=document.createElement('div');eyebrow.className='studio-eyebrow';eyebrow.innerHTML='<span class="studio-live-dot"></span><span id="studioEyebrow">РАБОТА В ДВИЖЕНИИ</span><span class="studio-page-index" id="studioPageIndex">01 / 07</span>';
-  heading.prepend(eyebrow);
-  const subtitle=document.createElement('p');subtitle.className='studio-subtitle';subtitle.id='studioSubtitle';heading.append(subtitle);
-  const note=document.createElement('span');note.className='studio-header-note';note.textContent='';
-  document.querySelector('.workspace-account').prepend(note);
-
   const hero=document.getElementById('totalCard');
   const heroTop=document.createElement('div');heroTop.className='studio-hero-top';heroTop.innerHTML='<span>ТЕКУЩИЙ ПЕРИОД</span><span class="studio-asterisk" aria-hidden="true">✳</span>';
   hero.prepend(heroTop);
   const art=document.createElement('div');art.className='studio-orbit';art.innerHTML=orbit;art.setAttribute('aria-hidden','true');hero.append(art);
-  const caption=document.createElement('div');caption.className='studio-hero-caption';caption.innerHTML='<span></span><span aria-hidden="true">↗</span>';hero.append(caption);
-  const journalIntro=document.createElement('div');journalIntro.className='studio-journal-label';journalIntro.innerHTML='<span>01 / ДНЕВНИК</span><span></span>';
-  document.querySelector('.day-strip-wrap').prepend(journalIntro);
-  const footer=document.createElement('footer');footer.className='studio-footer';footer.innerHTML='<span>ЗАРПЛАТА<span class="studio-brand-period">.</span> / ЛИЧНЫЙ УЧЁТ ТРУДА</span>';nav.before(footer);
-
   // A presentation surface for visitors, separate from the functional login form.
   const auth=document.getElementById('authOverlay');
   const story=document.createElement('section');story.className='studio-auth-story';story.setAttribute('aria-label','Зарплата — личный учёт труда');
@@ -61,7 +44,6 @@
   const demoEntry=document.createElement('a');demoEntry.className='studio-auth-demo';demoEntry.href='?demo=1';demoEntry.textContent='Сначала посмотреть демо ↗';document.querySelector('.auth-box').append(demoEntry);
   if(!new URLSearchParams(location.search).has('debug'))document.getElementById('authDiag').hidden=true;
 
-  const routes={work:['ДНЕВНИК','',1],period:['РАСЧЁТНЫЙ ПЕРИОД','',2],archive:['АРХИВ ПЕРИОДОВ','',3],calc:['КАЛЬКУЛЯТОР','',4],friends:['КОНТАКТЫ','',5],stats:['СТАТИСТИКА','',6],profile:['НАСТРОЙКИ АККАУНТА','',7],chat:['СООБЩЕНИЯ','',5]};
   function animateRoute(){
     if(motionDisabled())return;
     const page=document.querySelector('.page.active');
@@ -73,13 +55,7 @@
       animation.id='studio-route';
     });
   }
-  function refreshRoute(){
-    const [label,description,index]=routes[document.body.dataset.workspacePage]||routes.work;
-    document.getElementById('studioEyebrow').textContent=label;
-    document.getElementById('studioPageIndex').textContent=String(index).padStart(2,'0')+' / 07';
-    subtitle.textContent=description;
-    requestAnimationFrame(animateRoute);
-  }
+  function refreshRoute(){requestAnimationFrame(animateRoute);}
   new MutationObserver(refreshRoute).observe(document.body,{attributes:true,attributeFilter:['data-workspace-page']});refreshRoute();
 
   // Motion supports state changes; amounts themselves stay immediately accurate.
