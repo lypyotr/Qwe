@@ -416,7 +416,6 @@ body.light .st{--st-work:#6d4aff;--st-bonus:#d6339f;--st-net:#0aa5c4;--st-exp:#e
 .st-col-lbl{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;height:var(--lbl);padding-top:8px;box-sizing:border-box;font-size:11px;color:var(--muted);line-height:1.25;white-space:nowrap}
 .st-col-lbl b{font-weight:700;color:var(--text);font-size:12.5px}
 .st-col.best .st-col-val{color:var(--text)}
-.st-col.best .st-col-val::before{content:'🏆 '}
 .st-col.cur .st-col-bar,.st-cur-key{background:repeating-linear-gradient(-45deg,var(--st-work) 0 6px,color-mix(in srgb,var(--st-work) 55%,transparent) 6px 12px)}
 .st-cur-key{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px}
 .st-col.cur .st-col-lbl b{color:var(--accent-ink,var(--accent))}
@@ -587,3 +586,32 @@ body.studio.nova .cnt-stat-v{font:600 18px var(--font-display);letter-spacing:-.
 body.studio.nova .cnt-stat-l{font-size:11px;text-transform:none;letter-spacing:0;font-weight:500}
 body.studio.nova .cnt-act{border-radius:14px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-weight:600}
 body.studio.nova .cnt-reset{border-radius:14px;color:var(--muted)}
+
+/* ═══ Кнопки только с текстом ═══════════════════════════════════════════ */
+body.nova :is(button,[role=button],.nav-btn,.copy-day-btn,.photo-add-btn,.day-type-btn,.cur-toggle,summary,a.studio-demo-link,.studio-demo-strip a):not(.day-cell):not(.st-col)
+  :is(svg,img,.nav-icon,.payday-icon,.settings-chevron,.button-icon,.message-card-icon,.workspace-destination-icon,.profile-action-icon,.cnt-eye):not(.nova-keep){display:none!important}
+body.nova .studio-demo-link>span[aria-hidden]{display:none}
+body.nova summary::-webkit-details-marker{display:none}
+.nova-btn-text{font:600 13.5px var(--font-body,inherit);letter-spacing:0;white-space:nowrap;line-height:1}
+body.studio.nova .nova-text-only{width:auto!important;min-width:0!important;padding-inline:14px!important;aspect-ratio:auto!important;display:inline-flex!important;align-items:center;justify-content:center;gap:0}
+body.studio.nova .workspace-tools .nova-text-only,body.studio.nova .workspace-period .nova-text-only{height:44px;border-radius:14px}
+body.studio.nova .workspace-period .ui-icon.nova-text-only{height:36px;min-height:36px;font-size:14px}
+body.studio.nova .calendar-actions{gap:6px}
+body.studio.nova .calendar-actions .nova-text-only{height:32px;min-height:32px;border-radius:999px;padding-inline:12px!important}
+body.studio.nova .cnt-btn.nova-text-only{width:64px!important;padding:0!important}
+body.studio.nova .cnt-btn .nova-btn-text{font:600 20px var(--font-display)}
+body.studio.nova .cnt-sbtn .nova-btn-text{font:600 16px var(--font-display)}
+body.studio.nova .cnt-stepper{grid-template-columns:64px 1fr 64px}
+body.studio.nova .total-card .workspace-balance-stats.nova-text-only{width:auto!important;height:30px;border-radius:999px;font-size:12px}
+/* Навигация без иконок */
+body.studio.nova .nav-btn{justify-content:flex-start}
+@media (max-width:899px){
+  body.studio.nova .nav-btn{justify-content:center;padding:12px 8px!important;min-height:44px}
+  body.studio.nova .nav-lbl{font-size:13px;font-weight:600}
+  body.studio.nova .workspace-tools{flex-wrap:wrap;justify-content:flex-end}
+  body.studio.nova .workspace-tools .nova-text-only{height:40px;padding-inline:12px!important}
+}
+
+body.studio.nova .workspace-period{grid-template-columns:auto minmax(0,1fr) auto}
+body.studio.nova .work-summary-chevron{display:none!important}
+body.studio.nova .nav-btn:not(.active) .nav-lbl{color:var(--text);opacity:.78}

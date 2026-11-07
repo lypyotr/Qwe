@@ -205,4 +205,86 @@
   });
   const first = document.querySelector('.page.active');
   if (first) requestAnimationFrame(() => enter(first));
+
+  // ── Кнопки только с текстом ───────────────────────────────────────────
+  // Иконки внутри кнопок скрывает CSS. Здесь из подписей убираются эмодзи
+  // и значки, а кнопки из одной иконки получают короткую текстовую подпись.
+  const BTN = 'button,[role=button],.nav-btn,a.studio-demo-link,.studio-demo-strip a,.copy-day-btn,.photo-add-btn,.expenses-add-btn,.day-type-btn,.cur-toggle,.cnt-earn,summary';
+  const SKIP = '.day-cell,.toggle,.exp-toggle,.period-premium-toggle,.st-col,.cnt-tpl,.tvt-opt';
+  const SYM = '[\\p{Extended_Pictographic}\\uFE0F\\u200D\\u20E3↩↪↗↘↙↖⚑⛔✎✕✖×‹›«»▶◀►◄→←↑↓⤴⤵⟶⟵☰⋯…]';
+  const LEAD = new RegExp('^\\s*(?:' + SYM + '|[+−](?=\\s|$))+\\s*', 'u');
+  const TRAIL = new RegExp('\\s*(?:' + SYM + ')+\\s*$', 'u');
+  const aria = el => el.getAttribute('aria-label') || el.getAttribute('title') || '';
+  const LABELS = [
+    ['.workspace-search-button', 'Поиск'],
+    ['#themeBtn', el => /тёмн/i.test(aria(el)) ? 'Тёмная тема' : 'Светлая тема'],
+    ['.workspace-balance-stats', 'Статистика'],
+    ['.workspace-period .ui-icon,.calendar-actions button', el => /предыдущ|назад/i.test(aria(el)) ? 'Назад' : 'Вперёд'],
+    ['.copy-day-btn', el => /шаблон/i.test(aria(el)) ? 'Новый шаблон' : 'Копировать день'],
+    ['.photo-add-btn', 'Добавить фото'],
+    ['.tpl-del,.dw-del', 'Удалить'],
+    ['.message-copy-id', 'Копировать'],
+    ['.cnt-edit', 'Изменить'],
+    ['.cnt-btn.minus', '−1'], ['.cnt-btn.plus', '+1'],
+    ['.cnt-sbtn', el => /уменьш/i.test(aria(el)) ? '−10' : '+10'],
+    ['#workspaceAddWork', 'Добавить'],
+    ['.day-type-btn', el => (aria(el).split('.')[0] || 'Тип дня').trim()],
+    ['.cur-toggle', el => /доллар/i.test(aria(el)) ? 'В долларах' : 'В рублях'],
+    ['.modal-btn', 'Добавить'],
+    ['[aria-label*="Закрыть"],[title*="Закрыть"],.ui-icon', el => /закры/i.test(aria(el)) || !aria(el) ? 'Закрыть' : aria(el)]
+  ];
+  const labelFor = el => {
+    for (const [sel, v] of LABELS) if (el.matches(sel)) return typeof v === 'function' ? v(el) : v;
+    const a = aria(el).replace(/^(Открыть|Показать)\s+/i, s => s);
+    return a ? a.charAt(0).toUpperCase() + a.slice(1) : '';
+  };
+  const visibleText = el => {
+    let t = '';
+    const walk = n => {
+      for (const c of n.childNodes) {
+        if (c.nodeType === 3) t += c.nodeValue;
+        else if (c.nodeType === 1 && !c.matches('svg,img,.nova-btn-text') && getComputedStyle(c).display !== 'none') walk(c);
+      }
+    };
+    walk(el);
+    return t.trim();
+  };
+  const textify = el => {
+    if (el.closest(SKIP) || el.closest('.nova-btn-text')) return;
+    const tw = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    for (let n = tw.nextNode(); n; n = tw.nextNode()) if (!n.parentElement.closest('.nova-btn-text,input,textarea,select')) nodes.push(n);
+    nodes.forEach(n => {
+      const v = n.nodeValue, c = v.replace(LEAD, '').replace(TRAIL, '');
+      if (c !== v) n.nodeValue = c.trim() === '' ? '' : (v.match(/^\s/) && !LEAD.test(v) ? ' ' : '') + c.trim() + (v.match(/\s$/) && !TRAIL.test(v) ? ' ' : '');
+    });
+    let tag = el.querySelector(':scope>.nova-btn-text');
+    const own = visibleText(el);
+    if (!own) {
+      const label = labelFor(el);
+      if (!label) return;
+      if (!tag) { tag = document.createElement('span'); tag.className = 'nova-btn-text'; el.append(tag); }
+      if (tag.textContent !== label) tag.textContent = label;
+      el.classList.add('nova-text-only');
+    } else if (tag && own !== tag.textContent) { tag.remove(); el.classList.remove('nova-text-only'); }
+  };
+  let queued = new Set(), pending = false;
+  const flush = () => {
+    pending = false;
+    const list = [...queued]; queued = new Set();
+    mo.disconnect();
+    list.forEach(el => { if (el.isConnected) textify(el); });
+    mo.observe(body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['aria-label', 'title'] });
+  };
+  const queue = node => {
+    const el = node.nodeType === 1 ? node : node.parentElement;
+    if (!el) return;
+    const own = el.closest(BTN); if (own) queued.add(own);
+    if (el.querySelectorAll) el.querySelectorAll(BTN).forEach(b => queued.add(b));
+    if (!pending) { pending = true; requestAnimationFrame(flush); }
+  };
+  const mo = new MutationObserver(records => records.forEach(r => {
+    if (r.type === 'childList') { queue(r.target); r.addedNodes.forEach(queue); } else queue(r.target);
+  }));
+  queue(body);
 })();
