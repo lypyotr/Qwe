@@ -8,6 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Зарплата">
 <meta name="theme-color" content="#101816">
+<meta name="description" content="Зарплата — авторский дневник работы и личного дохода. Работы, премии, расходы и планы в ясных цифрах.">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="shortcut icon" href="icon.svg">
@@ -18,6 +19,7 @@
 <link rel="apple-touch-icon" href="icon.svg">
 <title>Зарплата</title>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Prata&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 
@@ -1325,6 +1327,7 @@ body:not(.light) #page-chat .chat-input{background:#2a2a2e;color:#f5f5f7}
 }
 </style>
 <link rel="stylesheet" href="workspace.css?v=5">
+<link rel="stylesheet" href="studio.css?v=1">
 </head>
 <body class="workspace-app">
 
@@ -1353,9 +1356,9 @@ body:not(.light) #page-chat .chat-input{background:#2a2a2e;color:#f5f5f7}
 
 <!-- AUTH SCREEN -->
 <!-- APP LOADER (hides flash while Supabase resolves auth) -->
-<div id="appLoader" style="position:fixed;inset:0;z-index:2000;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:40px;transition:opacity .25s">💰</div>
+<div id="appLoader" role="status" aria-label="Загрузка приложения" style="position:fixed;inset:0;z-index:2000;background:var(--bg);display:flex;align-items:center;justify-content:center;transition:opacity .25s"><span class="studio-loader-mark" aria-hidden="true">З.</span></div>
 
-<div class="auth-overlay hidden" id="authOverlay">
+<div class="auth-overlay hidden" id="authOverlay" role="dialog" aria-modal="true" aria-label="Вход в Зарплата">
   <div class="auth-box">
     <div class="auth-logo">💰</div>
     <div class="auth-title">Калькулятор зарплаты</div>
@@ -1568,7 +1571,7 @@ body:not(.light) #page-chat .chat-input{background:#2a2a2e;color:#f5f5f7}
 <!-- GOALS CARD -->
 <div class="goals-card" id="goalsCard">
   <div class="goals-header">
-    <div class="goals-title">🎯 Цели и прогресс</div>
+    <div class="goals-title">Цели и прогресс</div>
     <div class="goals-edit-btn" onclick="openGoalsModal()">Изменить</div>
   </div>
   <div id="goalsBody"></div>
@@ -2251,6 +2254,7 @@ body:not(.light) #page-chat .chat-input{background:#2a2a2e;color:#f5f5f7}
   </div>
 </div>
 
+<script src="demo.js?v=1"></script>
 <script>
 // ══════════════════════════════════════════════
 //  STATE
@@ -4003,10 +4007,10 @@ function renderChart(){
   const periodSum=sums.reduce((a,b)=>a+b.s,0);
   const avg=nonZero.length?Math.round(periodSum/nonZero.length):0;
   let s='';
-  s+=`<div class="chart-stat"><div class="chart-stat-label">💰 Заработано</div><div class="chart-stat-val">${M(periodSum)}</div></div>`;
-  s+=`<div class="chart-stat"><div class="chart-stat-label">📅 Отработано</div><div class="chart-stat-val">${nonZero.length} ${dayWord(nonZero.length)}</div></div>`;
-  s+=`<div class="chart-stat"><div class="chart-stat-label">📊 Средний день</div><div class="chart-stat-val">${M(avg)}</div></div>`;
-  if(maxDay.d)s+=`<div class="chart-stat"><div class="chart-stat-label">🏆 Лучший день</div><div class="chart-stat-val">${maxDay.d} ${MS[month]} · ${M(maxDay.s)}</div></div>`;
+  s+=`<div class="chart-stat"><div class="chart-stat-label">Итого по работам</div><div class="chart-stat-val">${M(periodSum)}</div></div>`;
+  s+=`<div class="chart-stat"><div class="chart-stat-label">Дней в работе</div><div class="chart-stat-val">${nonZero.length} ${dayWord(nonZero.length)}</div></div>`;
+  s+=`<div class="chart-stat"><div class="chart-stat-label">Средний день</div><div class="chart-stat-val">${M(avg)}</div></div>`;
+  if(maxDay.d)s+=`<div class="chart-stat"><div class="chart-stat-label">Лучший день</div><div class="chart-stat-val">${maxDay.d} ${MS[month]} · ${M(maxDay.s)}</div></div>`;
   document.getElementById('chartStats').innerHTML=s;
 }
 
@@ -5708,6 +5712,7 @@ async function authLock(name,acquireTimeout,fn){
 
 let _sbCdnRetried=false;
 function initSupabase(){
+  if(DEMO_MODE){showAuthOverlay(false);hideLoader();return;}
   if(typeof supabase==='undefined'){
     // The supabase-js <script> from cdn.jsdelivr.net didn't load (offline, or
     // the CDN is blocked by the ISP). Without it the app renders but every
@@ -7499,11 +7504,12 @@ initSupabase();
 refreshUsdRateIfNeeded(); // fetch/refresh USD rate in the background
 autoBackupLocal();        // roll a local safety snapshot (~daily)
 renderSyncStatus();       // paint the header sync pill
-checkBackupReminder();    // nudge if a file backup is overdue
+if(!DEMO_MODE)checkBackupReminder(); // real accounts only; demo is disposable
 </script>
 <script src="messenger-v2.js?v=9"></script>
 <script src="workspace.js?v=5"></script>
 <script src="workspace-avatar.js?v=1"></script>
+<script src="studio.js?v=1"></script>
 </body>
 </html>
 

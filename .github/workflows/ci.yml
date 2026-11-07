@@ -45,6 +45,9 @@ jobs:
       - name: Design and quick-entry checks (headless Chromium)
         run: node scripts/design-test.mjs
 
+      - name: Studio design and isolated public demo checks
+        run: node scripts/studio-test.mjs
+
       - name: Compact journal and avatar tests (headless Chromium)
         run: node scripts/compact-test.mjs
 
