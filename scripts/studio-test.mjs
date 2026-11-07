@@ -43,6 +43,11 @@ try{
   check('dark theme remains available',await page.evaluate(()=>!document.body.classList.contains('light')));
   check('demo status stays accurate after changing theme',await page.locator('.workspace-tools .sp-txt').textContent()==='Демо');
   check('reduced motion disables decorative animation',await page.evaluate(()=>getComputedStyle(document.querySelector('.studio-orbit svg')).animationName==='none'));
+  await page.locator('#navProfile').click();
+  await page.locator('#studioMotionToggle').click();
+  check('explicit motion preference overrides system duration clamp',await page.evaluate(()=>getComputedStyle(document.querySelector('.studio-orbit svg')).animationDuration==='14s'));
+  await page.locator('#studioMotionToggle').click();
+  check('motion can be disabled again',await page.evaluate(()=>getComputedStyle(document.querySelector('.studio-orbit svg')).animationName==='none'));
   check('demo made no project backend requests',backend.length===0);
   check('no uncaught browser errors',errors.length===0);
   console.log('studio presentation and demo safety checks OK');
