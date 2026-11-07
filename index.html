@@ -273,6 +273,9 @@ body.light .cur-toggle.usd{background:rgba(74,222,128,.2);color:var(--text)}
 .toggle.on{background:var(--accent)}
 .toggle::after{content:'';position:absolute;top:3px;left:3px;width:22px;height:22px;background:white;border-radius:50%;transition:transform .2s;box-shadow:0 1px 4px rgba(0,0,0,.3)}
 .toggle.on::after{transform:translateX(20px)}
+.period-premium-row{margin:0 0 12px;gap:12px;box-shadow:none}
+.period-premium-toggle{border:0;padding:0}
+body.light .period-premium-toggle.on,.period-premium-toggle.on{background:var(--accent)}
 
 /* ── PRODUCTION COUNTER ── */
 .cnt-card{margin:0 16px 12px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:var(--card-shadow)}
@@ -1574,6 +1577,14 @@ body:not(.light) #page-chat .chat-input{background:#2a2a2e;color:#f5f5f7}
 <!-- BONUSES -->
 <div class="section">
   <div class="section-header"><div class="section-title">Доплаты и вычеты</div></div>
+  <div class="tax-row period-premium-row">
+    <div class="tax-info">
+      <div class="tax-title" id="periodPremiumLabel">Премия +20%</div>
+      <div class="tax-sub" id="periodPremiumHint">От суммы работ за выбранный период, до НДФЛ</div>
+      <div class="tax-sub" id="periodPremiumAmount" role="status"></div>
+    </div>
+    <button type="button" class="toggle period-premium-toggle" id="periodPremiumToggle" role="switch" aria-checked="false" aria-labelledby="periodPremiumLabel" aria-describedby="periodPremiumHint" onclick="togglePeriodPremium()"></button>
+  </div>
   <div id="bonusList"></div>
   <button class="add-btn" onclick="addBonus()">
     <span style="font-size:20px;line-height:1">+</span> Добавить доплату / вычет
@@ -2438,6 +2449,7 @@ function renderTaxToggle(){
   toggle.classList.toggle('on',taxEnabled);toggle.setAttribute('aria-checked',String(taxEnabled));
 }
 function save(){
+  updatePeriodPremiumAmount();
   try{
     // Preserve the sync revision (_rev = last cloud updated_at we synced to);
     // dropping it would make reconciliation treat this record as never-synced.
@@ -2715,7 +2727,7 @@ function renderGoals(){
       if(raw){
         const d2=JSON.parse(raw);
         const b2=[].concat.apply([],Object.values(d2.days||{})).reduce((s,w)=>s+(parseFloat(w.qty)||0)*(parseFloat(w.price)||0),0);
-        const bon2=(d2.bonuses||[]).reduce((s,b)=>s+(parseFloat(b.amount)||0),0);
+        const bon2=sumBonuses(d2.bonuses||[],b2);
         // apply same tax setting to the other period
         const otherTax=!!d2.taxEnabled;
         monthEarned+=(b2+bon2)*(otherTax?0.87:1);
@@ -3243,6 +3255,30 @@ function copyExpensesFrom(key){
 // ══════════════════════════════════════════════
 //  BONUSES
 // ══════════════════════════════════════════════
+// Keep the percentage bonus in the existing bonuses JSON so plain sync,
+// encrypted sync, backups and undo all preserve it without a schema change.
+function isPeriodPremium(b){return b?.type==='period-premium-20';}
+function hasPeriodPremium(){return bonuses.some(isPeriodPremium);}
+function periodPremiumAmount(base){return Math.round(Math.max(0,base)*20)/100;}
+function bonusAmount(b,base){return isPeriodPremium(b)?periodPremiumAmount(base):(parseFloat(b.amount)||0);}
+function sumBonuses(list,base){return list.reduce((s,b)=>s+bonusAmount(b,base),0);}
+function updatePeriodPremiumAmount(){
+  const base=calcBase();
+  // Retain a ruble amount for existing readers of saved/exported periods.
+  bonuses.forEach(b=>{if(isPeriodPremium(b))b.amount=periodPremiumAmount(base);});
+}
+function renderPeriodPremium(){
+  const toggle=document.getElementById('periodPremiumToggle');
+  if(!toggle)return;
+  const enabled=hasPeriodPremium();
+  toggle.classList.toggle('on',enabled);toggle.setAttribute('aria-checked',String(enabled));
+  document.getElementById('periodPremiumAmount').textContent=enabled?'Премия: +'+M(periodPremiumAmount(calcBase())):'Не начисляется';
+}
+function togglePeriodPremium(){
+  if(hasPeriodPremium())bonuses=bonuses.filter(b=>!isPeriodPremium(b));
+  else bonuses.push({id:Date.now(),type:'period-premium-20',name:'Премия +20% за период',amount:periodPremiumAmount(calcBase())});
+  haptic('light');save();renderBonuses();renderTotal();renderGoals();
+}
 function addBonus(){
   haptic('medium');
   bonuses.push({id:Date.now(),name:'',amount:''});
@@ -3252,9 +3288,11 @@ function addBonus(){
 function removeBonus(id){const snap=periodSnapshot();bonuses=bonuses.filter(b=>b.id!==id);save();haptic('medium');renderBonuses();renderTotal();renderGoals();toast('Доплата удалена',()=>restorePeriodSnapshot(snap));}
 function updateBonus(id,f,v){const b=bonuses.find(b=>b.id===id);if(b){b[f]=v;save();renderTotal();renderGoals()}}
 function renderBonuses(){
+  renderPeriodPremium();
   const list=document.getElementById('bonusList');
-  if(!bonuses.length){list.innerHTML='';return}
-  list.innerHTML=bonuses.map(b=>`
+  const manualBonuses=bonuses.filter(b=>!isPeriodPremium(b));
+  if(!manualBonuses.length){list.innerHTML='';return}
+  list.innerHTML=manualBonuses.map(b=>`
     <div class="bonus-item">
       <div class="bonus-row">
         <input class="bonus-name" type="text" placeholder="Название" value="${esc(b.name)}"
@@ -3273,7 +3311,7 @@ function renderBonuses(){
 //  CALC
 // ══════════════════════════════════════════════
 function calcBase(){return [].concat.apply([],Object.values(days)).reduce((s,w)=>s+(parseFloat(w.qty)||0)*(parseFloat(w.price)||0),0)}
-function calcBonus(){return bonuses.reduce((s,b)=>s+(parseFloat(b.amount)||0),0)}
+function calcBonus(){return sumBonuses(bonuses,calcBase())}
 function calcTotal(){let t=calcBase()+calcBonus();if(taxEnabled)t*=0.87;return Math.max(0,t)}
 function fmt(n){return Math.round(n).toLocaleString('ru-RU')}
 // Currency-aware money helpers. Everything is stored/computed in rubles; when
@@ -3785,6 +3823,7 @@ function renderSpendCalc(){
 }
 
 function renderTotal(){
+  renderPeriodPremium();
   const base=calcBase(),total=calcTotal();
   const expTotal=calcExpensesTotal(),net=calcNetTotal();
   const hasExp=expTotal>0;
@@ -3798,7 +3837,7 @@ function renderTotal(){
   }
   const showNet=hasExp&&totalView==='net';
   document.getElementById('totalLabel').textContent=showNet?'На руки':'Заработано';
-  document.getElementById('totalHint').textContent=(showNet?'После расходов':'До расходов')+' · '+(taxEnabled?'НДФЛ 13%':'налог выключен');
+  document.getElementById('totalHint').textContent=(showNet?'После расходов':'До расходов')+(hasPeriodPremium()?' · премия +20%':'')+' · '+(taxEnabled?'НДФЛ 13%':'налог выключен');
   const disp=showNet?net:total;
   const dispEl=document.getElementById('totalDisplay');
   const usd=currencyView==='usd'&&usdRate>0;
@@ -3871,7 +3910,7 @@ function renderCompareBadge(total){
     const prevBonuses=data.bonuses||[];
     const prevTax=!!data.taxEnabled;
     const prevBase=[].concat.apply([],Object.values(prevDays)).reduce((s,w)=>s+(parseFloat(w.qty)||0)*(parseFloat(w.price)||0),0);
-    const prevBonus=prevBonuses.reduce((s,b)=>s+(parseFloat(b.amount)||0),0);
+    const prevBonus=sumBonuses(prevBonuses,prevBase);
     let prevTotal=prevBase+prevBonus;
     if(prevTax)prevTotal*=0.87;
     prevTotal=Math.max(0,prevTotal);
@@ -3899,7 +3938,7 @@ function calcTotalEarnedAllTime(){
       if(!k||!/^salary_\d+_\d+_\d+$/.test(k))continue;
       const data=JSON.parse(localStorage.getItem(k)||'{}');
       const base=[].concat.apply([],Object.values(data.days||{})).reduce((s,w)=>s+(parseFloat(w.qty)||0)*(parseFloat(w.price)||0),0);
-      const bonus=(data.bonuses||[]).reduce((s,b)=>s+(parseFloat(b.amount)||0),0);
+      const bonus=sumBonuses(data.bonuses||[],base);
       let t=base+bonus;if(data.taxEnabled)t*=0.87;
       total+=Math.max(0,t);
     }
@@ -3988,7 +4027,7 @@ function renderHistory(){
       const y=parseInt(parts[0]),m=parseInt(parts[1]),p=parseInt(parts[2]);
       const data=JSON.parse(localStorage.getItem(k)||'{}');
       const base=[].concat.apply([],Object.values(data.days||{})).reduce((s,w)=>s+(parseFloat(w.qty)||0)*(parseFloat(w.price)||0),0);
-      const bonus=(data.bonuses||[]).reduce((s,b)=>s+(parseFloat(b.amount)||0),0);
+      const bonus=sumBonuses(data.bonuses||[],base);
       let total=base+bonus;if(data.taxEnabled)total*=0.87;total=Math.max(0,total);
       return{k,y,m,p,total};
     }catch(e){return null}
@@ -4024,7 +4063,7 @@ function renderArchive(){
       const y=parseInt(parts[0]),m=parseInt(parts[1]),p=parseInt(parts[2]);
       const data=JSON.parse(localStorage.getItem(k)||'{}');
       const base=[].concat(...Object.values(data.days||{})).reduce((s,w)=>s+(parseFloat(w.qty)||0)*(parseFloat(w.price)||0),0);
-      const bonus=(data.bonuses||[]).reduce((s,b)=>s+(parseFloat(b.amount)||0),0);
+      const bonus=sumBonuses(data.bonuses||[],base);
       let total=base+bonus;if(data.taxEnabled)total*=0.87;total=Math.max(0,total);
       return{k,y,m,p,total};
     }catch(e){return null;}
@@ -4097,7 +4136,7 @@ function renderBreakdown(){
   const filledCount=sortedDays.filter(d=>daySum(d)>0).length;
   if(base>0&&filledCount>1)rows+=`<div class="breakdown-row"><span class="lbl">Итого по работам</span><span class="val">${M(base)}</span></div>`;
   bonuses.forEach(b=>{
-    const amt=parseFloat(b.amount)||0;
+    const amt=bonusAmount(b,base);
     if(amt!==0){
       const lbl=b.name||(amt>0?'Доплата':'Вычет');
       rows+=`<div class="breakdown-row bonus-r"><span class="lbl">${esc(lbl)}</span><span class="val" style="color:${amt>=0?'var(--accent3)':'var(--danger)'}">${amt>=0?'+':''}${M(amt)}</span></div>`;
@@ -6720,7 +6759,7 @@ function collectPeriodStats(){
       const y=parseInt(parts[0]),m=parseInt(parts[1]),p=parseInt(parts[2]);
       const d=JSON.parse(localStorage.getItem(k)||'{}');
       const base=[].concat.apply([],Object.values(d.days||{})).reduce((s,w)=>s+(parseFloat(w.qty)||0)*(parseFloat(w.price)||0),0);
-      const bonus=(d.bonuses||[]).reduce((s,b)=>s+(parseFloat(b.amount)||0),0);
+      const bonus=sumBonuses(d.bonuses||[],base);
       const expenses=(d.expenses||[]).reduce((s,e)=>e&&e.disabled?s:s+(parseFloat(e.amount)||0),0);
       let total=base+bonus;if(d.taxEnabled)total*=0.87;total=Math.max(0,total);
       const worked=Object.keys(d.days||{}).filter(day=>(d.days[day]||[]).reduce((s,w)=>s+(parseFloat(w.qty)||0)*(parseFloat(w.price)||0),0)>0).length;
@@ -7467,5 +7506,6 @@ checkBackupReminder();    // nudge if a file backup is overdue
 <script src="workspace-avatar.js?v=1"></script>
 </body>
 </html>
+
 
 

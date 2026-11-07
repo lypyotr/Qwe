@@ -1,4 +1,4 @@
-const CACHE='salary-v53';
+const CACHE='salary-v54';
 const STATIC=['./index.html','./manifest.json','./icon.svg','./messenger-v2.js?v=9','./workspace.css?v=5','./workspace.js?v=5','./workspace-avatar.js?v=1'];
 
 // Dynamic APIs that must NEVER be touched by the service worker: Supabase
@@ -69,5 +69,6 @@ self.addEventListener('notificationclick',e=>{
   e.notification.close();
   e.waitUntil(clients.openWindow('/Qwe/'));
 });
+
 
 
