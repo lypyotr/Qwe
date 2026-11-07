@@ -1,4 +1,4 @@
-const CACHE='salary-v56';
+const CACHE='salary-v57';
 const STATIC=['./index.html','./manifest.json','./icon.svg','./messenger-v2.js?v=9','./workspace.css?v=5','./workspace.js?v=5','./workspace-avatar.js?v=1','./studio.css?v=1','./studio.js?v=1','./demo.js?v=1'];
 
 // Dynamic APIs that must NEVER be touched by the service worker: Supabase
