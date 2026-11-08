@@ -1329,7 +1329,7 @@ body:not(.light) #page-chat .chat-input{background:#2a2a2e;color:#f5f5f7}
 <link rel="stylesheet" href="workspace.css?v=5">
 <link rel="stylesheet" href="studio.css?v=1">
 <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Unbounded:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="nova.css?v=4">
+<link rel="stylesheet" href="nova.css?v=5">
 </head>
 <body class="workspace-app">
 
@@ -2235,14 +2235,7 @@ body:not(.light) #page-chat .chat-input{background:#2a2a2e;color:#f5f5f7}
 
 <!-- Sync log popup (opened by tapping the sync pill) -->
 <div id="syncLogOverlay" onclick="if(event.target===this)closeSyncLog()">
-  <div class="synclog-card">
-    <div class="synclog-head"><div class="synclog-title">Синхронизация</div><div class="synclog-status" id="syncLogStatus"></div></div>
-    <div class="synclog-list" id="syncLogList"></div>
-    <div class="synclog-actions">
-      <button class="modal-btn" onclick="manualSync();renderSyncLogPopup()">↻ Синхронизировать</button>
-      <button class="modal-btn" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="closeSyncLog()">Закрыть</button>
-    </div>
-  </div>
+  <div class="synclog-card" id="syncLogCard" role="dialog" aria-modal="true" aria-labelledby="syncLogTitle"></div>
 </div>
 
 <!-- Recovery code overlay (shown once when E2EE is enabled) -->
@@ -2333,7 +2326,10 @@ const SETTINGS_REV_KEY = 'salary_settings_rev'; // last cloud updated_at we sync
 let _refreshing = false, _lastRefresh = 0, _resyncTimer = null, _refreshQueued = false;
 let _syncWired = false, _pollTimer = null;
 let _flushTimer = null, _flushing = false, _flushBackoff = 1000;
-let _syncError = false;   // last cloud read/write actually failed (vs. silently ok)
+let _syncError = false;
+// Sync window state: last fully successful cycle, current step, last error text,
+// live-update channel status and its reconnect delay.
+let _lastSyncOk = 0, _syncStage = '', _lastSyncErr = '', _rtStatus = 'off', _rtBackoff = 3000, _rtTimer = null, _lastPullChanges = 0;   // last cloud read/write actually failed (vs. silently ok)
 // ── End-to-end encryption (opt-in, off by default) ──
 // When on, period/settings CONTENTS are encrypted in-browser before upload and
 // only ciphertext reaches the DB. e2eeDEK is the in-memory data key; when E2EE
@@ -5849,7 +5845,8 @@ function enterApp(user){
       await flushPending();      // push edits queued offline before this load
       await loadAllUserData();   // pull + timestamp merge
       await flushPending();      // push legacy / local-only periods found in merge
-      renderAll();startRealtimeSync();setupSyncListeners();
+      _lastRefresh=Date.now();if(!_syncError&&!pendingGet().length)_lastSyncOk=_lastRefresh;
+      renderAll();startRealtimeSync();setupSyncListeners();renderSyncStatus();
       await loadAppConfig();   // pull global announcement / maintenance state
       startAppConfigRealtime();
       await ensureUserNumber();// assign/fetch this account's #number
@@ -6026,17 +6023,18 @@ async function loadAllUserData(){
   // Run settings + periods in parallel so one slow query can't time out the
   // whole chain. Each query is tolerated independently. Timeouts and retries
   // are handled by fetchWithRetry at the transport level.
-  let _pullOk=true;
-  const settledData = async (query) => {
+  let _pullOk=true,_pullErr=null;
+  _syncStage='Получение данных из облака';renderSyncStatus();
+  const settledData = async (make) => {
   try {
-    const { data, error } = await query;
+    const { data, error } = await withAuthRetry(make);
     
     if (error) {
       // Не логируем AbortError как ошибку — это нормально при таймауте
       if (error.name !== 'AbortError' && !error.message?.includes('aborted')) {
         console.warn('loadAllUserData query warning:', error.message || error);
       }
-      _pullOk = false;
+      _pullOk = false;_pullErr = error;
       return undefined;
     }
     return data;
@@ -6045,18 +6043,19 @@ async function loadAllUserData(){
     if (e?.name !== 'AbortError' && !e?.message?.toLowerCase().includes('aborted')) {
       console.warn('loadAllUserData query error:', e?.message || e);
     }
-    _pullOk = false;
+    _pullOk = false;_pullErr = e;
     return undefined;
   }
 };
   const[s,periods]=await Promise.all([
-    settledData(sbClient.from('user_settings').select('*').eq('user_id',currentUser.id).maybeSingle()),
-    settledData(sbClient.from('periods').select('*').eq('user_id',currentUser.id))
+    settledData(()=>sbClient.from('user_settings').select('*').eq('user_id',currentUser.id).maybeSingle()),
+    settledData(()=>sbClient.from('periods').select('*').eq('user_id',currentUser.id))
   ]);
+  _syncStage='';_lastPullChanges=0;
   // A real read failure (network/RLS) is now visible instead of silently doing
   // nothing while the pill claims "synced".
   _syncError=!_pullOk;
-  if(!_pullOk)syncLog('err','Не удалось прочитать из облака: соединение прервано или сервер отклонил запрос. Локальные записи сохранены.');
+  if(!_pullOk){_lastSyncErr=syncErrText(_pullErr);syncLog('err','Не удалось получить данные: '+_lastSyncErr+'. Записи на этом устройстве сохранены.');}
   // Cross-device detection: if the account's rows are encrypted but this device
   // didn't know yet, turn E2EE on and unlock (or lock) before reading anything.
   if(!e2eeOn){
@@ -6099,7 +6098,7 @@ async function loadAllUserData(){
         applyCounterFromSync(sc);
       }
       if(s.theme){localStorage.setItem('salary_theme',s.theme);lightTheme=s.theme==='light';document.body.classList.toggle('light',lightTheme);document.getElementById('themeBtn').textContent=lightTheme?'🌙':'☀️';}
-      localStorage.setItem(SETTINGS_REV_KEY,String(rrev));
+      localStorage.setItem(SETTINGS_REV_KEY,String(rrev));_lastPullChanges++;
     }else if(srev===null&&(nz(templates)||nz(goals))){
       // Legacy local settings never synced and cloud isn't better — keep & upload.
       localStorage.setItem(SETTINGS_TS_KEY,String(Date.now()));pendingAdd('settings');
@@ -6135,6 +6134,7 @@ async function loadAllUserData(){
       }else if(lrev===null||rrev!==lrev){
         // Cloud differs from the revision we last saw — adopt it.
         localStorage.setItem('salary_'+p.period_key,JSON.stringify({days,bonuses,taxEnabled:!!p.tax_enabled,dayOverrides:ov,expenses:exp,_rev:rrev,_ts:rrev}));
+        if(lrev!==null)_lastPullChanges++;
       }
     });
     // Periods that exist only locally (never reached the cloud) must be queued.
@@ -6163,30 +6163,45 @@ async function loadAllUserData(){
 // that gap (see setupSyncListeners).
 function startRealtimeSync(){
   if(!currentUser||!sbClient)return;
+  clearTimeout(_rtTimer);
   // Tear down any previous channel without letting its async status callback
   // (which may fire CLOSED) trigger a reconnect of the new one.
   if(realtimeChannel){const old=realtimeChannel;realtimeChannel=null;sbClient.removeChannel(old);}
-  // private:true → the channel is gated by the realtime.messages RLS policies in
-  // realtime_setup.sql, so nobody but the owner can subscribe to (or forge pings
-  // into) this user's sync channel. If those policies/Realtime Authorization
-  // aren't applied yet, the subscribe just fails and the app falls back to the
-  // focus/visibility/45s-poll refresh — degraded live-sync, never a hard break.
+  // private:true → gated by the realtime.messages RLS policies (realtime_setup.sql).
+  // Private channels authorize with the user's JWT, so hand it to Realtime BEFORE
+  // joining — joining with only the anon key is rejected, and the old code then
+  // retried every 3 s forever while devices fell back to slow polling.
   const ch=sbClient.channel('user-sync-'+currentUser.id,{config:{private:true,broadcast:{self:false}}});
-  realtimeChannel=ch;
+  realtimeChannel=ch;_rtStatus='connecting';
   ch.on('broadcast',{event:'data-updated'},({payload})=>{
       if(payload&&payload.from===CLIENT_ID)return; // ignore our own echo
-      // Force: a ping means another device JUST wrote — never drop it to the
-      // 3s throttle or an in-flight cycle (it queues a follow-up instead).
+      syncLog('down','Другое устройство сохранило изменения — загружаю');
+      // Force: a ping means another device JUST wrote — never drop it.
       refreshFromCloud(true);
     })
-    .on('broadcast',{event:'msg'},({payload})=>{onIncomingMsgPing(payload&&payload.from,payload&&payload.kind);})
-    .subscribe(status=>{
+    .on('broadcast',{event:'msg'},({payload})=>{onIncomingMsgPing(payload&&payload.from,payload&&payload.kind);});
+  (async()=>{
+    try{
+      const{data}=await sbClient.auth.getSession();
+      const token=data&&data.session&&data.session.access_token;
+      if(token&&sbClient.realtime&&sbClient.realtime.setAuth)await sbClient.realtime.setAuth(token);
+    }catch(_){}
+    if(realtimeChannel!==ch)return;
+    ch.subscribe(status=>{
       if(realtimeChannel!==ch)return; // stale channel — ignore
-      if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED'){
-        clearTimeout(_resyncTimer);
-        _resyncTimer=setTimeout(()=>{if(realtimeChannel===ch)startRealtimeSync();},3000);
+      if(status==='SUBSCRIBED'){
+        if(_rtStatus!=='on')syncLog('net','Мгновенные обновления подключены');
+        _rtStatus='on';_rtBackoff=3000;renderSyncStatus();
+      }else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED'){
+        if(_rtStatus==='on'||_rtBackoff===3000)syncLog('net','Мгновенные обновления недоступны — проверяю облако каждые 15 с');
+        _rtStatus='off';renderSyncStatus();
+        clearTimeout(_rtTimer);
+        // Back off instead of hammering the server every 3 s.
+        _rtTimer=setTimeout(()=>{if(realtimeChannel===ch)startRealtimeSync();},_rtBackoff);
+        _rtBackoff=Math.min(_rtBackoff*2,60000);
       }
     });
+  })();
 }
 
 // True while the broadcast channel is actually joined — used to avoid tearing
@@ -6224,84 +6239,139 @@ function saveSettingsToFirestore(){markSettingsDirty();}
 
 function scheduleFlush(){clearTimeout(_flushTimer);_flushTimer=setTimeout(flushPending,1200);}
 
-// Upload every queued record. Each carries its own _ts as updated_at so cloud
-// reflects edit time, not write time. Failures keep the key queued and retry
-// with exponential backoff — an edit is never silently dropped.
+// Human-readable reason for a failed request (shown in the sync window).
+function syncErrText(e){
+  if(!e)return 'неизвестная ошибка';
+  const m=String(e.message||e.error_description||e.msg||e).toLowerCase(),code=String(e.code||e.status||'');
+  if(navigator.onLine===false)return 'нет интернета';
+  if(e.name==='TimeoutError'||m.includes('истекло время'))return 'сервер не ответил вовремя';
+  if(isAuthErr(e))return 'сессия входа истекла';
+  if(m.includes('failed to fetch')||m.includes('networkerror')||m.includes('load failed')||m.includes('network'))return 'нет связи с сервером';
+  if(code==='42501'||code==='403'||m.includes('row-level security')||m.includes('permission denied'))return 'сервер отклонил запись (нет прав)';
+  if(code==='413'||m.includes('too large'))return 'запись слишком большая';
+  return String(e.message||e).slice(0,140)+(code?' ['+code+']':'');
+}
+function isAuthErr(e){
+  const m=String(e&&(e.message||e)||'').toLowerCase(),code=String(e&&(e.code||e.status)||'');
+  return code==='PGRST301'||code==='PGRST303'||code==='401'||m.includes('jwt')||m.includes('token is expired')||m.includes('invalid claim');
+}
+// Run a Supabase request; on an expired session refresh the token once and retry.
+// (Mobile browsers pause the auto-refresh timer in background, so a stale token
+// used to turn into a permanent "!" until the app was restarted.)
+async function withAuthRetry(make){
+  const r=await make();
+  if(r&&r.error&&isAuthErr(r.error)){
+    syncLog('net','Сессия входа устарела — обновляю');
+    try{await sbClient.auth.refreshSession();}catch(_){}
+    return await make();
+  }
+  return r;
+}
+// "2026_10_1" → "1–15 ноя 2026"; "settings" → "настройки".
+function syncKeyLabel(k){
+  if(k==='settings')return 'настройки';
+  const m=/^(\d+)_(\d+)_(\d)$/.exec(k);if(!m)return k;
+  const y=+m[1],mo=+m[2],last=new Date(y,mo+1,0).getDate();
+  return (m[3]==='1'?'1–15':'16–'+last)+' '+MS[mo]+' '+y;
+}
+function syncKeysText(keys){
+  const l=keys.map(syncKeyLabel);
+  return l.length<=3?l.join(', '):l.slice(0,3).join(', ')+' и ещё '+(l.length-3);
+}
+
+// Upload every queued record in ONE round trip: all periods go as a single
+// batched upsert (settings in parallel). The old loop sent one request per
+// record, so a slow network multiplied the wait by the queue length. If the
+// batch is rejected, rows are retried one by one so a single bad record can't
+// block the rest. Each row carries its own _ts as updated_at; failures keep the
+// key queued and retry with exponential backoff — an edit is never dropped.
 async function flushPending(){
   if(!currentUser||!sbClient||_e2eeBusy)return;
   // Another flush in flight: re-arm instead of silently dropping, so an edit
-  // made during an upload is sent right after it, not on the next 25s poll.
+  // made during an upload is sent right after it, not on the next poll.
   if(_flushing){scheduleFlush();return;}
   // Locked E2EE: never upload (we can't encrypt, and must not overwrite ciphertext).
   if(e2eeOn&&(!e2eeDEK||e2eeLocked))return;
   const keys=pendingGet();if(!keys.length)return;
-  _flushing=true;let allOk=true,uploaded=false;
+  _flushing=true;_syncStage='Отправка: '+syncKeysText(keys);
+  let allOk=true,uploaded=0,lastErr=null;
   renderSyncStatus();
   try{
+    let settingsJob=null;const rows=[],meta=[];
     for(const k of keys){
       try{
         if(k==='settings'){
           const ts=parseInt(localStorage.getItem(SETTINGS_TS_KEY)||'0',10)||Date.now();
-          // Carry the production counter inside goals so it syncs with no schema
-          // change (mirrors the existing goals.calc pattern).
+          // Carry the production counter inside goals so it syncs with no schema change.
           const goalsOut=Object.assign({},goals,{_counter:counter});
-          let row={user_id:currentUser.id,updated_at:new Date(ts).toISOString()};
+          const row={user_id:currentUser.id,updated_at:new Date(ts).toISOString()};
           if(e2eeOn&&e2eeDEK){
-            // Encrypt contents; blank EVERY plaintext data column. expenses is a
-            // legacy/unused column on user_settings — clear it too so no plaintext
-            // lingers in an encrypted row.
+            // Encrypt contents; blank EVERY plaintext data column (incl. legacy expenses).
             row.cipher=await encField({templates,goals:goalsOut,theme:lightTheme?'light':'dark'});
             row.templates=[];row.goals={};row.theme='';row.expenses=[];
           }else{
-            // Plaintext path: never reference the `cipher` column, so sync keeps
-            // working even if e2ee_setup.sql hasn't been run.
+            // Plaintext path never references `cipher`, so sync works without e2ee_setup.sql.
             row.templates=templates;row.goals=goalsOut;row.theme=lightTheme?'light':'dark';
           }
-          const{error}=await sbClient.from('user_settings').upsert(row,{onConflict:'user_id'});
-          if(error)throw error;
-          // Remember the revision we just wrote so a later pull doesn't re-adopt
-          // our own write (and so equality reconciliation has a baseline).
-          localStorage.setItem(SETTINGS_REV_KEY,String(ts));
-          // Only clear the queue if no newer settings edit landed while the
-          // upload was in flight — otherwise keep it queued for the next round.
-          const curTs=parseInt(localStorage.getItem(SETTINGS_TS_KEY)||'0',10)||0;
-          if(curTs===ts)pendingDel(k);
-          uploaded=true;
+          settingsJob={row,ts};
         }else{
           const p=periodPayload(k);
           if(!p){pendingDel(k);continue;}
           const ts=p._ts||Date.now();
-          let row={user_id:currentUser.id,period_key:k,updated_at:new Date(ts).toISOString()};
+          const row={user_id:currentUser.id,period_key:k,updated_at:new Date(ts).toISOString()};
           if(e2eeOn&&e2eeDEK){
             row.cipher=await encField({days:p.days||{},bonuses:p.bonuses||[],taxEnabled:!!p.taxEnabled,dayOverrides:p.dayOverrides||{},expenses:p.expenses||[]});
             row.days={};row.bonuses=[];row.tax_enabled=false;row.day_overrides={};row.expenses=[];
           }else{
-            // Plaintext path: never reference the `cipher` column (see above).
             row.days=p.days||{};row.bonuses=p.bonuses||[];row.tax_enabled=!!p.taxEnabled;row.day_overrides=p.dayOverrides||{};row.expenses=p.expenses||[];
           }
-          const{error}=await sbClient.from('periods').upsert(row,{onConflict:'user_id,period_key'});
-          if(error)throw error;
-          // Re-read before writing back: an edit made DURING the network await
-          // must not be clobbered by the stale pre-upload payload, and must
-          // stay queued. Only stamp _rev / dequeue if nothing changed.
-          const cur=periodPayload(k);
-          if(cur&&(cur._ts||0)===ts){
-            cur._rev=ts;try{localStorage.setItem('salary_'+k,JSON.stringify(cur));}catch(_){}
-            pendingDel(k);
-          }
-          uploaded=true;
+          rows.push(row);meta.push({k,ts});
         }
-      }catch(e){allOk=false;console.error('flush',k,e);}
+      }catch(e){allOk=false;lastErr=e;console.error('flush prepare',k,e);}
     }
-  }finally{_flushing=false;}
+    // Re-read before writing back: an edit made DURING the network await must
+    // not be clobbered and must stay queued. Only stamp _rev / dequeue if unchanged.
+    const settle=m=>{
+      const cur=periodPayload(m.k);
+      if(cur&&(cur._ts||0)===m.ts){cur._rev=m.ts;try{localStorage.setItem('salary_'+m.k,JSON.stringify(cur));}catch(_){}pendingDel(m.k);}
+      uploaded++;
+    };
+    const sendSettings=async()=>{
+      if(!settingsJob)return;
+      const{error}=await withAuthRetry(()=>sbClient.from('user_settings').upsert(settingsJob.row,{onConflict:'user_id'}));
+      if(error)throw error;
+      // Remember the revision we wrote so a later pull doesn't re-adopt our own write.
+      localStorage.setItem(SETTINGS_REV_KEY,String(settingsJob.ts));
+      const curTs=parseInt(localStorage.getItem(SETTINGS_TS_KEY)||'0',10)||0;
+      if(curTs===settingsJob.ts)pendingDel('settings');
+      uploaded++;
+    };
+    const sendPeriods=async()=>{
+      if(!rows.length)return;
+      const r=await withAuthRetry(()=>sbClient.from('periods').upsert(rows,{onConflict:'user_id,period_key'}));
+      if(!r.error){meta.forEach(settle);return;}
+      if(rows.length===1||isAuthErr(r.error))throw r.error;
+      let first=null;
+      for(let i=0;i<rows.length;i++){
+        const x=await withAuthRetry(()=>sbClient.from('periods').upsert(rows[i],{onConflict:'user_id,period_key'}));
+        if(x.error){first=first||x.error;console.error('flush',meta[i].k,x.error);}else settle(meta[i]);
+      }
+      if(first)throw first;
+    };
+    const res=await Promise.allSettled([sendSettings(),sendPeriods()]);
+    res.forEach(r=>{if(r.status==='rejected'){allOk=false;lastErr=r.reason;console.error('flush',r.reason);}});
+  }finally{_flushing=false;_syncStage='';}
   if(uploaded)broadcastChange();
   if(allOk){
-    _flushBackoff=1000;_syncError=false;
-    if(uploaded)syncLog('up','отправлено в облако: '+keys.length);
+    _flushBackoff=1000;_syncError=false;_lastSyncErr='';
+    if(uploaded)syncLog('up','Отправлено: '+syncKeysText(keys));
     // Anything still queued (kept above, or added mid-flight) goes next round.
     if(pendingGet().length)scheduleFlush();
+  }else{
+    _syncError=true;_lastSyncErr=syncErrText(lastErr);
+    syncLog('err','Не удалось отправить: '+_lastSyncErr+'. Повтор через '+Math.round(_flushBackoff/1000)+' с');
+    clearTimeout(_flushTimer);_flushTimer=setTimeout(flushPending,_flushBackoff);_flushBackoff=Math.min(_flushBackoff*2,30000);
   }
-  else{_syncError=true;syncLog('err','не удалось отправить — повтор позже');clearTimeout(_flushTimer);_flushTimer=setTimeout(flushPending,_flushBackoff);_flushBackoff=Math.min(_flushBackoff*2,30000);}
   renderSyncStatus();
 }
 
@@ -6325,13 +6395,19 @@ async function refreshFromCloud(force){
   const work=(async()=>{
     await flushPending();
     await loadAllUserData();   // pull + timestamp merge (skips queued keys)
-    await loadAppConfig();     // refresh global announcement / maintenance too
-    await flushPending();      // upload legacy/local-only periods found in merge
+    if(pendingGet().length)await flushPending();   // upload legacy/local-only periods found in merge
     renderAll();
+    if(!_syncError&&!pendingGet().length){
+      _lastSyncOk=Date.now();_lastSyncErr='';
+      if(_lastPullChanges)syncLog('down','Получены изменения с другого устройства: '+_lastPullChanges);
+    }
   })();
+  // Announcement / maintenance state has its own realtime channel — refresh it
+  // in the background instead of making every sync cycle wait for it.
+  loadAppConfig();
   const guard=setTimeout(()=>syncLog('net','Синхронизация ещё выполняется; ожидаем завершения запросов'),30000);
   try{await work;}
-  catch(e){_syncError=true;syncLog('err','Ошибка синхронизации: '+(e?.name||'Error'));console.error('refreshFromCloud',e);}
+  catch(e){_syncError=true;_lastSyncErr=syncErrText(e);syncLog('err','Ошибка синхронизации: '+_lastSyncErr);console.error('refreshFromCloud',e);}
   finally{
     clearTimeout(guard);
     _refreshing=false;renderSyncStatus();
@@ -6349,14 +6425,18 @@ function setupSyncListeners(){
     // Reconnect realtime only when the socket is actually dead (iOS closes it
     // in background); recreating a healthy channel would drop pings for the
     // duration of the resubscribe.
-    if(document.visibilityState==='visible'){if(!realtimeHealthy())startRealtimeSync();refreshFromCloud();}
+    if(document.visibilityState==='visible'){if(!realtimeHealthy()){_rtBackoff=3000;startRealtimeSync();}refreshFromCloud(true);}
     else flushPending();
   });
   window.addEventListener('focus',()=>refreshFromCloud());
   window.addEventListener('online',()=>{syncLog('net','сеть появилась');renderSyncStatus();flushPending();refreshFromCloud(true);startRealtimeSync();});
   window.addEventListener('offline',()=>{syncLog('net','офлайн');renderSyncStatus();});
   window.addEventListener('pagehide',flushPending);
-  _pollTimer=setInterval(()=>{if(document.visibilityState==='visible')refreshFromCloud();},45000);
+  // Poll every 15 s while live updates are unavailable, otherwise every 45 s.
+  _pollTimer=setInterval(()=>{
+    if(document.visibilityState!=='visible')return;
+    if(!realtimeHealthy()||Date.now()-_lastRefresh>=45000)refreshFromCloud();
+  },15000);
   // Keep the "synced N ago" label fresh even when nothing is happening.
   setInterval(()=>{if(document.visibilityState==='visible')renderSyncStatus();},15000);
 }
@@ -6642,75 +6722,135 @@ function restorePeriodSnapshot(s){
 // ══════════════════════════════════════════════
 //  SYNC STATUS PILL
 // ══════════════════════════════════════════════
-// Compact "time since" for the pill: ✓ / 3м / 2ч / 1д.
-function _agoMini(ms){
-  if(!ms)return '✓';
+// "только что" / "5 мин назад" / "2 ч назад" / "3 дн назад".
+function _agoText(ms){
+  if(!ms)return 'ещё не было';
   const s=Math.max(0,Math.round((Date.now()-ms)/1000));
-  if(s<60)return '✓';
-  const m=Math.round(s/60);if(m<60)return m+'м';
-  const h=Math.round(m/60);if(h<24)return h+'ч';
-  return Math.round(h/24)+'д';
+  if(s<60)return 'только что';
+  const m=Math.round(s/60);if(m<60)return m+' мин назад';
+  const h=Math.round(m/60);if(h<24)return h+' ч назад';
+  return Math.round(h/24)+' дн назад';
+}
+// One source of truth for the pill and the window.
+function syncState(){
+  const pend=pendingGet();
+  if(DEMO_MODE)return{cls:'ok',pill:'Демо',title:'Деморежим',text:'Изменения существуют только в этой вкладке и никуда не отправляются.'};
+  if(!currentUser)return{cls:'warn',pill:'Вход',title:'Вы не вошли',text:'Войдите в аккаунт, чтобы данные сохранялись в облаке и появлялись на других устройствах.'};
+  if(e2eeOn&&e2eeLocked)return{cls:'off',pill:'Закрыто',title:'Данные зашифрованы',text:'Введите пароль, чтобы расшифровать данные и продолжить синхронизацию.'};
+  if(navigator.onLine===false)return{cls:'off',pill:pend.length?'Офлайн · '+pend.length:'Офлайн',title:'Нет интернета',
+    text:pend.length?'Изменения сохранены на устройстве ('+pend.length+') и отправятся, когда появится сеть.':'Когда появится сеть, данные обновятся автоматически.'};
+  if(_flushing||_refreshing)return{cls:'busy',pill:'Синхронизация',title:'Идёт синхронизация',text:_syncStage||'Сверяю данные с облаком…'};
+  if(_syncError)return{cls:'off',pill:'Ошибка',title:'Не удалось синхронизировать',
+    text:(_lastSyncErr?'Причина: '+_lastSyncErr+'. ':'')+(pend.length?'Неотправленные изменения сохранены на устройстве, повторю автоматически.':'Повторю автоматически.')};
+  if(pend.length)return{cls:'warn',pill:'В очереди · '+pend.length,title:'Есть неотправленные изменения',text:'Отправляю: '+syncKeysText(pend)+'.'};
+  if(!_lastSyncOk)return{cls:'warn',pill:'Подключение',title:'Подключаюсь к облаку',text:'Первая синхронизация после запуска.'};
+  return{cls:'ok',pill:Date.now()-_lastSyncOk<60000?'Готово':_agoText(_lastSyncOk),title:'Всё синхронизировано',
+    text:'Последняя синхронизация '+_agoText(_lastSyncOk)+'. Изменения с других устройств '+(_rtStatus==='on'?'приходят сразу.':'проверяются каждые 15 секунд.')};
 }
 // Update every sync pill on the page (one per page header / synbar).
 function renderSyncStatus(){
-  const pills=document.querySelectorAll('.sync-pill');
-  if(!pills.length)return;
-  let cls='',txt='';
-  if(DEMO_MODE){cls='ok';txt='Демо';}
-  else if(!currentUser){cls='warn';txt='вход';}
-  else if(e2eeOn&&e2eeLocked){cls='off';txt='🔒';}
-  else if(navigator.onLine===false){const n=pendingGet().length;cls='off';txt=n?('⚡'+n):'⚡';}
-  else if(_flushing||_refreshing){cls='busy';txt='⟳';}
-  else{
-    const pend=pendingGet().length;
-    if(pend>0){cls='warn';txt='↑'+pend;}
-    else if(_syncError){cls='off';txt='!';}        // last read/write actually failed
-    else if(!_lastRefresh){cls='warn';txt='…';}    // not synced yet this session
-    else{cls='ok';txt=_agoMini(_lastRefresh);}
-  }
-  pills.forEach(p=>{
-    p.classList.remove('ok','busy','warn','off');if(cls)p.classList.add(cls);
-    const t=p.querySelector('.sp-txt');if(t)t.textContent=txt;
+  const st=syncState();
+  document.querySelectorAll('.sync-pill').forEach(p=>{
+    p.classList.remove('ok','busy','warn','off');p.classList.add(st.cls);
+    p.setAttribute('role','button');p.setAttribute('tabindex','0');p.setAttribute('aria-label','Синхронизация: '+st.title);
+    const t=p.querySelector('.sp-txt');if(t&&t.textContent!==st.pill)t.textContent=st.pill;
   });
+  const ov=document.getElementById('syncLogOverlay');
+  if(ov&&ov.style.display==='flex')renderSyncLogPopup();
 }
 function manualSync(){
   haptic('light');
   if(!currentUser){toast('Войдите в аккаунт для синхронизации');return;}
   if(e2eeOn&&e2eeLocked){e2eeUnlockFlow();return;}
-  if(navigator.onLine===false){syncLog('net','офлайн — изменения уйдут позже');renderSyncStatus();return;}
-  syncLog('act','ручная синхронизация');
+  if(navigator.onLine===false){syncLog('net','Нет интернета — изменения отправятся позже');renderSyncStatus();return;}
+  syncLog('act','Синхронизация запущена вручную');
+  _flushBackoff=1000;
+  if(!realtimeHealthy()){_rtBackoff=3000;startRealtimeSync();}
   refreshFromCloud(true);
 }
+// Re-queue every local record and push it again: a recovery tool for when
+// another device is missing data that this one has.
+function resendAllData(){
+  if(!currentUser){toast('Войдите в аккаунт');return;}
+  if(!confirm('Отправить все данные с этого устройства в облако заново?\nЭто поможет, если на другом устройстве чего-то не хватает. Данные других устройств не удаляются.'))return;
+  let n=0;
+  for(let i=0;i<localStorage.length;i++){
+    const k=localStorage.key(i);
+    if(k&&/^salary_\d+_\d+_\d+$/.test(k)){
+      const pk=k.replace('salary_',''),p=periodPayload(pk);
+      if(p){p._ts=Date.now();try{localStorage.setItem(k,JSON.stringify(p));}catch(_){}pendingAdd(pk);n++;}
+    }
+  }
+  try{localStorage.setItem(SETTINGS_TS_KEY,String(Date.now()));}catch(_){}
+  pendingAdd('settings');
+  syncLog('act','Повторная отправка всех данных: '+n+' '+_periodWord(n)+' и настройки');
+  _flushBackoff=1000;refreshFromCloud(true);
+}
+function copySyncReport(){
+  const st=syncState(),pend=pendingGet();
+  const lines=['Синхронизация: '+st.title,st.text,
+    'Последняя успешная: '+(_lastSyncOk?new Date(_lastSyncOk).toLocaleString('ru-RU'):'не было'),
+    'В очереди: '+(pend.length?syncKeysText(pend):'нет'),
+    'Мгновенные обновления: '+(_rtStatus==='on'?'подключены':'недоступны'),
+    'Интернет: '+(navigator.onLine===false?'нет':'есть'),
+    'Устройство: '+CLIENT_ID,'',
+    ..._syncLog.slice().reverse().map(e=>_fmtLogTime(e.t)+' '+e.msg)];
+  const txt=lines.join('\n');
+  if(navigator.clipboard)navigator.clipboard.writeText(txt).then(()=>toast('Отчёт скопирован'),()=>toast('Не удалось скопировать'));
+}
 
-// ── Sync log (shown in the pill popup) ──
+// ── Sync log (shown in the sync window) ──
 const _syncLog=[];
 function syncLog(kind,msg){
-  _syncLog.push({t:Date.now(),kind:kind||'',msg:msg});
-  if(_syncLog.length>40)_syncLog.shift();
+  const last=_syncLog[_syncLog.length-1];
+  // Collapse identical consecutive entries (e.g. repeated retries).
+  if(last&&last.msg===msg&&last.kind===(kind||'')){last.t=Date.now();last.n=(last.n||1)+1;}
+  else _syncLog.push({t:Date.now(),kind:kind||'',msg:msg});
+  if(_syncLog.length>60)_syncLog.shift();
   const ov=document.getElementById('syncLogOverlay');
   if(ov&&ov.style.display==='flex')renderSyncLogPopup();
 }
-function _syncStatusText(){
-  if(!currentUser)return 'не вошёл';
-  if(e2eeOn&&e2eeLocked)return 'заблокировано (E2EE)';
-  if(navigator.onLine===false)return 'офлайн';
-  if(_flushing||_refreshing)return 'синхронизация…';
-  const pend=pendingGet().length;
-  if(pend>0)return 'в очереди: '+pend;
-  if(_syncError)return 'нет связи с облаком';
-  return _lastRefresh?('обновлено '+_agoMini(_lastRefresh)):'ещё не синхронизировано';
-}
+function _syncStatusText(){return syncState().title;}
 function _fmtLogTime(t){const d=new Date(t),p=n=>String(n).padStart(2,'0');return p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());}
-function openSyncLog(){haptic('light');const ov=document.getElementById('syncLogOverlay');if(!ov)return;ov.style.display='flex';renderSyncLogPopup();}
+function openSyncLog(){
+  haptic('light');const ov=document.getElementById('syncLogOverlay');if(!ov)return;
+  ov.style.display='flex';renderSyncLogPopup();
+  // Opening the window is a good moment to check the cloud.
+  if(currentUser&&!DEMO_MODE&&!_refreshing&&!_flushing&&navigator.onLine!==false)refreshFromCloud();
+  setTimeout(()=>document.getElementById('syncNowBtn')?.focus(),50);
+}
+document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.classList&&e.target.classList.contains('sync-pill')){e.preventDefault();e.target.click();}});
 function closeSyncLog(){const ov=document.getElementById('syncLogOverlay');if(ov)ov.style.display='none';}
+const SYNC_KIND={up:'Отправка',down:'Получение',err:'Ошибка',net:'Связь',act:'Действие'};
 function renderSyncLogPopup(){
-  const st=document.getElementById('syncLogStatus'),list=document.getElementById('syncLogList');
-  if(st)st.textContent=_syncStatusText();
-  if(!list)return;
-  if(!_syncLog.length){list.innerHTML='<div class="synclog-empty">Событий пока нет</div>';return;}
-  list.innerHTML=_syncLog.slice().reverse().map(e=>
-    '<div class="synclog-row '+e.kind+'"><span class="sl-time">'+_fmtLogTime(e.t)+'</span><span class="sl-msg">'+esc(e.msg)+'</span></div>'
-  ).join('');
+  const card=document.getElementById('syncLogCard');if(!card)return;
+  const st=syncState(),pend=pendingGet(),busy=_flushing||_refreshing;
+  const online=navigator.onLine!==false;
+  const facts=[
+    ['Последняя синхронизация',_lastSyncOk?_agoText(_lastSyncOk):'ещё не было',_lastSyncOk?new Date(_lastSyncOk).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}):''],
+    ['Ожидают отправки',pend.length?String(pend.length):'Нет',pend.length?syncKeysText(pend):'всё отправлено'],
+    ['Мгновенные обновления',_rtStatus==='on'?'Подключены':_rtStatus==='connecting'?'Подключаются':'Резервный режим',_rtStatus==='on'?'изменения приходят сразу':'проверка облака каждые 15 с'],
+    ['Интернет',online?'Есть':'Нет',online?'':'данные хранятся на устройстве']
+  ];
+  const log=_syncLog.slice().reverse();
+  card.innerHTML=`
+    <div class="synclog-head"><h2 class="synclog-title" id="syncLogTitle">Синхронизация</h2>
+      <button type="button" class="synclog-close" onclick="closeSyncLog()">Закрыть</button></div>
+    <div class="synclog-state ${st.cls}" role="status" aria-live="polite">
+      <div class="synclog-state-title">${esc(st.title)}</div>
+      <div class="synclog-state-text">${esc(st.text)}</div>
+      ${busy?'<div class="synclog-progress" aria-hidden="true"><span></span></div>':''}
+    </div>
+    <div class="synclog-facts">${facts.map(f=>`<div class="synclog-fact"><span>${f[0]}</span><b>${esc(f[1])}</b>${f[2]?`<small>${esc(f[2])}</small>`:''}</div>`).join('')}</div>
+    <div class="synclog-actions">
+      <button type="button" class="synclog-primary" id="syncNowBtn" onclick="manualSync()" ${busy||!currentUser||DEMO_MODE?'disabled':''}>${busy?'Синхронизация…':'Синхронизировать сейчас'}</button>
+      <div class="synclog-secondary">
+        <button type="button" onclick="resendAllData()" ${!currentUser||DEMO_MODE?'disabled':''}>Отправить всё заново</button>
+        <button type="button" onclick="copySyncReport()">Скопировать отчёт</button>
+      </div>
+    </div>
+    <div class="synclog-log-head">Журнал</div>
+    <div class="synclog-list">${log.length?log.map(e=>`<div class="synclog-row ${e.kind}"><span class="sl-time">${_fmtLogTime(e.t)}</span><span class="sl-kind">${SYNC_KIND[e.kind]||'Событие'}</span><span class="sl-msg">${esc(e.msg)}${e.n>1?' <em>×'+e.n+'</em>':''}</span></div>`).join(''):'<div class="synclog-empty">Событий пока нет</div>'}</div>`;
 }
 
 // ══════════════════════════════════════════════
